@@ -34,7 +34,7 @@ Three generated files change: `core/internal/contracts/contracts.go`,
 make dev
 ```
 
-Open http://localhost:5173: "Core 0.1.0 is running." Then stop the database and reload:
+Open http://localhost:5173: "Core dev is running." (local builds report version `dev`). Then stop the database and reload:
 
 ```bash
 docker compose -f deploy/docker-compose.yml stop postgres
@@ -63,7 +63,9 @@ corner. Phase 2's acceptance test is to bring that under 10%.
 ## Verified and not verified
 
 - Verified on Windows 11: `make gen`, `make test`, `make lint`, the migration up/down test
-  against PostgreSQL 16, and the three processes running natively with the dashboard reaching
-  core through its proxy.
-- **Not verified:** `make dev` and the Dockerfiles (the development machine has no Docker yet),
-  and anything in Assetto Corsa. No agent code from this repository has run in the game.
+  against PostgreSQL 16 and 17, and the three processes running natively.
+- Verified in Docker Desktop (WSL 2): `make dev` builds the three images and starts the stack;
+  the dashboard shows core as running, as degraded with PostgreSQL stopped, and as not
+  reachable with core stopped; `make down` stops it. Ports are bound to 127.0.0.1 only.
+- **Not verified:** anything in Assetto Corsa. No agent code from this repository has run in
+  the game.

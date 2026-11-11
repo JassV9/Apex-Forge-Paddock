@@ -20,4 +20,5 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
   TypeScript, dependency audits, secret scan), pre-commit.
 - Docs: architecture, v0 audit, ADRs 0001 to 0006, onboarding, local-dev runbook, demo script.
 
-Not verified: `make dev` and the Docker images; anything in Assetto Corsa.
+`make dev` and the Docker images were verified on Docker Desktop after the first commit.
+Not verified: anything in Assetto Corsa.

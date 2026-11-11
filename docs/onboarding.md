@@ -50,7 +50,7 @@ make dev     # PostgreSQL + core + engine + web in Docker; open http://localhost
 make down
 ```
 
-The page says "Core 0.1.0 is running." when the dashboard reaches core and core reaches its
+The page says "Core dev is running." (local builds report version `dev`) when the dashboard reaches core and core reaches its
 database. To run the processes natively instead (no Docker except for PostgreSQL), see the
 runbook.
 

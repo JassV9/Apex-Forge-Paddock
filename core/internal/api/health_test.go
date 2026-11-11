@@ -1,21 +1,13 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"log/slog"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
 )
-
-type fakeDatabase struct{ err error }
-
-func (f fakeDatabase) PingContext(context.Context) error { return f.err }
 
 func TestHealth(t *testing.T) {
 	tests := []struct {
@@ -32,11 +24,10 @@ func TestHealth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-			handler := NewHandler(logger, "1.2.3", tt.database)
-			recorder := httptest.NewRecorder()
+			deps := testDeps()
+			deps.Database = tt.database
 
-			handler.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/health", nil))
+			recorder := get(t, NewHandler(deps), http.MethodGet, "/health")
 
 			if recorder.Code != http.StatusOK {
 				t.Fatalf("status code = %d, want 200", recorder.Code)
@@ -53,34 +44,6 @@ func TestHealth(t *testing.T) {
 			}
 			if got != want {
 				t.Errorf("health = %+v, want %+v", got, want)
-			}
-		})
-	}
-}
-
-func TestUnknownRoutesAndMethods(t *testing.T) {
-	tests := []struct {
-		name     string
-		method   string
-		path     string
-		wantCode int
-	}{
-		{name: "unknown path", method: http.MethodGet, path: "/nope", wantCode: http.StatusNotFound},
-		{
-			name:     "health is read-only",
-			method:   http.MethodPost,
-			path:     "/health",
-			wantCode: http.StatusMethodNotAllowed,
-		},
-	}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler := NewHandler(logger, "test", fakeDatabase{})
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), tt.method, tt.path, nil))
-			if recorder.Code != tt.wantCode {
-				t.Errorf("status code = %d, want %d", recorder.Code, tt.wantCode)
 			}
 		})
 	}

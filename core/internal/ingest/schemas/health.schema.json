@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "health.schema.json",
+  "title": "Health",
+  "description": "Liveness reply of a Paddock process (GET /health on core and on the engine).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["service", "version", "status"],
+  "properties": {
+    "service": {
+      "description": "Which process answered.",
+      "type": "string",
+      "enum": ["core", "engine"]
+    },
+    "version": {
+      "description": "Build version of that process.",
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "description": "ok: ready to serve. degraded: running, but a dependency is unavailable.",
+      "type": "string",
+      "enum": ["ok", "degraded"]
+    }
+  }
+}

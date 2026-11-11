@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Apex Forge Paddock core API
-  version: 0.1.0
+  version: 0.2.0
   description: >
     REST API of the core process, used by the web dashboard. This file is written first; the
     TypeScript client types in web/src/api/schema.d.ts are generated from it (`make gen`).
@@ -22,7 +22,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /sessions:
+    get:
+      operationId: listSessions
+      summary: Recorded sessions, newest first.
+      responses:
+        "200":
+          description: Every session core has ingested, with how much was recorded in it.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionSummary"
 components:
   schemas:
     Health:
       $ref: "../../contracts/health.schema.json"
+    SessionSummary:
+      $ref: "../../contracts/session_summary.schema.json"

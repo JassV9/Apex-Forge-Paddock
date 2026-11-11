@@ -12,10 +12,10 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: phase 0 of 7 complete.** The repository skeleton, contracts, CI and the reused
-> capture layer are in place and tested. The measurement and experiment engine is designed
-> ([docs/design.md](docs/design.md)) and is being built phase by phase. The
-> [roadmap](#roadmap) below says exactly what exists today.
+> **Status: phases 0 and 1 of 7 complete.** Capture and ingest work end to end and are tested;
+> the measurement and experiment engine is designed ([docs/design.md](docs/design.md)) and is
+> being built phase by phase. The [roadmap](#roadmap) below says exactly what exists today.
+> Nothing has been run inside Assetto Corsa yet.
 
 ## The finding that started this
 
@@ -114,8 +114,8 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | Phase | Scope | State |
 | --- | --- | --- |
 | 0 | Skeleton: layout, contracts + codegen, CI, Compose, ADRs, reused v0 capture code under test | **Done** |
-| 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | Next |
-| 2 | Measurement: features, noise model, mixed model, minimum detectable effect. Target: false-verdict rate from 39% to under 10% | Planned |
+| 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (offline; unverified in game) |
+| 2 | Measurement: features, noise model, mixed model, minimum detectable effect. Target: false-verdict rate from 39% to under 10% | Next |
 | 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | Planned |
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | Planned |
 | 5 | Sensitivity profile and experiment ranking | Planned |
@@ -125,12 +125,22 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 Each phase has written acceptance criteria ([docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md),
 section 5) and ends with a demo script in [docs/demos/](docs/demos/).
 
-**In the repository today:** a Go service with health endpoint, configuration, PostgreSQL
-migrations and tests; a typed Python service with the same contract; a React page that reports
-core's status through a generated client; the v0 Lua modules worth keeping, running under
-LuaJIT in CI against real exports from my cars; and the pipeline that keeps all four languages
-agreeing on shared types. Nothing in this repository has been run inside Assetto Corsa yet,
-and the docs say so wherever it matters.
+**In the repository today:**
+
+- An in-game agent (Lua) that records every corner pass with its conditions: fuel, tyre
+  temperatures, pressures, wear, track grip, and 24 raw channels at 60 Hz. It costs about
+  0.002 ms per frame in the mocked benchmark and drops any pass interrupted by a restart,
+  teleport, pit visit or replay.
+- A Go service that tails the agent's spool, validates every line against a JSON Schema,
+  writes raw samples to Parquet and passes to PostgreSQL idempotently, and exposes
+  Prometheus metrics.
+- The session that started this project, replayable by anyone: `make demo` ingests the real
+  FA26 COTA log (136 passes, 17 corners) and lists it in the dashboard.
+- One contract for all of it: the same schema files generate the Go, Python and TypeScript
+  types and validate what the Lua agent writes. CI fails on drift.
+
+Nothing in this repository has been run inside Assetto Corsa yet, and the docs say so wherever
+it matters ([first-run checklist](docs/runbooks/agent-in-game.md)).
 
 ## Run it
 
@@ -142,7 +152,8 @@ make setup   # install dependencies for every module
 make test    # Lua (under LuaJIT), Go, Python, TypeScript
 make lint    # golangci-lint, ruff, mypy --strict, eslint, prettier
 make gen     # regenerate Go, Python and TypeScript types from contracts/
-make dev     # PostgreSQL + core + engine + web in Docker, http://localhost:5173
+make demo    # full stack in Docker on a recorded session, http://localhost:5173
+make dev     # the same stack, ingesting what the in-game agent writes
 ```
 
 ## Repository tour
@@ -150,10 +161,11 @@ make dev     # PostgreSQL + core + engine + web in Docker, http://localhost:5173
 | Path | Contents |
 | --- | --- |
 | [`contracts/`](contracts/) | JSON Schema for every type that crosses a process boundary |
-| [`core/`](core/) | Go monolith: API, store and migrations today; ingest, setups, experiments next |
+| [`core/`](core/) | Go monolith: ingest, API, store and migrations today; setups and experiments next |
 | [`engine/`](engine/) | Python analysis engine |
 | [`web/`](web/) | React dashboard |
 | [`agent/`](agent/) | CSP Lua agent, mock CSP API, and offline tests on real fixtures |
+| [`datasets/demo/`](datasets/demo/) | The real v0 session as a replayable spool |
 | [`docs/`](docs/) | [Architecture](docs/architecture.md), [design](docs/design.md), [v0 audit](docs/audit-v0.md), [ADRs](docs/adr/), [API](docs/api/openapi.yaml), [onboarding](docs/onboarding.md) |
 | [`tools/`](tools/) | Scripts, including the verdict-noise simulation above |
 

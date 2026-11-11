@@ -1,0 +1,480 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spool_pass.schema.json",
+  "title": "SpoolPass",
+  "description": "One pass through one corner zone: when, under which conditions, and the raw samples. Written by the agent, read by core's ingest. The agent records facts only; it never judges a pass.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "v",
+    "session_id",
+    "seq",
+    "corner",
+    "t_start_ms",
+    "duration_s"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "pass"
+      ]
+    },
+    "v": {
+      "description": "Format version of this line.",
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "seq": {
+      "description": "Order of the pass within its session, from 1.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "corner": {
+      "description": "Corner number from the session line's corner map.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "t_start_ms": {
+      "description": "Wall clock when the car entered the zone, Unix milliseconds.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "duration_s": {
+      "description": "Time from zone start to zone end.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "lap_in_session": {
+      "description": "Completed laps when the pass ended.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "setup_hash": {
+      "description": "Hash of the setup values the car ran; the same values always give the same hash.",
+      "type": "string",
+      "minLength": 1
+    },
+    "conditions": {
+      "title": "PassConditions",
+      "description": "State of the car and track when the pass ended. FL, FR, RL, RR order.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fuel_l",
+        "tyre_core_c",
+        "tyre_surface_c",
+        "tyre_press_psi",
+        "tyre_wear",
+        "grip",
+        "air_c",
+        "road_c"
+      ],
+      "properties": {
+        "fuel_l": {
+          "description": "Fuel on board, litres.",
+          "type": "number",
+          "minimum": 0
+        },
+        "tyre_core_c": {
+          "description": "Tyre core temperature, degrees C.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "tyre_surface_c": {
+          "description": "Tyre surface temperature (middle of the tread), degrees C.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "tyre_press_psi": {
+          "description": "Hot tyre pressure, psi.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "tyre_wear": {
+          "description": "Tyre wear as the game reports it.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "grip": {
+          "description": "Track grip, 0..1.",
+          "type": "number",
+          "minimum": 0
+        },
+        "air_c": {
+          "description": "Air temperature, degrees C.",
+          "type": "number"
+        },
+        "road_c": {
+          "description": "Road temperature, degrees C.",
+          "type": "number"
+        }
+      }
+    },
+    "samples": {
+      "title": "PassSamples",
+      "description": "Raw channels at up to 60 Hz as column arrays of equal length n.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "n",
+        "columns"
+      ],
+      "properties": {
+        "n": {
+          "description": "Number of samples in every column.",
+          "type": "integer",
+          "minimum": 2
+        },
+        "columns": {
+          "title": "SampleColumns",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "t",
+            "d",
+            "v",
+            "gas",
+            "brake",
+            "steer",
+            "lat_g",
+            "lon_g",
+            "yaw",
+            "sa_fl",
+            "sa_fr",
+            "sa_rl",
+            "sa_rr",
+            "sr_fl",
+            "sr_fr",
+            "sr_rl",
+            "sr_rr",
+            "load_fl",
+            "load_fr",
+            "load_rl",
+            "load_rr",
+            "out",
+            "rh_f",
+            "rh_r"
+          ],
+          "properties": {
+            "t": {
+              "description": "Seconds since the pass started.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "d": {
+              "description": "Metres from the start line.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "v": {
+              "description": "Speed, m/s.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "gas": {
+              "description": "Throttle pedal, 0..1.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "brake": {
+              "description": "Brake pedal, 0..1.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "steer": {
+              "description": "Steering wheel angle, degrees.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "lat_g": {
+              "description": "Lateral acceleration, g.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "lon_g": {
+              "description": "Longitudinal acceleration, g.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "yaw": {
+              "description": "Yaw rate, rad/s.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sa_fl": {
+              "description": "Slip angle FL, degrees.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sa_fr": {
+              "description": "Slip angle FR, degrees.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sa_rl": {
+              "description": "Slip angle RL, degrees.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sa_rr": {
+              "description": "Slip angle RR, degrees.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sr_fl": {
+              "description": "Slip ratio FL.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sr_fr": {
+              "description": "Slip ratio FR.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sr_rl": {
+              "description": "Slip ratio RL.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "sr_rr": {
+              "description": "Slip ratio RR.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "load_fl": {
+              "description": "Tyre load FL, N.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "load_fr": {
+              "description": "Tyre load FR, N.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "load_rl": {
+              "description": "Tyre load RL, N.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "load_rr": {
+              "description": "Tyre load RR, N.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "out": {
+              "description": "Wheels outside the track, 0..4.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "rh_f": {
+              "description": "Front ride height, m.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "rh_r": {
+              "description": "Rear ride height, m.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "legacy": {
+      "title": "LegacySummary",
+      "description": "Only in data imported from Apex Forge v0, which stored per-phase averages instead of raw samples.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "v_min_kmh",
+        "off_track",
+        "phases"
+      ],
+      "properties": {
+        "source": {
+          "description": "Program and version that computed the summary.",
+          "type": "string",
+          "minLength": 1
+        },
+        "v_min_kmh": {
+          "description": "Minimum speed in the corner.",
+          "type": "number",
+          "minimum": 0
+        },
+        "off_track": {
+          "description": "True when three or more wheels left the track during the pass.",
+          "type": "boolean"
+        },
+        "phases": {
+          "title": "LegacyPhases",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "brake": {
+              "$ref": "#/definitions/LegacyPhase"
+            },
+            "entry": {
+              "$ref": "#/definitions/LegacyPhase"
+            },
+            "mid": {
+              "$ref": "#/definitions/LegacyPhase"
+            },
+            "exit": {
+              "$ref": "#/definitions/LegacyPhase"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "LegacyPhase": {
+      "title": "LegacyPhase",
+      "description": "Per-phase averages computed by Apex Forge v0 for one pass.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence",
+        "duration_s",
+        "coverage",
+        "front_slip_deg",
+        "rear_slip_deg",
+        "front_slip_max_deg",
+        "rear_slip_max_deg",
+        "lat_g",
+        "yaw_rate",
+        "steer_rate",
+        "gas",
+        "brake"
+      ],
+      "properties": {
+        "confidence": {
+          "description": "v0's trust in this phase reading, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "duration_s": {
+          "description": "Length of the phase.",
+          "type": "number",
+          "minimum": 0
+        },
+        "coverage": {
+          "description": "Share of the phase spent really cornering, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "front_slip_deg": {
+          "description": "Load-weighted front axle slip angle.",
+          "type": "number"
+        },
+        "rear_slip_deg": {
+          "description": "Load-weighted rear axle slip angle.",
+          "type": "number"
+        },
+        "front_slip_max_deg": {
+          "description": "Worst single front tyre.",
+          "type": "number"
+        },
+        "rear_slip_max_deg": {
+          "description": "Worst single rear tyre.",
+          "type": "number"
+        },
+        "lat_g": {
+          "description": "Mean lateral acceleration, g (absolute).",
+          "type": "number"
+        },
+        "yaw_rate": {
+          "description": "Mean yaw rate, rad/s (absolute).",
+          "type": "number"
+        },
+        "steer_rate": {
+          "description": "Steering rate as a share of peak angle per second.",
+          "type": "number"
+        },
+        "gas": {
+          "description": "Mean throttle, 0..1.",
+          "type": "number"
+        },
+        "brake": {
+          "description": "Mean brake, 0..1.",
+          "type": "number"
+        }
+      }
+    }
+  }
+}

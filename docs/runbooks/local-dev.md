@@ -11,9 +11,12 @@ docker compose -f deploy/docker-compose.yml up -d postgres
 or use any local PostgreSQL 16+. Then, in three terminals:
 
 ```bash
-# 1. core (PowerShell: $env:PADDOCK_DATABASE_URL = "...")
+# 1. core (PowerShell: $env:PADDOCK_DATABASE_URL = "..." and so on)
 cd core
-PADDOCK_DATABASE_URL="postgres://paddock:paddock@localhost:5432/paddock?sslmode=disable" go run ./cmd/paddock
+export PADDOCK_DATABASE_URL="postgres://paddock:paddock@localhost:5432/paddock?sslmode=disable"
+export PADDOCK_SPOOL_DIR="$HOME/Documents/Assetto Corsa/paddock/spool"   # optional: ingest
+export PADDOCK_DATA_DIR="../data"                                          # Parquet files
+go run ./cmd/paddock
 
 # 2. engine
 cd engine
@@ -30,24 +33,29 @@ Check:
 curl http://localhost:8080/health      # {"service":"core","status":"ok","version":"dev"}
 curl http://localhost:8000/health      # {"service":"engine","version":"0.1.0","status":"ok"}
 curl http://localhost:5173/api/health  # core's answer, through the dashboard's proxy
+curl http://localhost:8080/sessions    # recorded sessions
+curl http://localhost:8080/metrics     # Prometheus metrics (paddock_ingest_*)
 ```
+
+To ingest the demo dataset natively, point `PADDOCK_SPOOL_DIR` at `datasets/demo/spool`.
 
 ## Run core's database tests
 
-They need an empty database and are skipped when the variable is unset.
+They are skipped when the variable is unset. Each test package works in its own schema, which
+it creates and drops; the migration test in `internal/store` uses `public` and needs it empty.
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d postgres
 docker compose -f deploy/docker-compose.yml exec postgres createdb -U paddock paddock_test
 cd core
-PADDOCK_TEST_DATABASE_URL="postgres://paddock:paddock@localhost:5432/paddock_test?sslmode=disable" go test -count=1 ./internal/store/
+PADDOCK_TEST_DATABASE_URL="postgres://paddock:paddock@localhost:5432/paddock_test?sslmode=disable" go test -count=1 ./...
 ```
 
 Without Docker, the `pgserver` Python package bundles PostgreSQL binaries and starts a
-throwaway server (this is how the phase 0 migration test was run on Windows):
+throwaway server:
 
 ```bash
-uv run --no-project --with pgserver python -c "import pgserver, tempfile, subprocess, os; s = pgserver.get_server(tempfile.mkdtemp()); subprocess.run(['go', 'test', '-count=1', './internal/store/'], cwd='core', env=dict(os.environ, PADDOCK_TEST_DATABASE_URL=s.get_uri())); s.cleanup()"
+uv run --no-project --with pgserver python -c "import pgserver, tempfile, subprocess, os; s = pgserver.get_server(tempfile.mkdtemp()); subprocess.run(['go', 'test', '-count=1', './...'], cwd='core', env=dict(os.environ, PADDOCK_TEST_DATABASE_URL=s.get_uri())); s.cleanup()"
 ```
 
 ## Common problems
@@ -59,6 +67,8 @@ uv run --no-project --with pgserver python -c "import pgserver, tempfile, subpro
 | core exits with `PADDOCK_DATABASE_URL: required environment variable is not set` | The variable is unset | Set it (see above) |
 | core exits with `ping database: ...` | PostgreSQL is not up yet or the URL is wrong | Start the database; core fails fast by design and Compose waits for the health check |
 | Dashboard says "Core is not reachable" | core is not on port 8080, or `PADDOCK_CORE_URL` points elsewhere | Start core; check the variable |
+| Core logs `spool line rejected` | A line in the spool breaks the contract | The log has the session, file, line number and the rule; `paddock_ingest_rejects_total{reason}` counts them |
+| A session never appears | `PADDOCK_SPOOL_DIR` (native) or `PADDOCK_SPOOL_HOST` (Docker) points at the wrong folder, or its first file `000001.jsonl` is missing | Core logs the spool folder at start; later files without the session line are rejected as `unknown_session` |
 | `make gen-check` fails | A schema or `openapi.yaml` changed without regenerating | `make gen` and commit the result |
 | "Windows fatal exception: code 0xe24c4a02" in agent test output | LuaJIT raises Lua errors as Windows SEH exceptions and Python's faulthandler prints handled ones | Harmless; `agent/pyproject.toml` disables faulthandler for this reason. Keep `-p no:faulthandler` |
 | npm refuses to install with a TypeScript peer conflict | `openapi-typescript` 7 needs TypeScript 5 | Keep `typescript` on `^5.9` until it supports a newer major |

@@ -21,11 +21,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Recorded sessions, newest first. */
+    get: operations["listSessions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
     Health: components["schemas"]["health.schema"];
+    SessionSummary: components["schemas"]["session_summary.schema"];
     /**
      * Health
      * @description Liveness reply of a Paddock process (GET /health on core and on the engine).
@@ -43,6 +61,31 @@ export interface components {
        * @enum {string}
        */
       status: "ok" | "degraded";
+    };
+    /**
+     * SessionSummary
+     * @description One recorded session as core lists it for the dashboard.
+     */
+    "session_summary.schema": {
+      /** @description Core's id of the session. */
+      id: number;
+      /** @description The agent's session id. */
+      spool_id: string;
+      car_name: string;
+      track_name: string;
+      /** @description Track layout; empty for single-layout tracks. */
+      layout: string;
+      /** @description When the session started, RFC 3339 in UTC. */
+      started_at: string;
+      /**
+       * @description Who drove.
+       * @enum {string}
+       */
+      source: "human" | "ai" | "ghost" | "demo";
+      /** @description Corner passes recorded. */
+      passes: number;
+      /** @description Different corners with at least one pass. */
+      corners: number;
     };
   };
   responses: never;
@@ -69,6 +112,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["health.schema"];
+        };
+      };
+    };
+  };
+  listSessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Every session core has ingested, with how much was recorded in it. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["session_summary.schema"][];
         };
       };
     };

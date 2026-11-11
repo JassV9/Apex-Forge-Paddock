@@ -6,6 +6,7 @@ import (
 )
 
 func TestFromEnv(t *testing.T) {
+	const databaseURL = "postgres://localhost/paddock"
 	tests := []struct {
 		name    string
 		env     map[string]string
@@ -13,17 +14,24 @@ func TestFromEnv(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "defaults the listen address",
-			env:  map[string]string{envDatabaseURL: "postgres://localhost/paddock"},
-			want: Config{HTTPAddr: ":8080", DatabaseURL: "postgres://localhost/paddock"},
+			name: "defaults",
+			env:  map[string]string{envDatabaseURL: databaseURL},
+			want: Config{HTTPAddr: ":8080", DatabaseURL: databaseURL, DataDir: "data"},
 		},
 		{
-			name: "explicit listen address wins",
+			name: "everything set",
 			env: map[string]string{
 				envHTTPAddr:    "127.0.0.1:9000",
-				envDatabaseURL: "postgres://localhost/paddock",
+				envDatabaseURL: databaseURL,
+				envSpoolDir:    `C:\Users\me\Documents\Assetto Corsa\paddock\spool`,
+				envDataDir:     "/var/lib/paddock",
 			},
-			want: Config{HTTPAddr: "127.0.0.1:9000", DatabaseURL: "postgres://localhost/paddock"},
+			want: Config{
+				HTTPAddr:    "127.0.0.1:9000",
+				DatabaseURL: databaseURL,
+				SpoolDir:    `C:\Users\me\Documents\Assetto Corsa\paddock\spool`,
+				DataDir:     "/var/lib/paddock",
+			},
 		},
 		{
 			name:    "database URL is required",

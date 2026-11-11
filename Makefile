@@ -2,18 +2,22 @@
 # Prerequisites and a walkthrough: docs/onboarding.md
 
 COMPOSE       := docker compose -f deploy/docker-compose.yml
+COMPOSE_DEMO  := docker compose -p paddock-demo -f deploy/docker-compose.yml -f deploy/docker-compose.demo.yml
 SCHEMAS       := $(wildcard contracts/*.schema.json)
 GO_JSONSCHEMA := github.com/atombender/go-jsonschema@v0.24.1
 PY_CONTRACTS  := engine/paddock_engine/contracts
+GO_SCHEMAS    := core/internal/ingest/schemas
 RUFF          := uv run --project engine ruff
 
-.PHONY: help setup dev down test test-agent test-core test-engine test-web \
+.PHONY: help setup dev down demo demo-down test test-agent test-core test-engine test-web \
         lint lint-core lint-python lint-web gen gen-go gen-python gen-web gen-check
 
 help:
 	@echo "setup      install dependencies for every module"
 	@echo "dev        start Postgres + core + engine + web in Docker (http://localhost:5173)"
 	@echo "down       stop the dev stack"
+	@echo "demo       the same stack on the recorded sessions in datasets/demo (no game needed)"
+	@echo "demo-down  stop the demo stack and delete its data"
 	@echo "test       run every test suite"
 	@echo "lint       run every linter and type checker"
 	@echo "gen        regenerate code from contracts/ and docs/api/openapi.yaml"
@@ -30,6 +34,12 @@ dev:
 
 down:
 	$(COMPOSE) down
+
+demo:
+	$(COMPOSE_DEMO) up --build
+
+demo-down:
+	$(COMPOSE_DEMO) down --volumes
 
 test: test-agent test-core test-engine test-web
 
@@ -62,9 +72,11 @@ lint-web:
 
 gen: gen-go gen-python gen-web
 
+# Go types, plus a copy of the schemas for ingest to embed (go:embed cannot reach ../contracts).
 gen-go:
 	cd core && go run $(GO_JSONSCHEMA) -p contracts -t --tags json \
 		-o internal/contracts/contracts.go $(addprefix ../,$(SCHEMAS))
+	uv run --project engine python tools/sync_schemas.py contracts $(GO_SCHEMAS)
 
 gen-python:
 	uv run --project engine python -c "import shutil; shutil.rmtree('$(PY_CONTRACTS)', True)"
@@ -78,4 +90,4 @@ gen-web:
 	cd web && npm run gen
 
 gen-check: gen
-	git diff --exit-code -- core/internal/contracts $(PY_CONTRACTS) web/src/api/schema.d.ts
+	git diff --exit-code -- core/internal/contracts $(GO_SCHEMAS) $(PY_CONTRACTS) web/src/api/schema.d.ts

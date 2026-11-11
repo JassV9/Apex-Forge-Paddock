@@ -3,16 +3,14 @@
 -- pit stops and teleports simply drop the pass in progress. No laps involved anywhere.
 -- Pure Lua.
 
+local channels = require("core.channels")
 local corners = require("core.corners")
 
 local recorder = {}
 recorder.__index = recorder
 
 -- sample fields copied into column buffers
-recorder.FIELDS = {
-  "t", "d", "v", "gas", "brake", "steer", "latG", "lonG", "yaw",
-  "aF", "aR", "ndF", "ndR", "srF", "srR", "out", "rhF", "rhR", "aFmax", "aRmax",
-}
+recorder.FIELDS = channels.names
 
 local MAX_SAMPLES = 2400   -- 40 s at 60 Hz, far more than any corner zone
 local MIN_DT = 0.9 / 60    -- record at most ~60 samples per second (0.9: frame-time jitter)

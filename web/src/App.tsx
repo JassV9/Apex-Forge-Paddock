@@ -1,4 +1,5 @@
 import { CoreStatus } from "./components/CoreStatus";
+import { SessionList } from "./components/SessionList";
 
 export function App() {
   return (
@@ -6,6 +7,8 @@ export function App() {
       <h1>Apex Forge: Paddock</h1>
       <p>Every setup change is an experiment. Pages arrive with the phases that feed them.</p>
       <CoreStatus />
+      <h2>Sessions</h2>
+      <SessionList />
     </main>
   );
 }

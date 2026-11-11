@@ -5,6 +5,7 @@ package contracts
 import "encoding/json"
 import "fmt"
 import "reflect"
+import "regexp"
 import "unicode/utf8"
 
 // Liveness reply of a Paddock process (GET /health on core and on the engine).
@@ -103,5 +104,1112 @@ func (j *Health) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s length: must be >= %d", "version", 1)
 	}
 	*j = Health(plain)
+	return nil
+}
+
+// Per-phase averages computed by Apex Forge v0 for one pass.
+type LegacyPhase struct {
+	// Mean brake, 0..1.
+	Brake float64 `json:"brake"`
+
+	// v0's trust in this phase reading, 0..1.
+	Confidence float64 `json:"confidence"`
+
+	// Share of the phase spent really cornering, 0..1.
+	Coverage float64 `json:"coverage"`
+
+	// Length of the phase.
+	DurationS float64 `json:"duration_s"`
+
+	// Load-weighted front axle slip angle.
+	FrontSlipDeg float64 `json:"front_slip_deg"`
+
+	// Worst single front tyre.
+	FrontSlipMaxDeg float64 `json:"front_slip_max_deg"`
+
+	// Mean throttle, 0..1.
+	Gas float64 `json:"gas"`
+
+	// Mean lateral acceleration, g (absolute).
+	LatG float64 `json:"lat_g"`
+
+	// Load-weighted rear axle slip angle.
+	RearSlipDeg float64 `json:"rear_slip_deg"`
+
+	// Worst single rear tyre.
+	RearSlipMaxDeg float64 `json:"rear_slip_max_deg"`
+
+	// Steering rate as a share of peak angle per second.
+	SteerRate float64 `json:"steer_rate"`
+
+	// Mean yaw rate, rad/s (absolute).
+	YawRate float64 `json:"yaw_rate"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LegacyPhase) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["brake"]; raw != nil && !ok {
+		return fmt.Errorf("field brake in LegacyPhase: required")
+	}
+	if _, ok := raw["confidence"]; raw != nil && !ok {
+		return fmt.Errorf("field confidence in LegacyPhase: required")
+	}
+	if _, ok := raw["coverage"]; raw != nil && !ok {
+		return fmt.Errorf("field coverage in LegacyPhase: required")
+	}
+	if _, ok := raw["duration_s"]; raw != nil && !ok {
+		return fmt.Errorf("field duration_s in LegacyPhase: required")
+	}
+	if _, ok := raw["front_slip_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field front_slip_deg in LegacyPhase: required")
+	}
+	if _, ok := raw["front_slip_max_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field front_slip_max_deg in LegacyPhase: required")
+	}
+	if _, ok := raw["gas"]; raw != nil && !ok {
+		return fmt.Errorf("field gas in LegacyPhase: required")
+	}
+	if _, ok := raw["lat_g"]; raw != nil && !ok {
+		return fmt.Errorf("field lat_g in LegacyPhase: required")
+	}
+	if _, ok := raw["rear_slip_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field rear_slip_deg in LegacyPhase: required")
+	}
+	if _, ok := raw["rear_slip_max_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field rear_slip_max_deg in LegacyPhase: required")
+	}
+	if _, ok := raw["steer_rate"]; raw != nil && !ok {
+		return fmt.Errorf("field steer_rate in LegacyPhase: required")
+	}
+	if _, ok := raw["yaw_rate"]; raw != nil && !ok {
+		return fmt.Errorf("field yaw_rate in LegacyPhase: required")
+	}
+	type Plain LegacyPhase
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 < plain.Confidence {
+		return fmt.Errorf("field %s: must be <= %v", "confidence", 1)
+	}
+	if 0 > plain.Confidence {
+		return fmt.Errorf("field %s: must be >= %v", "confidence", 0)
+	}
+	if 1 < plain.Coverage {
+		return fmt.Errorf("field %s: must be <= %v", "coverage", 1)
+	}
+	if 0 > plain.Coverage {
+		return fmt.Errorf("field %s: must be >= %v", "coverage", 0)
+	}
+	if 0 > plain.DurationS {
+		return fmt.Errorf("field %s: must be >= %v", "duration_s", 0)
+	}
+	*j = LegacyPhase(plain)
+	return nil
+}
+
+type LegacyPhases struct {
+	// Brake corresponds to the JSON schema field "brake".
+	Brake *LegacyPhase `json:"brake,omitempty,omitzero"`
+
+	// Entry corresponds to the JSON schema field "entry".
+	Entry *LegacyPhase `json:"entry,omitempty,omitzero"`
+
+	// Exit corresponds to the JSON schema field "exit".
+	Exit *LegacyPhase `json:"exit,omitempty,omitzero"`
+
+	// Mid corresponds to the JSON schema field "mid".
+	Mid *LegacyPhase `json:"mid,omitempty,omitzero"`
+}
+
+// Only in data imported from Apex Forge v0, which stored per-phase averages
+// instead of raw samples.
+type LegacySummary struct {
+	// True when three or more wheels left the track during the pass.
+	OffTrack bool `json:"off_track"`
+
+	// Phases corresponds to the JSON schema field "phases".
+	Phases LegacyPhases `json:"phases"`
+
+	// Program and version that computed the summary.
+	Source string `json:"source"`
+
+	// Minimum speed in the corner.
+	VMinKmh float64 `json:"v_min_kmh"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LegacySummary) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["off_track"]; raw != nil && !ok {
+		return fmt.Errorf("field off_track in LegacySummary: required")
+	}
+	if _, ok := raw["phases"]; raw != nil && !ok {
+		return fmt.Errorf("field phases in LegacySummary: required")
+	}
+	if _, ok := raw["source"]; raw != nil && !ok {
+		return fmt.Errorf("field source in LegacySummary: required")
+	}
+	if _, ok := raw["v_min_kmh"]; raw != nil && !ok {
+		return fmt.Errorf("field v_min_kmh in LegacySummary: required")
+	}
+	type Plain LegacySummary
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Source)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "source", 1)
+	}
+	if 0 > plain.VMinKmh {
+		return fmt.Errorf("field %s: must be >= %v", "v_min_kmh", 0)
+	}
+	*j = LegacySummary(plain)
+	return nil
+}
+
+// State of the car and track when the pass ended. FL, FR, RL, RR order.
+type PassConditions struct {
+	// Air temperature, degrees C.
+	AirC float64 `json:"air_c"`
+
+	// Fuel on board, litres.
+	FuelL float64 `json:"fuel_l"`
+
+	// Track grip, 0..1.
+	Grip float64 `json:"grip"`
+
+	// Road temperature, degrees C.
+	RoadC float64 `json:"road_c"`
+
+	// Tyre core temperature, degrees C.
+	TyreCoreC []float64 `json:"tyre_core_c"`
+
+	// Hot tyre pressure, psi.
+	TyrePressPsi []float64 `json:"tyre_press_psi"`
+
+	// Tyre surface temperature (middle of the tread), degrees C.
+	TyreSurfaceC []float64 `json:"tyre_surface_c"`
+
+	// Tyre wear as the game reports it.
+	TyreWear []float64 `json:"tyre_wear"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassConditions) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["air_c"]; raw != nil && !ok {
+		return fmt.Errorf("field air_c in PassConditions: required")
+	}
+	if _, ok := raw["fuel_l"]; raw != nil && !ok {
+		return fmt.Errorf("field fuel_l in PassConditions: required")
+	}
+	if _, ok := raw["grip"]; raw != nil && !ok {
+		return fmt.Errorf("field grip in PassConditions: required")
+	}
+	if _, ok := raw["road_c"]; raw != nil && !ok {
+		return fmt.Errorf("field road_c in PassConditions: required")
+	}
+	if _, ok := raw["tyre_core_c"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_core_c in PassConditions: required")
+	}
+	if _, ok := raw["tyre_press_psi"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_press_psi in PassConditions: required")
+	}
+	if _, ok := raw["tyre_surface_c"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_surface_c in PassConditions: required")
+	}
+	if _, ok := raw["tyre_wear"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_wear in PassConditions: required")
+	}
+	type Plain PassConditions
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.FuelL {
+		return fmt.Errorf("field %s: must be >= %v", "fuel_l", 0)
+	}
+	if 0 > plain.Grip {
+		return fmt.Errorf("field %s: must be >= %v", "grip", 0)
+	}
+	if plain.TyreCoreC != nil && len(plain.TyreCoreC) < 4 {
+		return fmt.Errorf("field %s length: must be >= %d", "tyre_core_c", 4)
+	}
+	if len(plain.TyreCoreC) > 4 {
+		return fmt.Errorf("field %s length: must be <= %d", "tyre_core_c", 4)
+	}
+	if plain.TyrePressPsi != nil && len(plain.TyrePressPsi) < 4 {
+		return fmt.Errorf("field %s length: must be >= %d", "tyre_press_psi", 4)
+	}
+	if len(plain.TyrePressPsi) > 4 {
+		return fmt.Errorf("field %s length: must be <= %d", "tyre_press_psi", 4)
+	}
+	if plain.TyreSurfaceC != nil && len(plain.TyreSurfaceC) < 4 {
+		return fmt.Errorf("field %s length: must be >= %d", "tyre_surface_c", 4)
+	}
+	if len(plain.TyreSurfaceC) > 4 {
+		return fmt.Errorf("field %s length: must be <= %d", "tyre_surface_c", 4)
+	}
+	if plain.TyreWear != nil && len(plain.TyreWear) < 4 {
+		return fmt.Errorf("field %s length: must be >= %d", "tyre_wear", 4)
+	}
+	if len(plain.TyreWear) > 4 {
+		return fmt.Errorf("field %s length: must be <= %d", "tyre_wear", 4)
+	}
+	*j = PassConditions(plain)
+	return nil
+}
+
+// Raw channels at up to 60 Hz as column arrays of equal length n.
+type PassSamples struct {
+	// Columns corresponds to the JSON schema field "columns".
+	Columns SampleColumns `json:"columns"`
+
+	// Number of samples in every column.
+	N int `json:"n"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassSamples) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["columns"]; raw != nil && !ok {
+		return fmt.Errorf("field columns in PassSamples: required")
+	}
+	if _, ok := raw["n"]; raw != nil && !ok {
+		return fmt.Errorf("field n in PassSamples: required")
+	}
+	type Plain PassSamples
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 2 > plain.N {
+		return fmt.Errorf("field %s: must be >= %v", "n", 2)
+	}
+	*j = PassSamples(plain)
+	return nil
+}
+
+type SampleColumns struct {
+	// Brake pedal, 0..1.
+	Brake []float64 `json:"brake"`
+
+	// Metres from the start line.
+	D []float64 `json:"d"`
+
+	// Throttle pedal, 0..1.
+	Gas []float64 `json:"gas"`
+
+	// Lateral acceleration, g.
+	LatG []float64 `json:"lat_g"`
+
+	// Tyre load FL, N.
+	LoadFl []float64 `json:"load_fl"`
+
+	// Tyre load FR, N.
+	LoadFr []float64 `json:"load_fr"`
+
+	// Tyre load RL, N.
+	LoadRl []float64 `json:"load_rl"`
+
+	// Tyre load RR, N.
+	LoadRr []float64 `json:"load_rr"`
+
+	// Longitudinal acceleration, g.
+	LonG []float64 `json:"lon_g"`
+
+	// Wheels outside the track, 0..4.
+	Out []float64 `json:"out"`
+
+	// Front ride height, m.
+	RhF []float64 `json:"rh_f"`
+
+	// Rear ride height, m.
+	RhR []float64 `json:"rh_r"`
+
+	// Slip angle FL, degrees.
+	SaFl []float64 `json:"sa_fl"`
+
+	// Slip angle FR, degrees.
+	SaFr []float64 `json:"sa_fr"`
+
+	// Slip angle RL, degrees.
+	SaRl []float64 `json:"sa_rl"`
+
+	// Slip angle RR, degrees.
+	SaRr []float64 `json:"sa_rr"`
+
+	// Slip ratio FL.
+	SrFl []float64 `json:"sr_fl"`
+
+	// Slip ratio FR.
+	SrFr []float64 `json:"sr_fr"`
+
+	// Slip ratio RL.
+	SrRl []float64 `json:"sr_rl"`
+
+	// Slip ratio RR.
+	SrRr []float64 `json:"sr_rr"`
+
+	// Steering wheel angle, degrees.
+	Steer []float64 `json:"steer"`
+
+	// Seconds since the pass started.
+	T []float64 `json:"t"`
+
+	// Speed, m/s.
+	V []float64 `json:"v"`
+
+	// Yaw rate, rad/s.
+	Yaw []float64 `json:"yaw"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SampleColumns) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["brake"]; raw != nil && !ok {
+		return fmt.Errorf("field brake in SampleColumns: required")
+	}
+	if _, ok := raw["d"]; raw != nil && !ok {
+		return fmt.Errorf("field d in SampleColumns: required")
+	}
+	if _, ok := raw["gas"]; raw != nil && !ok {
+		return fmt.Errorf("field gas in SampleColumns: required")
+	}
+	if _, ok := raw["lat_g"]; raw != nil && !ok {
+		return fmt.Errorf("field lat_g in SampleColumns: required")
+	}
+	if _, ok := raw["load_fl"]; raw != nil && !ok {
+		return fmt.Errorf("field load_fl in SampleColumns: required")
+	}
+	if _, ok := raw["load_fr"]; raw != nil && !ok {
+		return fmt.Errorf("field load_fr in SampleColumns: required")
+	}
+	if _, ok := raw["load_rl"]; raw != nil && !ok {
+		return fmt.Errorf("field load_rl in SampleColumns: required")
+	}
+	if _, ok := raw["load_rr"]; raw != nil && !ok {
+		return fmt.Errorf("field load_rr in SampleColumns: required")
+	}
+	if _, ok := raw["lon_g"]; raw != nil && !ok {
+		return fmt.Errorf("field lon_g in SampleColumns: required")
+	}
+	if _, ok := raw["out"]; raw != nil && !ok {
+		return fmt.Errorf("field out in SampleColumns: required")
+	}
+	if _, ok := raw["rh_f"]; raw != nil && !ok {
+		return fmt.Errorf("field rh_f in SampleColumns: required")
+	}
+	if _, ok := raw["rh_r"]; raw != nil && !ok {
+		return fmt.Errorf("field rh_r in SampleColumns: required")
+	}
+	if _, ok := raw["sa_fl"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_fl in SampleColumns: required")
+	}
+	if _, ok := raw["sa_fr"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_fr in SampleColumns: required")
+	}
+	if _, ok := raw["sa_rl"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_rl in SampleColumns: required")
+	}
+	if _, ok := raw["sa_rr"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_rr in SampleColumns: required")
+	}
+	if _, ok := raw["sr_fl"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_fl in SampleColumns: required")
+	}
+	if _, ok := raw["sr_fr"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_fr in SampleColumns: required")
+	}
+	if _, ok := raw["sr_rl"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_rl in SampleColumns: required")
+	}
+	if _, ok := raw["sr_rr"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_rr in SampleColumns: required")
+	}
+	if _, ok := raw["steer"]; raw != nil && !ok {
+		return fmt.Errorf("field steer in SampleColumns: required")
+	}
+	if _, ok := raw["t"]; raw != nil && !ok {
+		return fmt.Errorf("field t in SampleColumns: required")
+	}
+	if _, ok := raw["v"]; raw != nil && !ok {
+		return fmt.Errorf("field v in SampleColumns: required")
+	}
+	if _, ok := raw["yaw"]; raw != nil && !ok {
+		return fmt.Errorf("field yaw in SampleColumns: required")
+	}
+	type Plain SampleColumns
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = SampleColumns(plain)
+	return nil
+}
+
+// One recorded session as core lists it for the dashboard.
+type SessionSummary struct {
+	// CarName corresponds to the JSON schema field "car_name".
+	CarName string `json:"car_name"`
+
+	// Different corners with at least one pass.
+	Corners int `json:"corners"`
+
+	// Core's id of the session.
+	Id int `json:"id"`
+
+	// Track layout; empty for single-layout tracks.
+	Layout string `json:"layout"`
+
+	// Corner passes recorded.
+	Passes int `json:"passes"`
+
+	// Who drove.
+	Source SessionSummarySource `json:"source"`
+
+	// The agent's session id.
+	SpoolId string `json:"spool_id"`
+
+	// When the session started, RFC 3339 in UTC.
+	StartedAt string `json:"started_at"`
+
+	// TrackName corresponds to the JSON schema field "track_name".
+	TrackName string `json:"track_name"`
+}
+
+type SessionSummarySource string
+
+const SessionSummarySourceAi SessionSummarySource = "ai"
+const SessionSummarySourceDemo SessionSummarySource = "demo"
+const SessionSummarySourceGhost SessionSummarySource = "ghost"
+const SessionSummarySourceHuman SessionSummarySource = "human"
+
+var enumValues_SessionSummarySource = []interface{}{
+	"human",
+	"ai",
+	"ghost",
+	"demo",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SessionSummarySource) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SessionSummarySource {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SessionSummarySource, v)
+	}
+	*j = SessionSummarySource(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SessionSummary) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["car_name"]; raw != nil && !ok {
+		return fmt.Errorf("field car_name in SessionSummary: required")
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in SessionSummary: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in SessionSummary: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in SessionSummary: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in SessionSummary: required")
+	}
+	if _, ok := raw["source"]; raw != nil && !ok {
+		return fmt.Errorf("field source in SessionSummary: required")
+	}
+	if _, ok := raw["spool_id"]; raw != nil && !ok {
+		return fmt.Errorf("field spool_id in SessionSummary: required")
+	}
+	if _, ok := raw["started_at"]; raw != nil && !ok {
+		return fmt.Errorf("field started_at in SessionSummary: required")
+	}
+	if _, ok := raw["track_name"]; raw != nil && !ok {
+		return fmt.Errorf("field track_name in SessionSummary: required")
+	}
+	type Plain SessionSummary
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.Corners {
+		return fmt.Errorf("field %s: must be >= %v", "corners", 0)
+	}
+	if 1 > plain.Id {
+		return fmt.Errorf("field %s: must be >= %v", "id", 1)
+	}
+	if 0 > plain.Passes {
+		return fmt.Errorf("field %s: must be >= %v", "passes", 0)
+	}
+	if utf8.RuneCountInString(string(plain.SpoolId)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "spool_id", 1)
+	}
+	if utf8.RuneCountInString(string(plain.StartedAt)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "started_at", 1)
+	}
+	*j = SessionSummary(plain)
+	return nil
+}
+
+type SpoolCar struct {
+	// Assetto Corsa car folder name.
+	AcId string `json:"ac_id"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolCar) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ac_id"]; raw != nil && !ok {
+		return fmt.Errorf("field ac_id in SpoolCar: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in SpoolCar: required")
+	}
+	type Plain SpoolCar
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.AcId)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "ac_id", 1)
+	}
+	*j = SpoolCar(plain)
+	return nil
+}
+
+type SpoolCorner struct {
+	// Total change of heading through the corner.
+	AngleDeg float64 `json:"angle_deg"`
+
+	// Tightest point, metres from the start line.
+	ApexM float64 `json:"apex_m"`
+
+	// Direction corresponds to the JSON schema field "direction".
+	Direction SpoolCornerDirection `json:"direction"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name"`
+
+	// 1-based, counted from the start line.
+	Number int `json:"number"`
+
+	// Radius at the apex.
+	RadiusM float64 `json:"radius_m"`
+
+	// Where a pass of this corner ends (includes the traction area).
+	ZoneEndM float64 `json:"zone_end_m"`
+
+	// Where a pass of this corner starts (includes the braking area).
+	ZoneStartM float64 `json:"zone_start_m"`
+}
+
+type SpoolCornerDirection string
+
+const SpoolCornerDirectionL SpoolCornerDirection = "L"
+const SpoolCornerDirectionR SpoolCornerDirection = "R"
+
+var enumValues_SpoolCornerDirection = []interface{}{
+	"L",
+	"R",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolCornerDirection) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolCornerDirection {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolCornerDirection, v)
+	}
+	*j = SpoolCornerDirection(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolCorner) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["angle_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field angle_deg in SpoolCorner: required")
+	}
+	if _, ok := raw["apex_m"]; raw != nil && !ok {
+		return fmt.Errorf("field apex_m in SpoolCorner: required")
+	}
+	if _, ok := raw["direction"]; raw != nil && !ok {
+		return fmt.Errorf("field direction in SpoolCorner: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in SpoolCorner: required")
+	}
+	if _, ok := raw["number"]; raw != nil && !ok {
+		return fmt.Errorf("field number in SpoolCorner: required")
+	}
+	if _, ok := raw["radius_m"]; raw != nil && !ok {
+		return fmt.Errorf("field radius_m in SpoolCorner: required")
+	}
+	if _, ok := raw["zone_end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field zone_end_m in SpoolCorner: required")
+	}
+	if _, ok := raw["zone_start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field zone_start_m in SpoolCorner: required")
+	}
+	type Plain SpoolCorner
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.AngleDeg {
+		return fmt.Errorf("field %s: must be >= %v", "angle_deg", 0)
+	}
+	if 0 > plain.ApexM {
+		return fmt.Errorf("field %s: must be >= %v", "apex_m", 0)
+	}
+	if 1 > plain.Number {
+		return fmt.Errorf("field %s: must be >= %v", "number", 1)
+	}
+	if 0 >= plain.RadiusM {
+		return fmt.Errorf("field %s: must be > %v", "radius_m", 0)
+	}
+	if 0 > plain.ZoneEndM {
+		return fmt.Errorf("field %s: must be >= %v", "zone_end_m", 0)
+	}
+	if 0 > plain.ZoneStartM {
+		return fmt.Errorf("field %s: must be >= %v", "zone_start_m", 0)
+	}
+	*j = SpoolCorner(plain)
+	return nil
+}
+
+// One pass through one corner zone: when, under which conditions, and the raw
+// samples. Written by the agent, read by core's ingest. The agent records facts
+// only; it never judges a pass.
+type SpoolPass struct {
+	// State of the car and track when the pass ended. FL, FR, RL, RR order.
+	Conditions *PassConditions `json:"conditions,omitempty,omitzero"`
+
+	// Corner number from the session line's corner map.
+	Corner int `json:"corner"`
+
+	// Time from zone start to zone end.
+	DurationS float64 `json:"duration_s"`
+
+	// Kind corresponds to the JSON schema field "kind".
+	Kind SpoolPassKind `json:"kind"`
+
+	// Completed laps when the pass ended.
+	LapInSession *int `json:"lap_in_session,omitempty,omitzero"`
+
+	// Only in data imported from Apex Forge v0, which stored per-phase averages
+	// instead of raw samples.
+	Legacy *LegacySummary `json:"legacy,omitempty,omitzero"`
+
+	// Raw channels at up to 60 Hz as column arrays of equal length n.
+	Samples *PassSamples `json:"samples,omitempty,omitzero"`
+
+	// Order of the pass within its session, from 1.
+	Seq int `json:"seq"`
+
+	// SessionId corresponds to the JSON schema field "session_id".
+	SessionId string `json:"session_id"`
+
+	// Hash of the setup values the car ran; the same values always give the same
+	// hash.
+	SetupHash *string `json:"setup_hash,omitempty,omitzero"`
+
+	// Wall clock when the car entered the zone, Unix milliseconds.
+	TStartMs int `json:"t_start_ms"`
+
+	// Format version of this line.
+	V SpoolPassV `json:"v"`
+}
+
+type SpoolPassKind string
+
+const SpoolPassKindPass SpoolPassKind = "pass"
+
+var enumValues_SpoolPassKind = []interface{}{
+	"pass",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolPassKind) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolPassKind {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolPassKind, v)
+	}
+	*j = SpoolPassKind(v)
+	return nil
+}
+
+type SpoolPassV int
+
+var enumValues_SpoolPassV = []interface{}{
+	1,
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolPassV) UnmarshalJSON(value []byte) error {
+	var v int
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolPassV {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolPassV, v)
+	}
+	*j = SpoolPassV(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolPass) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in SpoolPass: required")
+	}
+	if _, ok := raw["duration_s"]; raw != nil && !ok {
+		return fmt.Errorf("field duration_s in SpoolPass: required")
+	}
+	if _, ok := raw["kind"]; raw != nil && !ok {
+		return fmt.Errorf("field kind in SpoolPass: required")
+	}
+	if _, ok := raw["seq"]; raw != nil && !ok {
+		return fmt.Errorf("field seq in SpoolPass: required")
+	}
+	if _, ok := raw["session_id"]; raw != nil && !ok {
+		return fmt.Errorf("field session_id in SpoolPass: required")
+	}
+	if _, ok := raw["t_start_ms"]; raw != nil && !ok {
+		return fmt.Errorf("field t_start_ms in SpoolPass: required")
+	}
+	if _, ok := raw["v"]; raw != nil && !ok {
+		return fmt.Errorf("field v in SpoolPass: required")
+	}
+	type Plain SpoolPass
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 0 >= plain.DurationS {
+		return fmt.Errorf("field %s: must be > %v", "duration_s", 0)
+	}
+	if plain.LapInSession != nil && 0 > *plain.LapInSession {
+		return fmt.Errorf("field %s: must be >= %v", "lap_in_session", 0)
+	}
+	if 1 > plain.Seq {
+		return fmt.Errorf("field %s: must be >= %v", "seq", 1)
+	}
+	if matched, _ := regexp.MatchString(`^[A-Za-z0-9._-]{1,64}$`, string(plain.SessionId)); !matched {
+		return fmt.Errorf("field %s pattern match: must match %s", "SessionId", `^[A-Za-z0-9._-]{1,64}$`)
+	}
+	if plain.SetupHash != nil && utf8.RuneCountInString(string(*plain.SetupHash)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "setup_hash", 1)
+	}
+	if 0 > plain.TStartMs {
+		return fmt.Errorf("field %s: must be >= %v", "t_start_ms", 0)
+	}
+	*j = SpoolPass(plain)
+	return nil
+}
+
+// First line of a session in the spool: which car, which track, and the corner map
+// every pass refers to. Written by the agent, read by core's ingest.
+type SpoolSession struct {
+	// AgentVersion corresponds to the JSON schema field "agent_version".
+	AgentVersion string `json:"agent_version"`
+
+	// Car corresponds to the JSON schema field "car".
+	Car SpoolCar `json:"car"`
+
+	// Kind corresponds to the JSON schema field "kind".
+	Kind SpoolSessionKind `json:"kind"`
+
+	// Unique per agent run; also the spool directory name.
+	SessionId string `json:"session_id"`
+
+	// Who drove.
+	Source SpoolSessionSource `json:"source"`
+
+	// Wall clock when the session started, Unix milliseconds.
+	StartedAtMs int `json:"started_at_ms"`
+
+	// Track corresponds to the JSON schema field "track".
+	Track SpoolTrack `json:"track"`
+
+	// Format version of this line.
+	V SpoolSessionV `json:"v"`
+}
+
+type SpoolSessionKind string
+
+const SpoolSessionKindSession SpoolSessionKind = "session"
+
+var enumValues_SpoolSessionKind = []interface{}{
+	"session",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolSessionKind) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolSessionKind {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolSessionKind, v)
+	}
+	*j = SpoolSessionKind(v)
+	return nil
+}
+
+type SpoolSessionSource string
+
+const SpoolSessionSourceAi SpoolSessionSource = "ai"
+const SpoolSessionSourceDemo SpoolSessionSource = "demo"
+const SpoolSessionSourceGhost SpoolSessionSource = "ghost"
+const SpoolSessionSourceHuman SpoolSessionSource = "human"
+
+var enumValues_SpoolSessionSource = []interface{}{
+	"human",
+	"ai",
+	"ghost",
+	"demo",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolSessionSource) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolSessionSource {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolSessionSource, v)
+	}
+	*j = SpoolSessionSource(v)
+	return nil
+}
+
+type SpoolSessionV int
+
+var enumValues_SpoolSessionV = []interface{}{
+	1,
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolSessionV) UnmarshalJSON(value []byte) error {
+	var v int
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolSessionV {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolSessionV, v)
+	}
+	*j = SpoolSessionV(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolSession) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["agent_version"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_version in SpoolSession: required")
+	}
+	if _, ok := raw["car"]; raw != nil && !ok {
+		return fmt.Errorf("field car in SpoolSession: required")
+	}
+	if _, ok := raw["kind"]; raw != nil && !ok {
+		return fmt.Errorf("field kind in SpoolSession: required")
+	}
+	if _, ok := raw["session_id"]; raw != nil && !ok {
+		return fmt.Errorf("field session_id in SpoolSession: required")
+	}
+	if _, ok := raw["source"]; raw != nil && !ok {
+		return fmt.Errorf("field source in SpoolSession: required")
+	}
+	if _, ok := raw["started_at_ms"]; raw != nil && !ok {
+		return fmt.Errorf("field started_at_ms in SpoolSession: required")
+	}
+	if _, ok := raw["track"]; raw != nil && !ok {
+		return fmt.Errorf("field track in SpoolSession: required")
+	}
+	if _, ok := raw["v"]; raw != nil && !ok {
+		return fmt.Errorf("field v in SpoolSession: required")
+	}
+	type Plain SpoolSession
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.AgentVersion)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "agent_version", 1)
+	}
+	if matched, _ := regexp.MatchString(`^[A-Za-z0-9._-]{1,64}$`, string(plain.SessionId)); !matched {
+		return fmt.Errorf("field %s pattern match: must match %s", "SessionId", `^[A-Za-z0-9._-]{1,64}$`)
+	}
+	if 0 > plain.StartedAtMs {
+		return fmt.Errorf("field %s: must be >= %v", "started_at_ms", 0)
+	}
+	*j = SpoolSession(plain)
+	return nil
+}
+
+type SpoolTrack struct {
+	// Assetto Corsa track folder name.
+	AcId string `json:"ac_id"`
+
+	// Version of the corner-detection algorithm.
+	CornerMapVersion int `json:"corner_map_version"`
+
+	// Corners corresponds to the JSON schema field "corners".
+	Corners []SpoolCorner `json:"corners"`
+
+	// Layout folder name; empty for single-layout tracks.
+	Layout string `json:"layout"`
+
+	// Lap length along the AI line.
+	LengthM float64 `json:"length_m"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolTrack) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ac_id"]; raw != nil && !ok {
+		return fmt.Errorf("field ac_id in SpoolTrack: required")
+	}
+	if _, ok := raw["corner_map_version"]; raw != nil && !ok {
+		return fmt.Errorf("field corner_map_version in SpoolTrack: required")
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in SpoolTrack: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in SpoolTrack: required")
+	}
+	if _, ok := raw["length_m"]; raw != nil && !ok {
+		return fmt.Errorf("field length_m in SpoolTrack: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in SpoolTrack: required")
+	}
+	type Plain SpoolTrack
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.AcId)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "ac_id", 1)
+	}
+	if 1 > plain.CornerMapVersion {
+		return fmt.Errorf("field %s: must be >= %v", "corner_map_version", 1)
+	}
+	if plain.Corners != nil && len(plain.Corners) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "corners", 1)
+	}
+	if 0 >= plain.LengthM {
+		return fmt.Errorf("field %s: must be > %v", "length_m", 0)
+	}
+	*j = SpoolTrack(plain)
 	return nil
 }

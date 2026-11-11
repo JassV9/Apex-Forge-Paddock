@@ -1,5 +1,10 @@
 # Local development stack: `make dev`. Every port is bound to 127.0.0.1 only.
 # The database password below is a local-development default, not a secret.
+#
+# Core ingests the agent's spool. Point PADDOCK_SPOOL_HOST at the folder the in-game agent
+# writes to, for example (PowerShell):
+#   $env:PADDOCK_SPOOL_HOST = "$HOME/Documents/Assetto Corsa/paddock/spool"
+# Unset, an empty ./data/spool is used and nothing is ingested.
 name: paddock
 
 services:
@@ -24,8 +29,19 @@ services:
     environment:
       PADDOCK_HTTP_ADDR: ":8080"
       PADDOCK_DATABASE_URL: postgres://paddock:paddock@postgres:5432/paddock?sslmode=disable
+      PADDOCK_SPOOL_DIR: /spool
+      PADDOCK_DATA_DIR: /data
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      # read-only: core never writes to the spool
+      - type: bind
+        source: ${PADDOCK_SPOOL_HOST:-../data/spool}
+        target: /spool
+        read_only: true
+        bind:
+          create_host_path: true
+      - core-data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,3 +62,4 @@ services:
 
 volumes:
   postgres-data:
+  core-data:

@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "session_summary.schema.json",
+  "title": "SessionSummary",
+  "description": "One recorded session as core lists it for the dashboard.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "spool_id",
+    "car_name",
+    "track_name",
+    "layout",
+    "started_at",
+    "source",
+    "passes",
+    "corners"
+  ],
+  "properties": {
+    "id": {
+      "description": "Core's id of the session.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "spool_id": {
+      "description": "The agent's session id.",
+      "type": "string",
+      "minLength": 1
+    },
+    "car_name": {
+      "type": "string"
+    },
+    "track_name": {
+      "type": "string"
+    },
+    "layout": {
+      "description": "Track layout; empty for single-layout tracks.",
+      "type": "string"
+    },
+    "started_at": {
+      "description": "When the session started, RFC 3339 in UTC.",
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "description": "Who drove.",
+      "type": "string",
+      "enum": [
+        "human",
+        "ai",
+        "ghost",
+        "demo"
+      ]
+    },
+    "passes": {
+      "description": "Corner passes recorded.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "corners": {
+      "description": "Different corners with at least one pass.",
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

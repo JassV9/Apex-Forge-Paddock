@@ -11,7 +11,7 @@ From a fresh clone to a green test run takes under 15 minutes, most of it downlo
 | uv | 0.12+ | Python 3.12 environments for `engine/` and the agent tests |
 | Node.js | 24+ (with npm) | `web/` |
 | GNU make | 4+ | Entry points (`make test`, `make dev`, ...) |
-| Docker Desktop | any recent | `make dev` only (PostgreSQL and the full stack) |
+| Docker Desktop | any recent | `make dev` and `make demo` (PostgreSQL and the full stack) |
 
 Windows, in PowerShell:
 
@@ -20,8 +20,9 @@ winget install GoLang.Go astral-sh.uv OpenJS.NodeJS.LTS ezwinports.make Docker.D
 ```
 
 Open a new terminal afterwards so `PATH` is refreshed. Docker Desktop needs WSL 2
-(`wsl --install`, then restart). You do **not** need Docker, Assetto Corsa or a Lua install to
-run the tests: the agent's Lua runs under LuaJIT inside the Python test environment.
+(`wsl --install` in an administrator terminal, then restart Windows). You do **not** need
+Docker, Assetto Corsa or a Lua install to run the tests: the agent's Lua runs under LuaJIT
+inside the Python test environment.
 
 One more Go tool, needed only for `make lint`:
 
@@ -37,22 +38,29 @@ make test    # agent (Lua under LuaJIT), core (Go), engine (Python), web (TypeSc
 make lint    # go vet + golangci-lint, ruff + mypy --strict, tsc + eslint + prettier
 ```
 
-Expected from `make test`: 39 agent tests, three Go packages `ok`, 4 engine tests, 4 web tests.
-
-Core's database tests are skipped unless `PADDOCK_TEST_DATABASE_URL` points at an **empty**
-PostgreSQL database; CI always runs them. See `docs/runbooks/local-dev.md` for two ways to run
-them locally.
+`make test` runs four suites and each must end without failures. One agent test is skipped
+unless Assetto Corsa with the COTA track is installed. Core's database tests are skipped unless
+`PADDOCK_TEST_DATABASE_URL` points at a PostgreSQL database; CI always runs them. See
+`docs/runbooks/local-dev.md` for how to run them locally.
 
 ## 3. Start the stack
 
 ```bash
-make dev     # PostgreSQL + core + engine + web in Docker; open http://localhost:5173
+make demo        # the full stack on a recorded session; open http://localhost:5173
+make demo-down
+```
+
+The page says "Core dev is running." (local builds report version `dev`) and lists one
+session: the FA26 at COTA, 136 corner passes over 17 corners. No game is needed.
+
+```bash
+make dev         # the same stack, ingesting what the in-game agent writes
 make down
 ```
 
-The page says "Core dev is running." (local builds report version `dev`) when the dashboard reaches core and core reaches its
-database. To run the processes natively instead (no Docker except for PostgreSQL), see the
-runbook.
+`make dev` reads the agent's spool from the folder in `PADDOCK_SPOOL_HOST`. Installing the
+agent and pointing the stack at it is in `docs/runbooks/agent-in-game.md`. To run the
+processes natively instead of in Docker, see `docs/runbooks/local-dev.md`.
 
 ## 4. Find your way around
 
@@ -61,13 +69,14 @@ conventions. `docs/audit-v0.md` explains why the project exists.
 
 | Directory | What it is | Start reading at |
 | --- | --- | --- |
-| `contracts/` | JSON Schema for every cross-process type | `health.schema.json` |
-| `core/` | Go monolith | `cmd/paddock/main.go` |
+| `contracts/` | JSON Schema for every cross-process type | `spool_pass.schema.json` |
+| `agent/` | CSP Lua agent and its offline tests | `src/game/agent.lua`, then `tests/test_agent.py` |
+| `core/` | Go monolith | `cmd/paddock/main.go`, then `internal/ingest/service.go` |
 | `engine/` | Python analysis engine | `paddock_engine/app.py` |
 | `web/` | React dashboard | `src/App.tsx` |
-| `agent/` | CSP Lua agent and its offline tests | `tests/harness.py`, then `src/core/recorder.lua` |
 | `docs/api/openapi.yaml` | Core's REST API, written before the code | — |
-| `tools/` | Scripts, including the v0 verdict-noise simulation | `verdict_noise_sim.py` |
+| `datasets/demo/` | Recorded sessions for demo mode | `README.md` |
+| `tools/` | Scripts: agent installer, demo export, the v0 verdict-noise simulation | `verdict_noise_sim.py` |
 
 ## 5. Make a change
 
@@ -79,6 +88,9 @@ conventions. `docs/audit-v0.md` explains why the project exists.
   `-- +goose Down`. Never edit a merged migration.
 - **Agent Lua:** pure logic goes in `agent/src/core` (no `ac.*`; a test enforces it), CSP calls
   in `agent/src/game`. Anything not run in Assetto Corsa is reported as "unverified in game".
+- **A spool format change:** bump `v` in the schema, teach ingest both versions, and
+  regenerate the sample the Go tests read
+  (`cd agent && uv run python tests/export_spool_sample.py ../core/internal/ingest/testdata/spool`).
 - Tests ship with the change. Docs change in the same commit.
 
 Optional, runs the fast checks on every commit:

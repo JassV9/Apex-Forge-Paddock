@@ -2,6 +2,27 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 1: capture and ingest (2026-11-11)
+
+- Contracts for the spool: `spool_session`, `spool_pass` (conditions, 24 raw channels as
+  column arrays, optional legacy summary for v0 imports), and `session_summary` for the API.
+- agent: `PaddockAgent.lua` records every corner pass with its conditions and writes it to the
+  spool as numbered chunk files (CSP has no append; ADR 0003 amended). A pass is encoded one
+  column per frame. `carlink.lua` now reads raw per-wheel values. Installer:
+  `tools/install_agent.py`.
+- core: ingest tails the spool, validates each line against the JSON Schema, writes Parquet
+  parts and `corner_pass` rows idempotently, and reports OpenTelemetry metrics at
+  `GET /metrics`. New tables: car, track, corner, session, corner_pass, spool_chunk.
+  `GET /sessions`.
+- web: list of recorded sessions.
+- Demo dataset: the real v0 FA26 COTA session converted to a spool; `make demo`.
+- Tests: 72 agent tests on a synthetic track (restart, teleport, pits, replay, write rate,
+  frame cost), Go tests that read what the real agent wrote, database tests in per-package
+  schemas.
+- Docs: ADR 0007 (ingest libraries and Parquet layout), agent-in-game runbook, phase 1 demo.
+
+Not verified: anything in Assetto Corsa. Not done: OpenTelemetry traces (metrics only).
+
 ## Phase 0: skeleton (2026-11-11)
 
 - Repository layout: `agent/`, `core/`, `engine/`, `web/`, `contracts/`, `deploy/`, `docs/`,

@@ -20,7 +20,7 @@ Read `docs/architecture.md` and the ADRs in `docs/adr/` before changing anything
 ## Commands
 - `make dev` start Postgres + core + engine + web
 - `make test` all suites; `make lint`; `make gen` regenerate contracts
-- `make demo` run with `datasets/demo` and no game (added in phase 1 with the demo dataset)
+- `make demo` run with `datasets/demo` and no game; `make demo-down` stops it
 
 ## Conventions
 - Files < 300 lines, functions < 40 lines, descriptive names, no dead code.

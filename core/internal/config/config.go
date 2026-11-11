@@ -9,8 +9,11 @@ import (
 const (
 	envHTTPAddr    = "PADDOCK_HTTP_ADDR"
 	envDatabaseURL = "PADDOCK_DATABASE_URL"
+	envSpoolDir    = "PADDOCK_SPOOL_DIR"
+	envDataDir     = "PADDOCK_DATA_DIR"
 
 	defaultHTTPAddr = ":8080"
+	defaultDataDir  = "data"
 )
 
 // ErrMissing reports a required variable that is unset or empty.
@@ -22,6 +25,11 @@ type Config struct {
 	HTTPAddr string
 	// DatabaseURL is a PostgreSQL connection URL.
 	DatabaseURL string
+	// SpoolDir is where the in-game agent writes pass records, normally
+	// Documents/Assetto Corsa/paddock/spool. Empty turns ingest off.
+	SpoolDir string
+	// DataDir is where core keeps files it owns (Parquet files of raw samples).
+	DataDir string
 }
 
 // FromEnv builds a Config. getenv is os.Getenv in production and a map lookup in tests.
@@ -29,9 +37,14 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{
 		HTTPAddr:    getenv(envHTTPAddr),
 		DatabaseURL: getenv(envDatabaseURL),
+		SpoolDir:    getenv(envSpoolDir),
+		DataDir:     getenv(envDataDir),
 	}
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = defaultHTTPAddr
+	}
+	if cfg.DataDir == "" {
+		cfg.DataDir = defaultDataDir
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("%s: %w", envDatabaseURL, ErrMissing)

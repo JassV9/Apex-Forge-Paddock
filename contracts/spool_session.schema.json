@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spool_session.schema.json",
+  "title": "SpoolSession",
+  "description": "First line of a session in the spool: which car, which track, and the corner map every pass refers to. Written by the agent, read by core's ingest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "v",
+    "session_id",
+    "started_at_ms",
+    "source",
+    "agent_version",
+    "car",
+    "track"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "session"
+      ]
+    },
+    "v": {
+      "description": "Format version of this line.",
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "session_id": {
+      "description": "Unique per agent run; also the spool directory name.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "started_at_ms": {
+      "description": "Wall clock when the session started, Unix milliseconds.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "source": {
+      "description": "Who drove.",
+      "type": "string",
+      "enum": [
+        "human",
+        "ai",
+        "ghost",
+        "demo"
+      ]
+    },
+    "agent_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "car": {
+      "title": "SpoolCar",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ac_id",
+        "name"
+      ],
+      "properties": {
+        "ac_id": {
+          "description": "Assetto Corsa car folder name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "track": {
+      "title": "SpoolTrack",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ac_id",
+        "layout",
+        "name",
+        "length_m",
+        "corner_map_version",
+        "corners"
+      ],
+      "properties": {
+        "ac_id": {
+          "description": "Assetto Corsa track folder name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "layout": {
+          "description": "Layout folder name; empty for single-layout tracks.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "length_m": {
+          "description": "Lap length along the AI line.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "corner_map_version": {
+          "description": "Version of the corner-detection algorithm.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "corners": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/SpoolCorner"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "SpoolCorner": {
+      "title": "SpoolCorner",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "name",
+        "direction",
+        "apex_m",
+        "radius_m",
+        "angle_deg",
+        "zone_start_m",
+        "zone_end_m"
+      ],
+      "properties": {
+        "number": {
+          "description": "1-based, counted from the start line.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "L",
+            "R"
+          ]
+        },
+        "apex_m": {
+          "description": "Tightest point, metres from the start line.",
+          "type": "number",
+          "minimum": 0
+        },
+        "radius_m": {
+          "description": "Radius at the apex.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "angle_deg": {
+          "description": "Total change of heading through the corner.",
+          "type": "number",
+          "minimum": 0
+        },
+        "zone_start_m": {
+          "description": "Where a pass of this corner starts (includes the braking area).",
+          "type": "number",
+          "minimum": 0
+        },
+        "zone_end_m": {
+          "description": "Where a pass of this corner ends (includes the traction area).",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

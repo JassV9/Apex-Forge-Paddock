@@ -34,7 +34,8 @@ Three generated files change: `core/internal/contracts/contracts.go`,
 make dev
 ```
 
-Open http://localhost:5173: "Core dev is running." (local builds report version `dev`). Then stop the database and reload:
+Open http://localhost:5173: "Core dev is running." (local builds report version `dev`). Then
+stop the database and reload:
 
 ```bash
 docker compose -f deploy/docker-compose.yml stop postgres

@@ -1,0 +1,10 @@
+# Demo mode: `make demo`. The same stack, fed from the recorded sessions in datasets/demo
+# instead of the game. It runs as its own Compose project (paddock-demo), so its database
+# never mixes with real sessions.
+services:
+  core:
+    volumes:
+      - type: bind
+        source: ../datasets/demo/spool
+        target: /spool
+        read_only: true

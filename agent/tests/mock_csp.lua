@@ -1,4 +1,6 @@
--- Minimal mock of the CSP Lua app API: enough to run Apex Forge end to end outside the game.
+-- Minimal mock of the CSP Lua app API: enough to run the agent end to end outside the game.
+-- From Apex Forge v0, extended for Paddock: fuel, wear, grip and temperatures, a controllable
+-- os.preciseClock, a log of every file write, and paths that also work on Linux.
 -- Python fills MOCK: points {x,z}[], L, root (temp folder), spinners[], tabs{name->TAB},
 -- tyres{FRONT/REAR -> {PRESSURE_IDEAL, FRICTION_LIMIT_ANGLE}}, carID, trackID, layout, and
 -- helpers fs_exists(path), fs_mkdir(path), json_stringify(t), json_parse(s).
@@ -30,7 +32,7 @@ local function wheel()
   return {
     slipAngle = 0, slipRatio = 0, ndSlip = 0, load = 3000, tyreInsideTemperature = 85,
     tyreMiddleTemperature = 82, tyreOutsideTemperature = 78, tyreCoreTemperature = 90,
-    tyreOptimumTemperature = 90, tyrePressure = 27.5,
+    tyreOptimumTemperature = 90, tyrePressure = 27.5, tyreWear = 0.02,
   }
 end
 M.car = {
@@ -38,8 +40,15 @@ M.car = {
   acceleration = vec3(), localAngularVelocity = vec3(), wheels = { [0] = wheel(), wheel(), wheel(), wheel() },
   wheelsOutside = 0, rideHeight = { [0] = 0.02, 0.04 }, isInPitlane = false, isInPit = false,
   isAIControlled = false, resetCounter = 0, tractionType = 0, compoundIndex = 0,
+  fuel = 42.5, lapCount = 0,
 }
-M.sim = { trackLengthM = M.L, isPaused = false, isReplayActive = false, raceSessionType = 2 }
+M.sim = {
+  trackLengthM = M.L, isPaused = false, isReplayActive = false, raceSessionType = 2,
+  roadGrip = 0.97, ambientTemperature = 24, roadTemperature = 31,
+}
+M.now = 0     -- seconds since script start; the test driver advances it
+M.writes = {} -- every file write: { path, at (M.now), bytes, async }
+function os.preciseClock() return M.now end
 
 -- ac -------------------------------------------------------------------------------------------
 ac = {}
@@ -150,10 +159,20 @@ end
 function ac.INIConfig.currentSetup() return { filename = M.currentSetupFile } end
 
 -- io / JSON -------------------------------------------------------------------------------------
-function io.exists(p) return M.fs_exists(p) end
-function io.createDir(p) M.fs_mkdir(p) return true end
+-- CSP paths use backslashes; the tests also run on Linux
+local function native(p) return (p:gsub("\\", "/")) end
+local function writeFile(p, data, async)
+  M.writes[#M.writes + 1] = { path = native(p), at = M.now, bytes = #data, async = async }
+  local f = io.open(native(p), "wb")
+  if not f then return false end
+  f:write(data)
+  f:close()
+  return true
+end
+function io.exists(p) return M.fs_exists(native(p)) end
+function io.createDir(p) M.fs_mkdir(native(p)) return true end
 function io.load(p, fb)
-  local f = io.open(p, "rb")
+  local f = io.open(native(p), "rb")
   if not f then return fb end
   local s = f:read("*a")
   f:close()
@@ -161,16 +180,11 @@ function io.load(p, fb)
 end
 function io.save(p, data, ensure)
   M.calls.save = M.calls.save + 1
-  local f = io.open(p, "wb")
-  if not f then return false end
-  f:write(data)
-  f:close()
-  return true
+  return writeFile(p, data, false)
 end
 function io.saveAsync(p, data, cb, ensure)
   M.calls.saveAsync = M.calls.saveAsync + 1
-  local f = io.open(p, "wb")
-  if f then f:write(data) f:close() end
+  writeFile(p, data, true)
   if cb then cb(nil) end
 end
 JSON = { stringify = function(t) return M.json_stringify(t) end, parse = function(s) return M.json_parse(s) end }

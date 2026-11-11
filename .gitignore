@@ -1,0 +1,40 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+
+# Go
+core/bin/
+*.test
+coverage.out
+
+# Web
+node_modules/
+web/dist/
+web/coverage/
+
+# Local data and secrets
+.env
+.env.*
+!.env.example
+data/
+*.parquet
+!datasets/demo/**/*.parquet
+
+# Terraform
+.terraform/
+*.tfstate*
+
+# Unpublished working notes (kept on this machine only)
+docs/private/

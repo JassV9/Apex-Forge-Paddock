@@ -1,0 +1,9 @@
+# One ruff configuration for every Python file in the repo (engine, agent tests, tools).
+target-version = "py312"
+line-length = 100
+extend-exclude = ["engine/paddock_engine/contracts"]
+# Where first-party imports live, so import sorting is the same from any directory.
+src = ["engine", "agent/tests"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "N", "RUF"]

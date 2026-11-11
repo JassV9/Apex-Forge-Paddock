@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+# Real data copied from Apex Forge v0: keep byte-for-byte (see docs/adr/0002-reuse-from-v0.md)
+agent/tests/fixtures/** -text
+
+*.png binary
+*.parquet binary

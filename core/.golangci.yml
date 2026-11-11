@@ -1,0 +1,39 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - funlen
+    - gocritic
+    - misspell
+    - noctx
+    - revive
+    - sqlclosecheck
+    - unparam
+  settings:
+    funlen:
+      # CLAUDE.md: functions under 40 lines.
+      lines: 40
+      statements: -1
+  exclusions:
+    paths:
+      # Generated from contracts/ by `make gen`; never hand-edited.
+      - internal/contracts
+    rules:
+      # Table-driven tests keep their cases inside the test function.
+      - path: _test\.go
+        linters: [funlen]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/JassV9/Apex-Forge-Paddock
+  exclusions:
+    paths:
+      - internal/contracts

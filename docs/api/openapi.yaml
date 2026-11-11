@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: Apex Forge Paddock core API
+  version: 0.1.0
+  description: >
+    REST API of the core process, used by the web dashboard. This file is written first; the
+    TypeScript client types in web/src/api/schema.d.ts are generated from it (`make gen`).
+    Response bodies are the JSON Schemas in contracts/.
+servers:
+  - url: /api
+    description: Core behind the web dev server or reverse proxy (the /api prefix is stripped).
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness of the core process and whether it can reach its database.
+      responses:
+        "200":
+          description: >
+            Core is running. `status` is `degraded` when PostgreSQL cannot be reached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      $ref: "../../contracts/health.schema.json"

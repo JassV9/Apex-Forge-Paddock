@@ -1,0 +1,18 @@
+[project]
+name = "paddock-agent-tests"
+version = "0.0.0"
+description = "Offline tests for the CSP Lua agent: the real Lua files run under LuaJIT via lupa."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["lupa>=2.5", "pytest>=8.3"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# faulthandler is off because LuaJIT raises Lua errors as Windows SEH exceptions (0xe24c4a02),
+# even inside pcall, and faulthandler prints a "fatal exception" dump for each handled one.
+addopts = "-q -p no:faulthandler"

@@ -1,0 +1,45 @@
+# Install once: uvx pre-commit install     Run on everything: uvx pre-commit run --all-files
+# Fast checks only; the full suites run in CI and with `make test` / `make lint`.
+exclude: ^(agent/tests/fixtures/|engine/paddock_engine/contracts/|core/internal/contracts/|web/src/api/schema\.d\.ts$)
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --project engine ruff check --force-exclude
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --project engine ruff format --check --force-exclude
+        language: system
+        types: [python]
+      - id: gofmt
+        name: gofmt
+        entry: gofmt -l -d
+        language: system
+        types: [go]
+      - id: prettier
+        name: prettier (web)
+        entry: npm --prefix web exec -- prettier --check --ignore-unknown
+        language: system
+        files: ^web/
+        exclude: ^web/package-lock\.json$

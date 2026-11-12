@@ -153,7 +153,8 @@ def features_request() -> dict[str, Any]:
         for chunk in sorted(SAMPLE_SPOOL.glob("*.jsonl"))
         for line in chunk.read_text(encoding="utf-8").splitlines()
     ]
-    session, passes = spool[0], spool[1:]
+    session = spool[0]
+    passes = [line for line in spool if line["kind"] == "pass"]
     keys = ("number", "zone_start_m", "start_m", "end_m", "apex_m", "zone_end_m")
     return {
         "track_length_m": session["track"]["length_m"],

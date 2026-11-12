@@ -41,6 +41,12 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [[tool.mypy.overrides]]
+# Generated code (never hand-edited). The contracts have enum values "lower" and "higher";
+# as StrEnum members they shadow str.lower, which mypy reports as an incompatible assignment.
+module = ["paddock_engine.contracts.*"]
+disable_error_code = ["assignment"]
+
+[[tool.mypy.overrides]]
 # statsmodels ships no type information; it is used only in tests, as an independent check.
 module = ["statsmodels.*"]
 ignore_missing_imports = true

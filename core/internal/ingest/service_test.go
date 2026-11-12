@@ -123,8 +123,12 @@ func TestScanIngestsWhatTheAgentWroteAndWritesParquet(t *testing.T) {
 	if len(parts) != 3 || gotSamples != wantSamples || wantSamples == 0 {
 		t.Errorf("%d parquet parts with %d rows, want 3 parts with %d rows", len(parts), gotSamples, wantSamples)
 	}
-	if got := h.counter(t, "paddock.ingest.lines", "outcome", "ingested"); got != 4 {
-		t.Errorf("ingested lines metric = %d, want 4", got)
+	first := h.store.chunks[0]
+	if first.Catalog == nil || len(first.Setups) != 1 {
+		t.Errorf("first chunk: catalog %v, %d setups; want both", first.Catalog != nil, len(first.Setups))
+	}
+	if got := h.counter(t, "paddock.ingest.lines", "outcome", "ingested"); got != 6 {
+		t.Errorf("ingested lines metric = %d, want 6", got)
 	}
 }
 

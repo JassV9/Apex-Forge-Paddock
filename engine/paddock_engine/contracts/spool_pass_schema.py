@@ -18,6 +18,21 @@ class V(IntEnum):
     integer_1 = 1
 
 
+class PassBlock(BaseModel):
+    """
+    The run-plan block the pass was driven in, when an experiment is running.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    experiment_id: int = Field(..., ge=1)
+    order: int = Field(..., description="The block's position in the plan.", ge=1)
+    lap: int = Field(
+        ..., description="Laps completed in the block when the pass ended; 0 is the out-lap.", ge=0
+    )
+
+
 class PassConditions(BaseModel):
     """
     State of the car and track when the pass ended. FL, FR, RL, RR order.
@@ -167,6 +182,11 @@ class SpoolPass(BaseModel):
         None,
         description="Hash of the setup values the car ran; the same values always give the same hash.",
         min_length=1,
+    )
+    block: PassBlock | None = Field(
+        None,
+        description="The run-plan block the pass was driven in, when an experiment is running.",
+        title="PassBlock",
     )
     conditions: PassConditions | None = Field(
         None,

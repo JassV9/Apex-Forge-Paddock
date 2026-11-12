@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "plan_response.schema.json",
+  "title": "PlanResponse",
+  "description": "An A-B-A-B run plan and what it can answer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sigma",
+    "sigma_source",
+    "corners",
+    "blocks",
+    "passes_per_arm",
+    "mde_detect",
+    "mde_decide"
+  ],
+  "properties": {
+    "sigma": {
+      "description": "Pass-to-pass scatter of the primary channel per corner.",
+      "type": "number",
+      "minimum": 0
+    },
+    "sigma_source": {
+      "description": "measured: from the baseline passes. assumed: no usable passes, a default was used.",
+      "type": "string",
+      "enum": [
+        "measured",
+        "assumed"
+      ]
+    },
+    "corners": {
+      "description": "Corners the experiment is evaluated on.",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "title": "PlanBlock",
+        "description": "One block of the plan.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "order",
+          "arm",
+          "laps_target"
+        ],
+        "properties": {
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "arm": {
+            "type": "string",
+            "enum": [
+              "baseline",
+              "variant"
+            ]
+          },
+          "laps_target": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "passes_per_arm": {
+      "description": "Passes per arm in each corner if the plan is driven fully.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "mde_detect": {
+      "description": "Smallest average effect per corner whose direction this plan establishes with 80 % power.",
+      "type": "number",
+      "minimum": 0
+    },
+    "mde_decide": {
+      "description": "Smallest effect that also clears the equivalence band with 80 % power: what a decision needs.",
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}

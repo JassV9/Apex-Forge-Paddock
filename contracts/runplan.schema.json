@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "runplan.schema.json",
+  "title": "RunPlan",
+  "description": "What the agent must load and for how many laps. Written by core as runplan.json; the agent reads it in the pits. Labels are code names: the plan does not say which setup is the baseline.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "experiment_id",
+    "revision",
+    "blocks"
+  ],
+  "properties": {
+    "v": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "experiment_id": {
+      "description": "Core's id of the experiment.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "revision": {
+      "description": "Increases whenever core rewrites the plan of this experiment.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "title": "RunPlanBlock",
+        "description": "One stint on one setup.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "order",
+          "label",
+          "laps_target",
+          "values"
+        ],
+        "properties": {
+          "order": {
+            "description": "Position in the plan, from 1.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "label": {
+            "description": "Code name shown to the driver, e.g. Setup K.",
+            "type": "string",
+            "minLength": 1
+          },
+          "laps_target": {
+            "description": "Push laps to drive; 0 means only load the setup.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "values": {
+            "description": "Setup item name to raw value, as the setup menu's spinners hold it.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  }
+}

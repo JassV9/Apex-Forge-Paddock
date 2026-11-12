@@ -20,6 +20,8 @@ type Chunk struct {
 	SpoolID    string // session id: the name of the spool sub-directory
 	FileName   string
 	Header     *contracts.SpoolSession // set when the file starts a session
+	Catalog    *contracts.SpoolCatalog // the car's setup menu, once per session
+	Setups     []*contracts.SpoolSetup // setups that went on the car, in order
 	Passes     []*contracts.SpoolPass
 	ParquetURI string         // directory that holds the session's Parquet parts
 	Lines      int            // non-empty lines in the file
@@ -30,7 +32,7 @@ type Chunk struct {
 type ChunkResult struct {
 	Inserted   int            // new corner_pass rows
 	Duplicates int            // passes that were already stored
-	Rejects    map[string]int // passes the store refused, by reason
+	Rejects    map[string]int // lines the store refused, by reason
 }
 
 // Store persists chunks. PostgresStore is the real one.
@@ -84,22 +86,21 @@ func (s *Service) addLine(chunk *Chunk, text []byte) {
 			"file", chunk.FileName, "line", chunk.Lines, "error", err.Error())
 		return
 	}
-	if line.Session != nil {
+	switch {
+	case line.Session != nil:
 		chunk.Header = line.Session
-		return
+	case line.Catalog != nil:
+		chunk.Catalog = line.Catalog
+	case line.Setup != nil:
+		chunk.Setups = append(chunk.Setups, line.Setup)
+	default:
+		chunk.Passes = append(chunk.Passes, line.Pass)
 	}
-	chunk.Passes = append(chunk.Passes, line.Pass)
 }
 
 // A line must belong to the session whose directory it is in.
 func checkSession(spoolID string, line Line) error {
-	lineID := ""
-	if line.Session != nil {
-		lineID = line.Session.SessionId
-	} else {
-		lineID = line.Pass.SessionId
-	}
-	if lineID != spoolID {
+	if lineID := line.SessionID(); lineID != spoolID {
 		return reject(ReasonSessionMismatch, "line is for session %q", lineID)
 	}
 	return nil

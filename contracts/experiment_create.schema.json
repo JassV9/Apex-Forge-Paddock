@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "experiment_create.schema.json",
+  "title": "ExperimentCreate",
+  "description": "A proposed experiment: one knob, one or more clicks, against the setup a session was driven on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "parameter",
+    "clicks",
+    "statement",
+    "predictions"
+  ],
+  "properties": {
+    "session_id": {
+      "description": "Core's id of the session whose latest setup is the baseline.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "parameter": {
+      "description": "Setup item to change.",
+      "type": "string",
+      "minLength": 1
+    },
+    "clicks": {
+      "description": "Clicks to move it; negative is down. Never 0.",
+      "type": "integer"
+    },
+    "statement": {
+      "description": "The hypothesis in words.",
+      "type": "string",
+      "minLength": 1
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PredictionSpec"
+      }
+    }
+  },
+  "definitions": {
+    "PredictionSpec": {
+      "title": "PredictionSpec",
+      "description": "What the hypothesis expects of one channel, written before driving.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "direction",
+        "low",
+        "high"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "decrease",
+            "increase"
+          ]
+        },
+        "low": {
+          "description": "Smallest expected size of the change.",
+          "type": "number",
+          "minimum": 0
+        },
+        "high": {
+          "description": "Largest expected size of the change.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

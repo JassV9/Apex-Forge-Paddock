@@ -12,7 +12,7 @@ import (
 const sampleSpool = "testdata/spool"
 
 // sampleLines returns every line the real agent wrote in testdata (see
-// agent/tests/export_spool_sample.py): one session line, then three passes.
+// agent/tests/export_spool_sample.py): session, catalog, setup, then three passes.
 func sampleLines(t *testing.T) [][]byte {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join(sampleSpool, "sample-session", "*.jsonl"))
@@ -32,14 +32,20 @@ func sampleLines(t *testing.T) [][]byte {
 	return lines
 }
 
+// samplePass is the first pass line of the sample.
+func samplePass(t *testing.T) string {
+	t.Helper()
+	return string(sampleLines(t)[3])
+}
+
 func TestDecodeAcceptsWhatTheAgentWrites(t *testing.T) {
 	decoder, err := NewDecoder()
 	if err != nil {
 		t.Fatalf("NewDecoder: %v", err)
 	}
 	lines := sampleLines(t)
-	if len(lines) != 4 {
-		t.Fatalf("sample has %d lines, want 4", len(lines))
+	if len(lines) != 6 {
+		t.Fatalf("sample has %d lines, want 6", len(lines))
 	}
 
 	session, err := decoder.Decode(lines[0])
@@ -49,7 +55,15 @@ func TestDecodeAcceptsWhatTheAgentWrites(t *testing.T) {
 	if session.Session == nil || len(session.Session.Track.Corners) != 7 {
 		t.Fatalf("session line decoded as %+v", session)
 	}
-	for index, raw := range lines[1:] {
+	catalog, err := decoder.Decode(lines[1])
+	if err != nil || catalog.Catalog == nil || len(catalog.Catalog.Parameters) != 35 {
+		t.Fatalf("catalog line: err=%v, decoded %+v", err, catalog.Catalog)
+	}
+	setup, err := decoder.Decode(lines[2])
+	if err != nil || setup.Setup == nil || setup.Setup.Values["ARB_FRONT"] != 3 {
+		t.Fatalf("setup line: err=%v, decoded %+v", err, setup.Setup)
+	}
+	for index, raw := range lines[3:] {
 		line, err := decoder.Decode(raw)
 		if err != nil {
 			t.Fatalf("pass line %d rejected: %v", index+1, err)
@@ -69,7 +83,7 @@ func TestDecodeRejects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDecoder: %v", err)
 	}
-	pass := string(sampleLines(t)[1])
+	pass := samplePass(t)
 	tests := []struct {
 		name       string
 		line       string

@@ -21,6 +21,13 @@ func NewPostgresStore(database *sql.DB) *PostgresStore {
 	return &PostgresStore{database: database}
 }
 
+// sessionRef is the stored session a chunk belongs to.
+type sessionRef struct {
+	id      int64
+	carID   int64
+	trackID int64
+}
+
 // DoneChunks implements Store.
 func (p *PostgresStore) DoneChunks(ctx context.Context, spoolID string) (map[string]bool, error) {
 	rows, err := p.database.QueryContext(ctx,
@@ -40,8 +47,9 @@ func (p *PostgresStore) DoneChunks(ctx context.Context, spoolID string) (map[str
 	return done, rows.Err()
 }
 
-// StoreChunk implements Store: the session, its passes and the "file ingested" mark are
-// written in one transaction, so a crash can never leave a file half ingested.
+// StoreChunk implements Store: the session, its setups and passes, the job that computes
+// their features and the "file ingested" mark are written in one transaction, so a crash can
+// never leave a file half ingested.
 func (p *PostgresStore) StoreChunk(ctx context.Context, chunk Chunk) (ChunkResult, error) {
 	tx, err := p.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -55,7 +63,7 @@ func (p *PostgresStore) StoreChunk(ctx context.Context, chunk Chunk) (ChunkResul
 			return ChunkResult{}, err
 		}
 	}
-	if err := savePasses(ctx, tx, chunk, &result); err != nil {
+	if err := saveContent(ctx, tx, chunk, &result); err != nil {
 		return ChunkResult{}, err
 	}
 	_, err = tx.ExecContext(ctx,
@@ -69,6 +77,53 @@ func (p *PostgresStore) StoreChunk(ctx context.Context, chunk Chunk) (ChunkResul
 		return ChunkResult{}, fmt.Errorf("commit: %w", err)
 	}
 	return result, nil
+}
+
+// saveContent stores everything in the chunk that hangs off the session.
+func saveContent(ctx context.Context, tx *sql.Tx, chunk Chunk, result *ChunkResult) error {
+	dependents := len(chunk.Setups) + len(chunk.Passes)
+	if chunk.Catalog != nil {
+		dependents++
+	}
+	if dependents == 0 {
+		return nil
+	}
+	session, found, err := findSession(ctx, tx, chunk.SpoolID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		result.Rejects[ReasonUnknownSession] += dependents
+		return nil
+	}
+	if chunk.Catalog != nil {
+		if err := saveCatalog(ctx, tx, session.carID, chunk.Catalog); err != nil {
+			return err
+		}
+	}
+	for _, setup := range chunk.Setups {
+		if err := saveSetup(ctx, tx, session.carID, setup); err != nil {
+			return err
+		}
+	}
+	if err := savePasses(ctx, tx, session, chunk.Passes, result); err != nil {
+		return err
+	}
+	return enqueueFeatures(ctx, tx, chunk)
+}
+
+func findSession(ctx context.Context, tx *sql.Tx, spoolID string) (sessionRef, bool, error) {
+	var session sessionRef
+	err := tx.QueryRowContext(ctx,
+		`SELECT id, car_id, track_id FROM session WHERE spool_id = $1`, spoolID).
+		Scan(&session.id, &session.carID, &session.trackID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sessionRef{}, false, nil
+	}
+	if err != nil {
+		return sessionRef{}, false, fmt.Errorf("find session: %w", err)
+	}
+	return session, true, nil
 }
 
 func saveSession(ctx context.Context, tx *sql.Tx, s *contracts.SpoolSession, parquetURI string) error {
@@ -114,32 +169,21 @@ func saveSession(ctx context.Context, tx *sql.Tx, s *contracts.SpoolSession, par
 	return nil
 }
 
-func savePasses(ctx context.Context, tx *sql.Tx, chunk Chunk, result *ChunkResult) error {
-	if len(chunk.Passes) == 0 {
+func savePasses(ctx context.Context, tx *sql.Tx, session sessionRef, passes []*contracts.SpoolPass, result *ChunkResult) error {
+	if len(passes) == 0 {
 		return nil
 	}
-	var sessionID, trackID int64
-	err := tx.QueryRowContext(ctx,
-		`SELECT id, track_id FROM session WHERE spool_id = $1`, chunk.SpoolID).
-		Scan(&sessionID, &trackID)
-	if errors.Is(err, sql.ErrNoRows) {
-		result.Rejects[ReasonUnknownSession] += len(chunk.Passes)
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("find session: %w", err)
-	}
-	corners, err := cornerIDs(ctx, tx, trackID)
+	corners, err := cornerIDs(ctx, tx, session.trackID)
 	if err != nil {
 		return err
 	}
-	for _, pass := range chunk.Passes {
+	for _, pass := range passes {
 		cornerID, known := corners[pass.Corner]
 		if !known {
 			result.Rejects[ReasonUnknownCorner]++
 			continue
 		}
-		inserted, err := insertPass(ctx, tx, sessionID, cornerID, pass)
+		inserted, err := insertPass(ctx, tx, session, cornerID, pass)
 		if err != nil {
 			return fmt.Errorf("save pass %d: %w", pass.Seq, err)
 		}

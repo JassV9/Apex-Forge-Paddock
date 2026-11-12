@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spool_catalog.schema.json",
+  "title": "SpoolCatalog",
+  "description": "The car's setup menu, written once per session by the agent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "v",
+    "session_id",
+    "parameters"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "catalog"
+      ]
+    },
+    "v": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SetupParameter"
+      }
+    }
+  },
+  "definitions": {
+    "SetupParameter": {
+      "title": "SetupParameter",
+      "description": "One item of the car's setup menu, as the game reports it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "tab",
+        "min",
+        "max",
+        "step",
+        "shown_scale",
+        "excluded"
+      ],
+      "properties": {
+        "name": {
+          "description": "The game's item name, e.g. ARB_FRONT.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "description": "What the setup menu calls it.",
+          "type": "string"
+        },
+        "tab": {
+          "description": "Setup menu tab; empty when the car does not say.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "How the menu shows the value, e.g. clicks or a list.",
+          "type": "string"
+        },
+        "min": {
+          "description": "Lowest raw value.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Highest raw value.",
+          "type": "number"
+        },
+        "step": {
+          "description": "Raw value of one click.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shown_scale": {
+          "description": "Raw value times this is what the menu shows.",
+          "type": "number"
+        },
+        "role": {
+          "description": "What the item does (arb, wing, camber, ...), read from its label.",
+          "type": "string"
+        },
+        "axle": {
+          "description": "F or R when the item belongs to one axle.",
+          "type": "string"
+        },
+        "excluded": {
+          "description": "True for items an experiment must not change (power unit, display, read-only).",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -93,7 +93,7 @@ func TestAgentPassesAreStoredWithTheirConditions(t *testing.T) {
 func TestPassesWithoutTheirSessionAreRejectedNotLost(t *testing.T) {
 	database := testdb.Open(t, "ingest_orphan")
 	spool := t.TempDir()
-	writeChunk(t, spool, "sample-session", "000002.jsonl", string(sampleLines(t)[1])+"\n")
+	writeChunk(t, spool, "sample-session", "000002.jsonl", samplePass(t)+"\n")
 
 	scanInto(t, database, spool)
 
@@ -102,5 +102,30 @@ func TestPassesWithoutTheirSessionAreRejectedNotLost(t *testing.T) {
 	}
 	if got := count(t, database, `SELECT rejected FROM spool_chunk WHERE file_name = '000002.jsonl'`); got != 1 {
 		t.Errorf("chunk recorded %d rejected lines, want 1", got)
+	}
+}
+
+func TestSetupMenuAndSetupVersionsAreStoredAndLinked(t *testing.T) {
+	database := testdb.Open(t, "ingest_setups")
+
+	scanInto(t, database, sampleSpool)
+
+	for query, want := range map[string]int{
+		`SELECT count(*) FROM setup_parameter`:                                           35,
+		`SELECT count(*) FROM setup_parameter WHERE name = 'ARB_FRONT' AND role = 'arb'`: 1,
+		`SELECT count(*) FROM setup_version WHERE created_by = 'agent'`:                  1,
+		`SELECT count(*) FROM corner_pass WHERE setup_version_id IS NOT NULL`:            3,
+		`SELECT count(*) FROM corner_pass WHERE block_id IS NOT NULL`:                    0,
+		`SELECT count(*) FROM jobs WHERE kind = 'features' AND state = 'queued'`:         3,
+	} {
+		if got := count(t, database, query); got != want {
+			t.Errorf("%s = %d, want %d", query, got, want)
+		}
+	}
+	var front float64
+	err := database.QueryRowContext(context.Background(),
+		`SELECT ("values"->>'ARB_FRONT')::float8 FROM setup_version`).Scan(&front)
+	if err != nil || front != 3 {
+		t.Errorf("stored ARB_FRONT = %v (err=%v), want 3", front, err)
 	}
 }

@@ -1,0 +1,483 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "experiment.schema.json",
+  "title": "Experiment",
+  "description": "An experiment with its plan, results, verdict and history.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "state",
+    "statement",
+    "car_name",
+    "track_name",
+    "parameter",
+    "parameter_label",
+    "clicks",
+    "success_test",
+    "guardrails",
+    "predictions",
+    "arms",
+    "blocks",
+    "results",
+    "events",
+    "extensions",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "ofat",
+        "factorial",
+        "recheck"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "planned",
+        "running",
+        "evaluating",
+        "accepted",
+        "rejected",
+        "tradeoff",
+        "inconclusive",
+        "reverted",
+        "aborted",
+        "discarded"
+      ]
+    },
+    "statement": {
+      "description": "The hypothesis in words.",
+      "type": "string"
+    },
+    "car_name": {
+      "type": "string"
+    },
+    "track_name": {
+      "type": "string"
+    },
+    "parameter": {
+      "description": "Setup item that is changed.",
+      "type": "string"
+    },
+    "parameter_label": {
+      "description": "What the setup menu calls it.",
+      "type": "string"
+    },
+    "clicks": {
+      "description": "Clicks the variant moves it; negative is down.",
+      "type": "integer"
+    },
+    "success_test": {
+      "$ref": "#/definitions/SuccessTest"
+    },
+    "guardrails": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/GuardrailSpec"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PredictionSpec"
+      }
+    },
+    "arms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentArm"
+      }
+    },
+    "plan": {
+      "$ref": "#/definitions/PlanSummary"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentBlock"
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentResult"
+      }
+    },
+    "verdict": {
+      "$ref": "#/definitions/VerdictSummary"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentEvent"
+      }
+    },
+    "extensions": {
+      "description": "Times the plan was extended after an inconclusive result (at most 2).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "description": "RFC 3339, UTC.",
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "SuccessTest": {
+      "title": "SuccessTest",
+      "description": "The test an experiment must pass, fixed before driving.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "rope",
+        "level",
+        "better"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id of the primary response.",
+          "type": "string",
+          "minLength": 1
+        },
+        "rope": {
+          "description": "Half-width of the band of effects too small to matter, in the channel's unit.",
+          "type": "number",
+          "minimum": 0
+        },
+        "level": {
+          "description": "Confidence level of the interval.",
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "better": {
+          "description": "Which direction is an improvement.",
+          "type": "string",
+          "enum": [
+            "lower",
+            "higher"
+          ]
+        }
+      }
+    },
+    "GuardrailSpec": {
+      "title": "GuardrailSpec",
+      "description": "A channel that must not get worse by more than a tolerance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "tolerance",
+        "worse"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tolerance": {
+          "description": "Allowed change in the bad direction, in the channel's unit.",
+          "type": "number",
+          "minimum": 0
+        },
+        "worse": {
+          "description": "Which direction is bad.",
+          "type": "string",
+          "enum": [
+            "higher",
+            "lower"
+          ]
+        }
+      }
+    },
+    "PredictionSpec": {
+      "title": "PredictionSpec",
+      "description": "What the hypothesis expects of one channel, written before driving.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "direction",
+        "low",
+        "high"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "decrease",
+            "increase"
+          ]
+        },
+        "low": {
+          "description": "Smallest expected size of the change.",
+          "type": "number",
+          "minimum": 0
+        },
+        "high": {
+          "description": "Largest expected size of the change.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "ExperimentArm": {
+      "title": "ExperimentArm",
+      "description": "One setup of the experiment.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "is_baseline",
+        "setup_version_id",
+        "value"
+      ],
+      "properties": {
+        "label": {
+          "description": "Code name shown to the driver.",
+          "type": "string"
+        },
+        "is_baseline": {
+          "type": "boolean"
+        },
+        "setup_version_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "value": {
+          "description": "Raw value of the changed item on this arm.",
+          "type": "number"
+        }
+      }
+    },
+    "PlanSummary": {
+      "title": "PlanSummary",
+      "description": "What the plan can answer, computed before driving.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sigma",
+        "sigma_source",
+        "passes_per_arm",
+        "mde_detect",
+        "mde_decide"
+      ],
+      "properties": {
+        "sigma": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sigma_source": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "assumed"
+          ]
+        },
+        "passes_per_arm": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mde_detect": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mde_decide": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "ExperimentBlock": {
+      "title": "ExperimentBlock",
+      "description": "One block of the run plan and how much of it is driven.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order",
+        "label",
+        "laps_target",
+        "laps_done",
+        "passes"
+      ],
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "description": "Code name of the setup to load.",
+          "type": "string"
+        },
+        "laps_target": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "laps_done": {
+          "description": "Push laps driven in this block (the out-lap does not count).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "passes": {
+          "description": "Corner passes recorded in this block.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ExperimentResult": {
+      "title": "ExperimentResult",
+      "description": "The measured effect on one channel.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "role",
+        "corner_class",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes",
+        "effect_class"
+      ],
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "guardrail",
+            "driver_input",
+            "prediction"
+          ]
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_class": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "negligible",
+            "inconclusive"
+          ]
+        }
+      }
+    },
+    "VerdictSummary": {
+      "title": "VerdictSummary",
+      "description": "How the experiment ended.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "reason",
+        "decided_by",
+        "decided_at",
+        "prediction_hits",
+        "prediction_total"
+      ],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "rejected",
+            "tradeoff",
+            "inconclusive",
+            "reverted",
+            "aborted"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "decided_by": {
+          "type": "string",
+          "enum": [
+            "engine",
+            "driver"
+          ]
+        },
+        "decided_at": {
+          "description": "RFC 3339, UTC.",
+          "type": "string"
+        },
+        "prediction_hits": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prediction_total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ExperimentEvent": {
+      "title": "ExperimentEvent",
+      "description": "One state transition.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "reason",
+        "at"
+      ],
+      "properties": {
+        "from": {
+          "description": "State before; empty for the creation.",
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "at": {
+          "description": "RFC 3339, UTC.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "experiment_decision.schema.json",
+  "title": "ExperimentDecision",
+  "description": "The driver's call on a trade-off.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accept"
+  ],
+  "properties": {
+    "accept": {
+      "description": "True keeps the variant; false goes back to the baseline.",
+      "type": "boolean"
+    }
+  }
+}

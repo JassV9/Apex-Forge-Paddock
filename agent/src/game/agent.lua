@@ -36,11 +36,20 @@ end
 
 -- The setup can only change in the pits, so the hash is refreshed at start and on pit exit.
 local function refreshSetupHash()
-  local ok, key = pcall(function()
+  local ok, key, values = pcall(function()
     if not setup.cat and not setup.scan(nil) then return nil end
-    return setup.key(setup.current())
+    local current = setup.current()
+    return setup.key(current), current
   end)
-  agent.setupHash = ok and key ~= "unknown" and key or nil
+  local hash = ok and key ~= "unknown" and key or nil
+  if hash and not agent.catalogSent then
+    agent.out:add(lines.catalog(agent.sessionId, setup.cat))
+    agent.catalogSent = true
+  end
+  if hash and hash ~= agent.setupHash then
+    agent.out:add(lines.setup(agent.sessionId, hash, values))
+  end
+  agent.setupHash = hash
 end
 
 local function sessionMeta()

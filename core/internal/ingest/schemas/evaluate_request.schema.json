@@ -1,0 +1,214 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evaluate_request.schema.json",
+  "title": "EvaluateRequest",
+  "description": "Core asks the engine to judge a driven experiment (POST /evaluate).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "success_test",
+    "guardrails",
+    "predictions",
+    "driver_channels",
+    "passes"
+  ],
+  "properties": {
+    "success_test": {
+      "$ref": "#/definitions/SuccessTest"
+    },
+    "guardrails": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/GuardrailSpec"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PredictionSpec"
+      }
+    },
+    "driver_channels": {
+      "description": "Driver-input metrics; a shift in them means the driver adapted to the setup.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "passes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/EvaluatePass"
+      }
+    }
+  },
+  "definitions": {
+    "SuccessTest": {
+      "title": "SuccessTest",
+      "description": "The test an experiment must pass, fixed before driving.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "rope",
+        "level",
+        "better"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id of the primary response.",
+          "type": "string",
+          "minLength": 1
+        },
+        "rope": {
+          "description": "Half-width of the band of effects too small to matter, in the channel's unit.",
+          "type": "number",
+          "minimum": 0
+        },
+        "level": {
+          "description": "Confidence level of the interval.",
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "better": {
+          "description": "Which direction is an improvement.",
+          "type": "string",
+          "enum": [
+            "lower",
+            "higher"
+          ]
+        }
+      }
+    },
+    "GuardrailSpec": {
+      "title": "GuardrailSpec",
+      "description": "A channel that must not get worse by more than a tolerance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "tolerance",
+        "worse"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tolerance": {
+          "description": "Allowed change in the bad direction, in the channel's unit.",
+          "type": "number",
+          "minimum": 0
+        },
+        "worse": {
+          "description": "Which direction is bad.",
+          "type": "string",
+          "enum": [
+            "higher",
+            "lower"
+          ]
+        }
+      }
+    },
+    "PredictionSpec": {
+      "title": "PredictionSpec",
+      "description": "What the hypothesis expects of one channel, written before driving.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "direction",
+        "low",
+        "high"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "decrease",
+            "increase"
+          ]
+        },
+        "low": {
+          "description": "Smallest expected size of the change.",
+          "type": "number",
+          "minimum": 0
+        },
+        "high": {
+          "description": "Largest expected size of the change.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "EvaluatePass": {
+      "title": "EvaluatePass",
+      "description": "One corner pass of the experiment.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corner",
+        "arm",
+        "block",
+        "metrics",
+        "covariates"
+      ],
+      "properties": {
+        "corner": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "arm": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "variant"
+          ]
+        },
+        "block": {
+          "description": "Order of the run block the pass was driven in.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "lap": {
+          "description": "Lap within the session; passes of one lap share their errors.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "speed_class": {
+          "type": "string",
+          "enum": [
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "metrics": {
+          "description": "Metric id to value; null when it could not be measured on this pass.",
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "covariates": {
+          "description": "Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

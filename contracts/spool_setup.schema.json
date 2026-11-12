@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spool_setup.schema.json",
+  "title": "SpoolSetup",
+  "description": "The setup on the car: written at session start and whenever it changed in the pits.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "v",
+    "session_id",
+    "setup_hash",
+    "values"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "setup"
+      ]
+    },
+    "v": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$"
+    },
+    "setup_hash": {
+      "description": "The agent's fingerprint of these values; passes carry the same hash.",
+      "type": "string",
+      "minLength": 1
+    },
+    "values": {
+      "description": "Setup item name to raw value, as the setup menu's spinners hold it.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
+  }
+}

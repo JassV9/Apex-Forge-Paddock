@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evaluate_response.schema.json",
+  "title": "EvaluateResponse",
+  "description": "The engine's verdict on an experiment, with the numbers behind it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision",
+    "reason",
+    "results",
+    "guardrails",
+    "prediction_hits",
+    "prediction_total",
+    "driver_adapted",
+    "passes_used",
+    "passes_excluded"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rejected",
+        "tradeoff",
+        "inconclusive"
+      ]
+    },
+    "reason": {
+      "description": "One sentence a person can read.",
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ChannelResult"
+      }
+    },
+    "guardrails": {
+      "type": "array",
+      "items": {
+        "title": "GuardrailResult",
+        "description": "Whether one guardrail held.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel",
+          "status"
+        ],
+        "properties": {
+          "channel": {
+            "description": "Metric id.",
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "description": "holds: within tolerance. moved: the estimate is past the tolerance but the interval is not. broke: the whole interval is past it. unknown: not enough data.",
+            "type": "string",
+            "enum": [
+              "holds",
+              "moved",
+              "broke",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "prediction_hits": {
+      "description": "Predictions whose direction came true.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "prediction_total": {
+      "description": "Predictions that could be checked.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "driver_adapted": {
+      "description": "True when a driver-input channel shifted between the setups: the effect may be the driver, not the car.",
+      "type": "boolean"
+    },
+    "passes_used": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "passes_excluded": {
+      "description": "Passes left out: not valid, or missing the primary channel.",
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "definitions": {
+    "ChannelResult": {
+      "title": "ChannelResult",
+      "description": "The variant's effect on one channel: variant minus baseline per corner pass.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "role",
+        "corner_class",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes",
+        "effect_class"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "description": "Why the channel was evaluated.",
+          "type": "string",
+          "enum": [
+            "primary",
+            "guardrail",
+            "driver_input",
+            "prediction"
+          ]
+        },
+        "corner_class": {
+          "description": "all, or the speed class the estimate is restricted to.",
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "description": "Variant minus baseline.",
+          "type": "number"
+        },
+        "ci_low": {
+          "description": "Lower end of the interval.",
+          "type": "number"
+        },
+        "ci_high": {
+          "description": "Upper end of the interval.",
+          "type": "number"
+        },
+        "n_passes": {
+          "description": "Passes used, both arms.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_class": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "negligible",
+            "inconclusive"
+          ]
+        }
+      }
+    }
+  }
+}

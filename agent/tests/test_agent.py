@@ -24,10 +24,10 @@ def test_two_laps_produce_a_valid_spool(agent: Agent) -> None:
     drive_laps(agent, 2)
 
     lines = agent.lines()
-    session, passes = lines[0], lines[1:]
-    jsonschema.Draft7Validator(schema("spool_session")).validate(session)
-    for record in passes:
-        jsonschema.Draft7Validator(schema("spool_pass")).validate(record)
+    for record in lines:
+        jsonschema.Draft7Validator(schema(f"spool_{record['kind']}")).validate(record)
+    session, passes = lines[0], agent.passes()
+    assert [record["kind"] for record in lines[:3]] == ["session", "catalog", "setup"]
     assert Counter(record["corner"] for record in passes) == {n: 2 for n in range(1, CORNERS + 1)}
     assert [record["seq"] for record in passes] == list(range(1, 2 * CORNERS + 1))
     assert {record["session_id"] for record in lines} == {session["session_id"]}
@@ -95,6 +95,28 @@ def test_restart_teleport_pits_and_replay_never_leave_a_partial_pass(agent: Agen
         assert 0.8 * expected < record["duration_s"] < 1.2 * expected
     aborts = dict(agent.drive.agent["rec"]["aborts"].items())
     assert {"session restart", "car reset", "not driving", "replay"} <= set(aborts)
+
+
+def test_setup_menu_and_current_setup_are_written_once_and_on_change(agent: Agent) -> None:
+    drive_laps(agent, 1)
+    agent.drive.pit(True)
+    agent.mock["setup"]["ARB_FRONT"] = agent.mock["setup"]["ARB_FRONT"] + 1
+    agent.drive.pit(False)
+    drive_laps(agent, 1)
+
+    lines = agent.lines()
+    catalogs = [record for record in lines if record["kind"] == "catalog"]
+    setups = [record for record in lines if record["kind"] == "setup"]
+    assert len(catalogs) == 1
+    parameters = {item["name"]: item for item in catalogs[0]["parameters"]}
+    assert parameters["ARB_FRONT"]["role"] == "arb" and parameters["ARB_FRONT"]["axle"] == "F"
+    assert (parameters["CAMBER_LF"]["min"], parameters["CAMBER_LF"]["step"]) == (-38, 1)
+    assert len(setups) == 2
+    first, second = setups
+    assert second["values"]["ARB_FRONT"] == first["values"]["ARB_FRONT"] + 1
+    assert first["setup_hash"] != second["setup_hash"]
+    hashes = [record["setup_hash"] for record in agent.passes()]
+    assert hashes[0] == first["setup_hash"] and hashes[-1] == second["setup_hash"]
 
 
 def test_ai_controlled_car_is_not_recorded(agent: Agent) -> None:

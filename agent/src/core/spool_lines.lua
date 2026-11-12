@@ -64,6 +64,51 @@ function lines.session(meta, map)
   })
 end
 
+local function parameterJson(item)
+  local parts = {
+    '{"name":', quote(item.name), ',"label":', quote(item.label), ',"tab":', quote(item.tab),
+    ',"min":', num(item.min, 4), ',"max":', num(item.max, 4), ',"step":', num(item.step, 4),
+    ',"shown_scale":', num(item.mult or 1, 6),
+    ',"excluded":', item.auto and "false" or "true",
+  }
+  for _, field in ipairs({ "kind", "role", "axle" }) do
+    if item[field] then
+      parts[#parts + 1] = ',"' .. field .. '":'
+      parts[#parts + 1] = quote(item[field])
+    end
+  end
+  parts[#parts + 1] = "}"
+  return concat(parts)
+end
+
+---The car's setup menu, once per session.
+---@param sessionId string
+---@param cat table catalog from catalog.build
+function lines.catalog(sessionId, cat)
+  local items = {}
+  for i, item in ipairs(cat.items) do items[i] = parameterJson(item) end
+  return concat({
+    '{"kind":"catalog","v":1,"session_id":', quote(sessionId),
+    ',"parameters":[', concat(items, ","), "]}",
+  })
+end
+
+---The setup on the car: its fingerprint and every value that makes it up.
+---@param sessionId string
+---@param hash string from versions.key
+---@param values table item name -> raw value
+function lines.setup(sessionId, hash, values)
+  local names = {}
+  for name in pairs(values) do names[#names + 1] = name end
+  table.sort(names)
+  local pairsJson = {}
+  for i, name in ipairs(names) do pairsJson[i] = quote(name) .. ":" .. num(values[name], 4) end
+  return concat({
+    '{"kind":"setup","v":1,"session_id":', quote(sessionId), ',"setup_hash":', quote(hash),
+    ',"values":{', concat(pairsJson, ","), "}}",
+  })
+end
+
 local function conditionsJson(c)
   return concat({
     ',"conditions":{"fuel_l":', num(c.fuel, 2),
@@ -87,6 +132,12 @@ local function headJson(raw, meta)
     parts[#parts + 1] = ',"setup_hash":'
     parts[#parts + 1] = quote(meta.setupHash)
   end
+  if meta.block then
+    parts[#parts + 1] = concat({
+      ',"block":{"experiment_id":', int(meta.block.experimentId), ',"order":', int(meta.block.order),
+      ',"lap":', int(meta.block.lap), "}",
+    })
+  end
   if meta.conditions then parts[#parts + 1] = conditionsJson(meta.conditions) end
   return concat(parts)
 end
@@ -105,7 +156,7 @@ end
 
 ---Start encoding a finished pass. Call lines.step until it returns the line.
 ---@param raw table finished pass from recorder:feed (corner, n, cols, tIn, tOut)
----@param meta table sessionId, seq, startMs, lap?, setupHash?, conditions?
+---@param meta table sessionId, seq, startMs, lap?, setupHash?, block?, conditions?
 function lines.beginPass(raw, meta)
   return { raw = raw, head = headJson(raw, meta), encoded = {}, done = 0 }
 end

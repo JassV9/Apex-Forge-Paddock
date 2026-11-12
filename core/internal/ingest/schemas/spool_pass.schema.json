@@ -62,6 +62,33 @@
       "type": "string",
       "minLength": 1
     },
+    "block": {
+      "title": "PassBlock",
+      "description": "The run-plan block the pass was driven in, when an experiment is running.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "order",
+        "lap"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "order": {
+          "description": "The block's position in the plan.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "lap": {
+          "description": "Laps completed in the block when the pass ended; 0 is the out-lap.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "conditions": {
       "title": "PassConditions",
       "description": "State of the car and track when the pass ended. FL, FR, RL, RR order.",

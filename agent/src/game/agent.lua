@@ -5,6 +5,7 @@
 local carlink = require("game.carlink")
 local corners = require("core.corners")
 local lines = require("core.spool_lines")
+local plan = require("game.plan")
 local recorder = require("core.recorder")
 local setup = require("game.setup")
 local spool = require("core.spool")
@@ -80,8 +81,12 @@ function agent.init()
   agent.wasInPit = ac.getCar(0).isInPitlane
   refreshSetupHash()
   if ac.onSessionStart then
-    ac.onSessionStart(function() agent.rec:reset("session restart") end)
+    ac.onSessionStart(function()
+      agent.rec:reset("session restart")
+      plan.pit()
+    end)
   end
+  plan.poll(agent.t)
   agent.ready = true
   agent.status = string.format("recording %d corners", #agent.map.list)
 end
@@ -106,7 +111,7 @@ local function encode(raw, car)
   agent.job = lines.beginPass(raw, {
     sessionId = agent.sessionId, seq = agent.passes,
     startMs = nowMs() - (raw.tOut - raw.tIn) * 1000,
-    lap = car.lapCount, setupHash = agent.setupHash,
+    lap = car.lapCount, setupHash = agent.setupHash, block = plan.tag(),
     conditions = carlink.conditions(car, ac.getSim()),
   })
 end
@@ -137,10 +142,17 @@ function agent.update(dt)
     agent.rec:reset("car reset")
   end
   local inPit = car.isInPitlane
-  if agent.wasInPit and not inPit then refreshSetupHash() end
+  if inPit then
+    plan.pit()
+    plan.poll(agent.t)
+  elseif agent.wasInPit then
+    refreshSetupHash()
+    plan.leftPit()
+  end
   agent.wasInPit = inPit
 
   local driving = (not inPit) and (not car.isAIControlled)
+  if driving then plan.position(car.splinePosition) end
   local raw = agent.rec:feed(carlink.read(car, agent.trackLength, agent.t), driving)
   if raw then encode(raw, car) end
   stepEncoding()

@@ -4,6 +4,7 @@
 package.add("src")
 
 local agent = require("game.agent")
+local plan = require("game.plan")
 
 local ok, err = pcall(agent.init)
 if not ok then
@@ -26,9 +27,13 @@ end
 function script.windowMain()
   ui.text("Paddock agent " .. agent.VERSION)
   ui.text(agent.status)
-  if agent.ready then
-    ui.text(string.format("%d passes recorded, %d spool files written", agent.passes, agent.writes))
-  end
+  if not agent.ready then return end
+  ui.text(string.format("%d passes recorded, %d spool files written", agent.passes, agent.writes))
+  ui.separator()
+  -- the run plan: code names only, so the driver does not know which setup is the baseline
+  ui.text(plan.status())
+  if plan.canLoad() and ui.button("Load " .. plan.label()) then plan.loadBlock() end
+  if plan.message ~= "" then ui.text(plan.message) end
 end
 
 ac.onRelease(function() pcall(agent.shutdown) end)

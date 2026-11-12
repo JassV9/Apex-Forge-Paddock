@@ -31,6 +31,7 @@ web/coverage/
 data/
 *.parquet
 !datasets/demo/**/*.parquet
+!engine/tests/fixtures/**/*.parquet
 
 # Terraform
 .terraform/

@@ -1,4 +1,4 @@
-import type { Experiment } from "./api/client";
+import type { Diagnosis, Experiment } from "./api/client";
 
 /** An experiment that is being driven: a softer front anti-roll bar, two of four blocks done. */
 export const running: Experiment = {
@@ -6,6 +6,7 @@ export const running: Experiment = {
   kind: "ofat",
   state: "running",
   statement: "A softer front bar gives the front more grip.",
+  source: "human",
   car_name: "Mazda MX-5 Cup",
   track_name: "Test Ring",
   parameter: "ARB_FRONT",
@@ -100,4 +101,76 @@ export const tradeoff: Experiment = {
       at: "2026-11-12T10:30:00Z",
     },
   ],
+};
+
+/** A session where slow-corner understeer is as well explained by the driver's steering. */
+export const diagnosis: Diagnosis = {
+  evidence: [
+    {
+      id: "front_slip_mid_deg.slow",
+      metric: "front_slip_mid_deg",
+      corner_class: "slow",
+      value: 7.667,
+      passes: 32,
+    },
+    {
+      id: "rear_slip_mid_deg.slow",
+      metric: "rear_slip_mid_deg",
+      corner_class: "slow",
+      value: 3.271,
+      passes: 32,
+    },
+    {
+      id: "front_slip_mid_deg.fast",
+      metric: "front_slip_mid_deg",
+      corner_class: "fast",
+      value: 3.706,
+      passes: 5,
+    },
+  ],
+  hypotheses: [
+    {
+      key: "mid_understeer.slow",
+      statement:
+        "Understeer mid-corner in slow corners: the front axle slips 7.7 degrees against 3.3 at the rear.",
+      phase: "mid",
+      corner_class: "slow",
+      score: 3.35,
+      evidence: ["front_slip_mid_deg.slow", "rear_slip_mid_deg.slow"],
+      alternatives: [
+        {
+          kind: "driver_input",
+          statement:
+            "This is the pattern of steering past the front tyre's peak (front saturation).",
+          supported: true,
+          evidence: ["front_slip_mid_deg.slow", "front_slip_mid_deg.fast"],
+        },
+        {
+          kind: "conditions",
+          statement: "Tyre temperature, fuel load and track grip were not compared.",
+          supported: false,
+          evidence: [],
+        },
+      ],
+      candidates: [
+        {
+          parameter: "ARB_FRONT",
+          label: "Front ARB",
+          clicks: -1,
+          why: "a softer front bar gives more front grip mid-corner",
+          expects: [
+            { channel: "corner_time_s", direction: "decrease" },
+            { channel: "front_slip_mid_deg", direction: "decrease" },
+          ],
+        },
+      ],
+      not_testable: ["Camber LF: a left/right pair cannot be changed in one experiment yet."],
+    },
+  ],
+  explanation: {
+    provider: "none",
+    summary: "Strongest reading: understeer mid-corner in slow corners.",
+    ranking: [],
+    rejected: "",
+  },
 };

@@ -1,5 +1,6 @@
 import { fetchSessions, type SessionSummary } from "../api/client";
 import { useLoaded } from "../hooks/useLoaded";
+import { sessionHref } from "../hooks/useRoute";
 
 interface SessionListProps {
   /** Injected in tests; the real client by default. */
@@ -28,6 +29,9 @@ function SessionRow({ session }: { session: SessionSummary }) {
       <td>{SOURCE_LABEL[session.source]}</td>
       <td>{session.passes}</td>
       <td>{session.corners}</td>
+      <td>
+        <a href={sessionHref(session.id)}>Diagnosis</a>
+      </td>
     </tr>
   );
 }
@@ -51,6 +55,7 @@ export function SessionList({ loadSessions = fetchSessions }: SessionListProps) 
           <th scope="col">Source</th>
           <th scope="col">Corner passes</th>
           <th scope="col">Corners</th>
+          <th scope="col">What it says</th>
         </tr>
       </thead>
       <tbody>

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "explain_reply.schema.json",
+  "title": "ExplainReply",
+  "description": "What a language model must answer when given an evidence pack. The engine rejects a reply that names a hypothesis or cites evidence that is not in the pack, or states a number the pack does not contain.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary",
+    "ranking"
+  ],
+  "properties": {
+    "summary": {
+      "description": "The diagnosis in two or three plain sentences.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200
+    },
+    "ranking": {
+      "description": "The pack's hypotheses in the order the writer would test them.",
+      "type": "array",
+      "items": {
+        "title": "RankedReply",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis",
+          "why",
+          "cites"
+        ],
+        "properties": {
+          "hypothesis": {
+            "description": "Key of a hypothesis in the pack.",
+            "type": "string",
+            "minLength": 1
+          },
+          "why": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "cites": {
+            "description": "Ids of evidence in the pack.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

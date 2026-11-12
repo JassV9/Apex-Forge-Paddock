@@ -10,6 +10,7 @@ import {
   type SetupItem,
 } from "../api/client";
 import { useLoaded } from "../hooks/useLoaded";
+import type { Prefill } from "../hooks/useRoute";
 
 /** The calls the form makes; injected in tests, the real client by default. */
 export interface ProposeApi {
@@ -26,6 +27,8 @@ const coreApi: ProposeApi = {
 
 interface ProposeFormProps {
   api?: ProposeApi;
+  /** A candidate experiment of a diagnosis to start the form from. */
+  prefill?: Prefill;
   /** Called with the stored experiment. */
   onProposed: (experiment: Experiment) => void;
 }
@@ -37,9 +40,24 @@ interface Draft {
   /** Expected gain per corner pass in seconds, low to high; empty for no prediction. */
   gainLow: string;
   gainHigh: string;
+  /** Key of the diagnosis hypothesis under test; empty for the driver's own. */
+  hypothesisKey: string;
 }
 
-const EMPTY: Draft = { parameter: "", clicks: -1, statement: "", gainLow: "", gainHigh: "" };
+const EMPTY: Draft = {
+  parameter: "",
+  clicks: -1,
+  statement: "",
+  gainLow: "",
+  gainHigh: "",
+  hypothesisKey: "",
+};
+
+function draftFrom(prefill: Prefill | undefined): Draft {
+  if (prefill === undefined) return EMPTY;
+  const { parameter, clicks, statement, hypothesisKey } = prefill;
+  return { ...EMPTY, parameter, clicks, statement, hypothesisKey };
+}
 
 /** The request body for a draft. The prediction is optional and is on corner time. */
 export function toRequest(sessionId: number, draft: Draft): ExperimentCreate {
@@ -52,6 +70,7 @@ export function toRequest(sessionId: number, draft: Draft): ExperimentCreate {
     clicks: draft.clicks,
     statement: draft.statement.trim(),
     predictions: predicted ? [{ channel: "corner_time_s", direction: "decrease", low, high }] : [],
+    ...(draft.hypothesisKey === "" ? {} : { hypothesis_key: draft.hypothesisKey }),
   };
 }
 
@@ -189,10 +208,10 @@ function SessionField({ sessions, value, choose }: SessionFieldProps) {
 }
 
 /** Proposes a one-item experiment against a recorded session. Nothing is driven yet. */
-export function ProposeForm({ api = coreApi, onProposed }: ProposeFormProps) {
+export function ProposeForm({ api = coreApi, prefill, onProposed }: ProposeFormProps) {
   const sessions = useLoaded(api.sessions);
-  const [chosen, setChosen] = useState<number | null>(null);
-  const [edited, setEdited] = useState(EMPTY);
+  const [chosen, setChosen] = useState<number | null>(prefill?.sessionId ?? null);
+  const [edited, setEdited] = useState(() => draftFrom(prefill));
   const [problem, setProblem] = useState("");
   const list = sessions.kind === "ready" ? sessions.value : [];
   const sessionId = chosen ?? list[0]?.id ?? null;
@@ -216,6 +235,12 @@ export function ProposeForm({ api = coreApi, onProposed }: ProposeFormProps) {
         });
       }}
     >
+      {draft.hypothesisKey !== "" && (
+        <p className="note">
+          Tests hypothesis <code>{draft.hypothesisKey}</code> of the session's diagnosis. Its
+          evidence and alternatives are stored with the experiment.
+        </p>
+      )}
       <SessionField sessions={list} value={sessionId} choose={setChosen} />
       <ChangeFields draft={draft} items={items} set={set} />
       <HypothesisFields draft={draft} set={set} />

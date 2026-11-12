@@ -5,6 +5,9 @@ import type { components, paths } from "./schema";
 export type Health = components["schemas"]["Health"];
 export type SessionSummary = components["schemas"]["SessionSummary"];
 export type SetupItem = components["schemas"]["SetupItem"];
+export type Diagnosis = components["schemas"]["Diagnosis"];
+export type Hypothesis = Diagnosis["hypotheses"][number];
+export type Evidence = Diagnosis["evidence"][number];
 export type Experiment = components["schemas"]["Experiment"];
 export type ExperimentCreate = components["schemas"]["ExperimentCreate"];
 export type ExperimentResult = components["schemas"]["ExperimentResult"];
@@ -33,6 +36,23 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
 export async function fetchSetupItems(sessionId: number): Promise<SetupItem[]> {
   const reply = await coreApi.GET("/sessions/{id}/setup", { params: { path: { id: sessionId } } });
   return unwrap(reply, "GET /sessions/{id}/setup");
+}
+
+/** The newest stored diagnosis of a session; null when it was never diagnosed. */
+export async function fetchDiagnosis(sessionId: number): Promise<Diagnosis | null> {
+  const reply = await coreApi.GET("/sessions/{id}/diagnosis", {
+    params: { path: { id: sessionId } },
+  });
+  if (reply.response.status === 404) return null;
+  return unwrap(reply, "GET /sessions/{id}/diagnosis");
+}
+
+/** Diagnoses the session now; core keeps the answer. */
+export async function runDiagnosis(sessionId: number): Promise<Diagnosis> {
+  const reply = await coreApi.POST("/sessions/{id}/diagnosis", {
+    params: { path: { id: sessionId } },
+  });
+  return unwrap(reply, "POST /sessions/{id}/diagnosis");
 }
 
 export async function fetchExperiments(): Promise<Experiment[]> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { experimentHref, parseRoute, type Route } from "./useRoute";
+import { experimentHref, parseRoute, proposeHref, type Route, sessionHref } from "./useRoute";
 
 describe("parseRoute", () => {
   const cases: [string, Route][] = [
@@ -10,6 +10,10 @@ describe("parseRoute", () => {
     ["#/propose", { page: "propose" }],
     ["#/experiments/12", { page: "experiment", id: 12 }],
     ["#/experiments/0", { page: "sessions" }],
+    ["#/sessions/4", { page: "session", id: 4 }],
+    ["#/sessions/x", { page: "sessions" }],
+    ["#/propose?session=2&parameter=ARB_FRONT&clicks=0", { page: "propose" }],
+    ["#/propose?session=x&parameter=ARB_FRONT&clicks=1", { page: "propose" }],
     ["#/experiments/abc", { page: "sessions" }],
     ["#/somewhere-else", { page: "sessions" }],
   ];
@@ -20,5 +24,21 @@ describe("parseRoute", () => {
 
   it("reads back the link of an experiment", () => {
     expect(parseRoute(experimentHref(7))).toEqual({ page: "experiment", id: 7 });
+  });
+
+  it("reads back the link of a session", () => {
+    expect(parseRoute(sessionHref(4))).toEqual({ page: "session", id: 4 });
+  });
+
+  it("reads back a candidate handed to the propose form, whatever its text", () => {
+    const prefill = {
+      sessionId: 2,
+      parameter: "ARB_FRONT",
+      clicks: -1,
+      hypothesisKey: "mid_understeer.slow",
+      statement: "Front slips 7.7° & rear 3.3? Test: a softer bar = more grip.",
+    };
+
+    expect(parseRoute(proposeHref(prefill))).toEqual({ page: "propose", prefill });
   });
 });

@@ -2,6 +2,32 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 4: diagnosis and explanation (2026-11-12)
+
+- Contracts: `diagnose_request`, `diagnosis`, `explain_reply`; `experiment` gains `source`
+  and `experiment_create` an optional `hypothesis_key`. OpenAPI with the diagnosis routes.
+- engine: `POST /diagnose`. An evidence pack (metric means per corner class); symptoms from
+  v0's thresholds; a driver-input and a conditions alternative on every hypothesis, with
+  driver input marked supported by front saturation or by front slip that depends on corner
+  speed while rear slip does not; v0's rule table as candidate experiments on the car's own
+  setup items, with a reason for every knob that cannot be tested.
+- engine: explanations. `NullProvider` (templates), `GeminiProvider`, `OpenRouterProvider`
+  behind one interface; a reply that ranks an unknown hypothesis, cites unknown evidence,
+  names an identifier or states a number that is not in the pack is rejected and the
+  template text is shown with the reason. Keys from the environment or the OS keyring.
+- core: `diagnosis` table (migration 00004), `POST` and `GET /sessions/{id}/diagnosis`. An
+  experiment proposed from a candidate stores where its hypothesis came from, with the
+  evidence and alternatives as shown.
+- web: diagnosis page per session; "Test this" fills the propose form; the experiment page
+  says where the hypothesis came from.
+- The end-to-end test now diagnoses the baseline session first. It found that a session
+  could be diagnosed while its features were still being computed, which stored an empty
+  diagnosis as if it were the whole one; core now answers 409 until they are done.
+
+Not verified: anything in Assetto Corsa; any real call to Gemini or OpenRouter (recorded
+transport only). The driver-input thresholds are judgement. Candidates have a direction and
+no size.
+
 ## Phase 3: experiments (2026-11-12)
 
 - Contracts: setup catalog and setup lines in the spool, `runplan`, `experiment` with its

@@ -13,5 +13,10 @@ services:
         source: demo-outbox
         target: /outbox
 
+  engine:
+    environment:
+      # the demo is the same for everyone: template text, no hosted model, no key
+      PADDOCK_LLM_PROVIDER: none
+
 volumes:
   demo-outbox:

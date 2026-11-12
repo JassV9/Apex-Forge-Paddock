@@ -10,6 +10,7 @@
     "kind",
     "state",
     "statement",
+    "source",
     "car_name",
     "track_name",
     "parameter",
@@ -57,6 +58,15 @@
     "statement": {
       "description": "The hypothesis in words.",
       "type": "string"
+    },
+    "source": {
+      "description": "Where the hypothesis came from: the diagnosis rules, a language model, or the human.",
+      "type": "string",
+      "enum": [
+        "rules",
+        "llm",
+        "human"
+      ]
     },
     "car_name": {
       "type": "string"

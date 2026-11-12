@@ -159,7 +159,7 @@ def start(work: Path, game_documents: Path) -> Stack:
             stack,
             [str(engine_python()), *uvicorn, "--port", port],
             REPO / "engine",
-            {},
+            {"PADDOCK_LLM_PROVIDER": "none"},  # the test never talks to a hosted model
             work / "engine.log",
         )
         _wait_healthy(engine_url, stack.processes[0], stack.logs[0])

@@ -1,0 +1,310 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "diagnosis.schema.json",
+  "title": "Diagnosis",
+  "description": "What a session's passes say about the car: computed evidence, ranked hypotheses with their alternatives and candidate experiments, and an explanation in words. Every number is in `evidence`; the explanation adds none.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence",
+    "hypotheses",
+    "explanation"
+  ],
+  "properties": {
+    "evidence": {
+      "description": "The evidence pack: every computed number a hypothesis or the explanation may cite.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Evidence"
+      }
+    },
+    "hypotheses": {
+      "description": "Most strongly supported first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Hypothesis"
+      }
+    },
+    "explanation": {
+      "$ref": "#/definitions/Explanation"
+    }
+  },
+  "definitions": {
+    "Evidence": {
+      "title": "Evidence",
+      "description": "One computed number: the mean of a metric over the valid passes of a corner class.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "metric",
+        "corner_class",
+        "value",
+        "passes"
+      ],
+      "properties": {
+        "id": {
+          "description": "Metric id and corner class, for example front_slip_mid_deg.slow.",
+          "type": "string",
+          "minLength": 1
+        },
+        "metric": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "value": {
+          "type": "number"
+        },
+        "passes": {
+          "description": "Passes the mean is over.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "Alternative": {
+      "title": "Alternative",
+      "description": "Another explanation of the same symptom that a setup change would not cure.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "statement",
+        "supported",
+        "evidence"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "driver_input",
+            "conditions"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supported": {
+          "description": "True when the evidence speaks for this alternative; false when it could only not be ruled out.",
+          "type": "boolean"
+        },
+        "evidence": {
+          "description": "Ids of the evidence it rests on.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Candidate": {
+      "title": "Candidate",
+      "description": "One experiment that would test the hypothesis: one setup item moved by a number of clicks.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "why",
+        "expects"
+      ],
+      "properties": {
+        "parameter": {
+          "description": "Item id in the game's setup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "description": "Clicks to move the item by; negative lowers the raw value.",
+          "type": "integer"
+        },
+        "why": {
+          "description": "The rule of thumb behind the candidate. A prior, not a measurement.",
+          "type": "string"
+        },
+        "expects": {
+          "description": "Which way each response channel should move if the hypothesis is right.",
+          "type": "array",
+          "items": {
+            "title": "Expectation",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "channel",
+              "direction"
+            ],
+            "properties": {
+              "channel": {
+                "type": "string",
+                "minLength": 1
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "decrease",
+                  "increase"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Hypothesis": {
+      "title": "Hypothesis",
+      "description": "A testable statement about the car, with the evidence for it and what else could explain it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "statement",
+        "phase",
+        "corner_class",
+        "score",
+        "evidence",
+        "alternatives",
+        "candidates",
+        "not_testable"
+      ],
+      "properties": {
+        "key": {
+          "description": "Stable id of the symptom, for example mid_understeer.slow.",
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "brake",
+            "entry",
+            "mid",
+            "exit"
+          ]
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "score": {
+          "description": "How far the symptom is beyond its threshold, lowered when an alternative is supported. Only for ranking.",
+          "type": "number",
+          "minimum": 0
+        },
+        "evidence": {
+          "description": "Ids of the evidence the hypothesis rests on.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "alternatives": {
+          "description": "Always includes driver input and conditions.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Alternative"
+          }
+        },
+        "candidates": {
+          "description": "Experiments on this car that would test it, in the rule table's order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Candidate"
+          }
+        },
+        "not_testable": {
+          "description": "Knobs the rule table names that cannot be tested here, each with the reason.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Explanation": {
+      "title": "Explanation",
+      "description": "The diagnosis in words. Written from the evidence pack by a language model or, without one, from templates. It carries no number that is not in the pack.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "summary",
+        "ranking",
+        "rejected"
+      ],
+      "properties": {
+        "provider": {
+          "description": "Who wrote the text that is shown.",
+          "type": "string",
+          "enum": [
+            "none",
+            "gemini",
+            "openrouter"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "ranking": {
+          "description": "The hypotheses in the order the writer would test them, each with its reason.",
+          "type": "array",
+          "items": {
+            "title": "RankedHypothesis",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis",
+              "why",
+              "cites"
+            ],
+            "properties": {
+              "hypothesis": {
+                "description": "Key of a hypothesis of this diagnosis.",
+                "type": "string",
+                "minLength": 1
+              },
+              "why": {
+                "type": "string"
+              },
+              "cites": {
+                "description": "Ids of the evidence the reason rests on.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "rejected": {
+          "description": "Why a language model's reply was thrown away and the template text is shown instead; empty when nothing was rejected.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

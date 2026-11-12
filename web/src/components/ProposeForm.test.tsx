@@ -83,6 +83,35 @@ describe("ProposeForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("above its maximum 4");
   });
 
+  it("starts from a diagnosis candidate and names the hypothesis it tests", async () => {
+    const api = apiWith();
+    const prefill = {
+      sessionId: 3,
+      parameter: "ARB_REAR",
+      clicks: 1,
+      statement: "Understeer in slow corners. Test: a stiffer rear bar.",
+      hypothesisKey: "mid_understeer.slow",
+    };
+    render(<ProposeForm api={api} prefill={prefill} onProposed={vi.fn()} />);
+
+    await screen.findByRole("option", { name: /Rear ARB/ });
+    expect(screen.getByLabelText("Setup item")).toHaveValue("ARB_REAR");
+    expect(screen.getByLabelText("Hypothesis")).toHaveValue(prefill.statement);
+    expect(screen.getByText("mid_understeer.slow")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Propose experiment" }));
+
+    await vi.waitFor(() => {
+      expect(api.create).toHaveBeenCalledWith({
+        session_id: 3,
+        parameter: "ARB_REAR",
+        clicks: 1,
+        statement: prefill.statement,
+        predictions: [],
+        hypothesis_key: "mid_understeer.slow",
+      });
+    });
+  });
+
   it("asks for a session when none was recorded", async () => {
     render(
       <ProposeForm api={apiWith({ sessions: () => Promise.resolve([]) })} onProposed={vi.fn()} />,
@@ -99,6 +128,7 @@ describe("toRequest", () => {
     statement: "Softer.",
     gainLow: "",
     gainHigh: "",
+    hypothesisKey: "",
   };
 
   it("sends no prediction when the gain is left empty or is not a range", () => {

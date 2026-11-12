@@ -82,6 +82,8 @@ game. Logs of both processes are printed when a step times out.
 | Dashboard says "Core is not reachable" | core is not on port 8080, or `PADDOCK_CORE_URL` points elsewhere | Start core; check the variable |
 | Core logs `spool line rejected` | A line in the spool breaks the contract | The log has the session, file, line number and the rule; `paddock_ingest_rejects_total{reason}` counts them |
 | A session never appears | `PADDOCK_SPOOL_DIR` (native) or `PADDOCK_SPOOL_HOST` (Docker) points at the wrong folder, or its first file `000001.jsonl` is missing | Core logs the spool folder at start; later files without the session line are rejected as `unknown_session` |
+| `POST /sessions/{id}/diagnosis` answers 409 | The session's features are still being computed, or it has no valid pass on its baseline setup | Wait and retry; check `PADDOCK_ENGINE_URL` and core's log |
+| The diagnosis says "gemini gave no reply" or "The reply was rejected" | The hosted model failed or wrote something that is not in the evidence | Nothing to fix: the template text is shown. Set `PADDOCK_LLM_PROVIDER=none` to stop asking |
 | `POST /experiments/{id}/evaluate` answers 409 "features of N passes are not computed yet" | The features worker has not caught up, or the engine is down | Wait and retry; check `PADDOCK_ENGINE_URL` and core's log |
 | `POST /experiments/{id}/start` answers 409 "no longer the champion" | Another experiment was accepted or rolled back since this one was proposed | Discard it and propose it again |
 | The end-to-end test needs two minutes to start on Windows | `localhost` resolves to IPv6 first and Docker's PostgreSQL only listens on IPv4 | Already handled in `agent/tests/e2e/stack.py`; use `127.0.0.1` in your own scripts |

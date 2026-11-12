@@ -149,6 +149,30 @@ def result(exp: dict[str, Any], channel: str) -> dict[str, Any]:
     return next(r for r in exp["results"] if r["channel"] == channel and r["corner_class"] == "all")
 
 
+def check_diagnosis(rig: Rig) -> None:
+    """The baseline session is diagnosed without a language model, once its features are
+    computed: every reference is in the evidence pack and candidates are real setup items."""
+    backend = rig.backend
+    session = backend.get("/sessions")[0]["id"]
+    path = f"/sessions/{session}/diagnosis"
+
+    def diagnosed() -> Any:
+        status, body = backend.request("POST", path)
+        return body if status == 201 else None
+
+    diagnosis = rig.wait("the diagnosis of the baseline session", diagnosed)
+    ids = {reading["id"] for reading in diagnosis["evidence"]}
+    items = {item["name"] for item in backend.get(f"/sessions/{session}/setup")}
+    assert ids, f"the passes gave evidence: {diagnosis}"
+    assert diagnosis["explanation"]["provider"] == "none"
+    assert diagnosis["explanation"]["rejected"] == ""
+    for hypothesis in diagnosis["hypotheses"]:
+        assert set(hypothesis["evidence"]) <= ids
+        assert {a["kind"] for a in hypothesis["alternatives"]} == {"driver_input", "conditions"}
+        assert {c["parameter"] for c in hypothesis["candidates"]} <= items
+    assert backend.get(path) == diagnosis, "core kept what the engine answered"
+
+
 def test_three_experiments_through_the_whole_stack(rig: Rig) -> None:
     backend = rig.backend
 
@@ -158,6 +182,8 @@ def test_three_experiments_through_the_whole_stack(rig: Rig) -> None:
         "the baseline session",
         lambda: [s for s in backend.get("/sessions") if s["passes"] == 4 * CORNERS],
     )
+
+    check_diagnosis(rig)
 
     # 1. A softer front bar is faster, but the rear slides more: a trade-off for the driver.
     softer = rig.run_experiment("ARB_FRONT", -1, "A softer front bar gives the front more grip.")

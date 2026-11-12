@@ -29,6 +29,8 @@ type Deps struct {
 	Sessions SessionLister
 	// Experiments serves the /experiments routes; nil leaves them out.
 	Experiments Experiments
+	// Diagnoses serves the /sessions/{id}/diagnosis routes; nil leaves them out.
+	Diagnoses Diagnoses
 	// Metrics serves GET /metrics for Prometheus; nil leaves the route out.
 	Metrics http.Handler
 }
@@ -40,6 +42,9 @@ func NewHandler(deps Deps) http.Handler {
 	mux.Handle("GET /sessions", sessionsHandler(deps.Logger, deps.Sessions))
 	if deps.Experiments != nil {
 		registerExperiments(mux, deps.Logger, deps.Experiments)
+	}
+	if deps.Diagnoses != nil {
+		registerDiagnoses(mux, deps.Logger, deps.Diagnoses)
 	}
 	if deps.Metrics != nil {
 		mux.Handle("GET /metrics", deps.Metrics)

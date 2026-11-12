@@ -156,18 +156,41 @@ the session's Parquet parts.
 Every move writes an `experiment_event` with its reason. The rules and what was rejected are
 in [ADR 0009](adr/0009-experiments.md).
 
-## What exists today (after phase 3)
+## The diagnosis path (phase 4)
+
+1. **Ask.** `POST /sessions/{id}/diagnosis`. Core refuses while the session's features are
+   still being computed. It sends the engine the valid passes driven on the setup an
+   experiment would start from (every valid pass when the session has no setup data) and
+   that setup's changeable items with their role, axle and scale.
+2. **Evidence.** The engine averages each metric per corner class into the evidence pack.
+   Every number anyone states later is an entry of the pack.
+3. **Hypotheses.** Readings beyond a threshold become symptoms. Each gets a driver-input
+   and a conditions alternative; driver input is marked supported when front saturation or
+   the speed pattern of front slip speaks for it, which halves the hypothesis's score. The
+   rule table (ported from v0's advisor) turns a symptom into candidate experiments on this
+   car's items, or says why a knob cannot be tested.
+4. **Words.** The provider (`none`, `gemini`, `openrouter`) puts the pack into words. A
+   model's reply is shown only if every hypothesis, evidence id, identifier and number in it
+   is in the pack; otherwise the template text is shown with the reason.
+5. **Keep.** Core stores the reply in `diagnosis`; earlier ones stay. "Test this" on a
+   candidate proposes an experiment whose hypothesis row keeps the evidence and the
+   alternatives as they were shown.
+
+The rules, the thresholds and what was rejected are in
+[ADR 0010](adr/0010-diagnosis-and-explain.md).
+
+## What exists today (after phase 4)
 
 | Piece | State |
 | --- | --- |
-| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan and evaluate requests and responses; generators and drift check | Working, checked in CI |
+| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply; generators and drift check | Working, checked in CI |
 | agent: capture with conditions, setup catalog and setup lines, run-plan window, setup loading with read-back and rollback, block and lap tags, installer (`tools/install_agent.py`) | 96 offline tests pass; **unverified in game** |
-| core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, REST API for sessions and experiments, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
-| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, `POST /features/session`, `POST /plan`, `POST /evaluate` | Working, 78 tests, `mypy --strict`; acceptance numbers are from simulation |
-| web: sessions, propose form, experiment page with its full history, ledger | Working, 46 tests |
-| End to end: the Lua agent on the mocked game, core and the engine through three experiments (`make test-e2e`) | Passes locally and in CI |
-| Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so no experiments |
-| Diagnosis, explanations, sensitivity, optimizer, ghost | Not started (phases 4 to 6) |
+| core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, REST API for sessions, diagnoses and experiments, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
+| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose` | Working, 120 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
+| web: sessions, diagnosis page, propose form (also filled from a candidate), experiment page with its full history, ledger | Working, 59 tests |
+| End to end: the Lua agent on the mocked game, core and the engine through a diagnosis and three experiments (`make test-e2e`) | Passes locally and in CI |
+| Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates and no experiments |
+| Sensitivity, optimizer, ghost | Not started (phases 5 and 6) |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.
@@ -177,11 +200,11 @@ phase that first uses it.
 | Process | Port | Environment variables |
 | --- | --- | --- |
 | core | 8080 | `PADDOCK_DATABASE_URL` (required), `PADDOCK_HTTP_ADDR` (default `:8080`), `PADDOCK_SPOOL_DIR` (the agent's spool; unset turns ingest off), `PADDOCK_DATA_DIR` (Parquet files; default `data`), `PADDOCK_ENGINE_URL` (unset: no features, experiments cannot be planned or judged), `PADDOCK_OUTBOX_DIR` (the agent's outbox; unset: nothing is written for the agent) |
-| engine | 8000 | — |
+| engine | 8000 | `PADDOCK_LLM_PROVIDER` (`none`, `gemini` or `openrouter`; unset: Gemini when its key is present, otherwise no model), `PADDOCK_LLM_MODEL` (model id; default per provider), `GEMINI_API_KEY`, `OPENROUTER_API_KEY` (environment, or the OS keyring under service `paddock` when the `keyring` package is installed) |
 | web (dev server) | 5173 | `PADDOCK_CORE_URL` (default `http://localhost:8080`), target of the `/api` proxy |
 | PostgreSQL | 5432 | Set in `deploy/docker-compose.yml` |
 
 In Docker, `PADDOCK_SPOOL_HOST` is the host folder mounted read-only as core's spool and
 `PADDOCK_OUTBOX_HOST` the host folder mounted as its outbox. The engine mounts core's data
 volume read-only at the same path, because core hands it the directory of a session's Parquet
-files. Every port is bound to `127.0.0.1`. Nothing needs a cloud service to run locally.
+files. Every port is bound to `127.0.0.1`. Nothing needs a cloud service to run locally; a hosted language model is used only when a key is given, and then it receives the evidence pack and nothing else.

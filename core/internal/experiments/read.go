@@ -12,7 +12,7 @@ import (
 )
 
 const headSQL = `
-SELECT e.id, e.kind, e.state, h.statement, c.name, t.name, COALESCE(sp.name, ''),
+SELECT e.id, e.kind, e.state, h.statement, h.source, c.name, t.name, COALESCE(sp.name, ''),
        COALESCE(sp.label, ''), e.clicks, e.success_test, e.guardrails, e.mde, e.extensions,
        e.created_at
 FROM experiment e
@@ -49,7 +49,7 @@ func readHead(ctx context.Context, q querier, id int64) (contracts.Experiment, e
 	var test, guardrails, plan []byte
 	var createdAt time.Time
 	err := q.QueryRowContext(ctx, headSQL, id).Scan(&exp.Id, &exp.Kind, &exp.State, &exp.Statement,
-		&exp.CarName, &exp.TrackName, &exp.Parameter, &exp.ParameterLabel, &exp.Clicks,
+		&exp.Source, &exp.CarName, &exp.TrackName, &exp.Parameter, &exp.ParameterLabel, &exp.Clicks,
 		&test, &guardrails, &plan, &exp.Extensions, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return exp, fmt.Errorf("experiment %d: %w", id, ErrNotFound)

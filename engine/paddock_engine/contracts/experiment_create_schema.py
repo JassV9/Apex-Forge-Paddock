@@ -40,3 +40,8 @@ class ExperimentCreate(BaseModel):
     clicks: int = Field(..., description="Clicks to move it; negative is down. Never 0.")
     statement: str = Field(..., description="The hypothesis in words.", min_length=1)
     predictions: list[PredictionSpec]
+    hypothesis_key: str | None = Field(
+        None,
+        description="Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",
+        min_length=1,
+    )

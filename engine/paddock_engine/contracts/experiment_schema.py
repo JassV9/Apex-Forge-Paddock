@@ -26,6 +26,16 @@ class State(StrEnum):
     discarded = "discarded"
 
 
+class Source(StrEnum):
+    """
+    Where the hypothesis came from: the diagnosis rules, a language model, or the human.
+    """
+
+    rules = "rules"
+    llm = "llm"
+    human = "human"
+
+
 class Better(StrEnum):
     """
     Which direction is an improvement.
@@ -242,6 +252,10 @@ class Experiment(BaseModel):
     kind: Kind
     state: State
     statement: str = Field(..., description="The hypothesis in words.")
+    source: Source = Field(
+        ...,
+        description="Where the hypothesis came from: the diagnosis rules, a language model, or the human.",
+    )
     car_name: str
     track_name: str
     parameter: str = Field(..., description="Setup item that is changed.")

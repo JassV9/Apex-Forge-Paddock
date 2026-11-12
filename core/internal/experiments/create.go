@@ -51,7 +51,7 @@ type draft struct {
 	parameterID     *int64
 	clicks          int
 	statement       string
-	source          string // hypothesis.source: rules, llm or human
+	origin          origin // where the hypothesis came from
 	predictions     []contracts.PredictionSpec
 }
 
@@ -124,8 +124,11 @@ func loadCatalog(ctx context.Context, q querier, carID int64) (setups.Catalog, m
 func insertDraft(ctx context.Context, tx *sql.Tx, d draft, baselineLabel, variantLabel string) (int64, error) {
 	var hypothesisID, id int64
 	err := tx.QueryRowContext(ctx,
-		`INSERT INTO hypothesis (car_id, track_id, statement, source) VALUES ($1, $2, $3, $4)
-		 RETURNING id`, d.carID, d.trackID, d.statement, d.source).Scan(&hypothesisID)
+		`INSERT INTO hypothesis (car_id, track_id, statement, source, phase, corner_class,
+		                         evidence, alternatives)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		d.carID, d.trackID, d.statement, string(d.origin.source), d.origin.phase,
+		d.origin.cornerClass, d.origin.evidence, d.origin.alternatives).Scan(&hypothesisID)
 	if err != nil {
 		return 0, fmt.Errorf("save hypothesis: %w", err)
 	}

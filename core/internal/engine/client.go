@@ -58,6 +58,11 @@ func (c *Client) Evaluate(ctx context.Context, request contracts.EvaluateRequest
 	return post[contracts.EvaluateResponse](ctx, c, "/evaluate", request)
 }
 
+// Diagnose asks what a session's passes say about the car.
+func (c *Client) Diagnose(ctx context.Context, request contracts.DiagnoseRequest) (contracts.Diagnosis, error) {
+	return post[contracts.Diagnosis](ctx, c, "/diagnose", request)
+}
+
 func post[T any](ctx context.Context, c *Client, path string, body any) (T, error) {
 	var reply T
 	if c.baseURL == "" {

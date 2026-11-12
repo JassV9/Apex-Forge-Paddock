@@ -34,6 +34,10 @@ describe("SessionList", () => {
     ).toBeInTheDocument();
     expect(within(second).getByText("136")).toBeInTheDocument();
     expect(within(second).getByText("17")).toBeInTheDocument();
+    expect(within(second).getByRole("link", { name: "Diagnosis" })).toHaveAttribute(
+      "href",
+      "#/sessions/1",
+    );
   });
 
   it("says how to get data when nothing is recorded yet", async () => {

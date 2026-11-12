@@ -12,9 +12,9 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: phases 0 to 2 of 7 complete.** Capture, ingest and the measurement statistics work
-> and are tested; experiments, diagnosis and the sensitivity profile are designed
-> ([docs/design.md](docs/design.md)) and are being built phase by phase. The
+> **Status: phases 0 to 4 of 7 complete.** Capture, ingest, the measurement statistics,
+> experiments and diagnosis work and are tested; the sensitivity profile is designed
+> ([docs/design.md](docs/design.md)) and is next. The
 > [roadmap](#roadmap) below says exactly what exists today. Nothing has been run inside
 > Assetto Corsa yet, and no real experiment has been driven.
 
@@ -118,8 +118,8 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (offline; unverified in game) |
 | 2 | Measurement: features, noise model, mixed model, minimum detectable effect | **Done** (simulated: false decisions 39% to 0%) |
 | 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (end to end on a simulated car; unverified in game) |
-| 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | Next |
-| 5 | Sensitivity profile and experiment ranking | Planned |
+| 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | **Done** (on the real COTA session; hosted models unverified) |
+| 5 | Sensitivity profile and experiment ranking | Next |
 | 6 | Ghost Driver (research, optional): machine-driven test manoeuvres | Gated |
 | 7 | Public read-only demo on recorded data | Planned |
 
@@ -152,8 +152,18 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   through three experiments on a simulated car (`make test-e2e`). It caught a design error
   that every unit test had passed: after a rejected experiment, the next one would have
   started from the rejected setup ([demo script](docs/demos/phase-3.md)).
+- A diagnosis that asks the question v0 never did. On the session that started this,
+  it reads "understeer in slow corners" and, beside it, that the driver's steering
+  explains it as well as the car does, with the numbers that say so. Its output is a
+  list of experiments to run, never a fix to apply
+  ([ADR 0010](docs/adr/0010-diagnosis-and-explain.md), [demo script](docs/demos/phase-4.md)).
+- A language model behind a gate. It gets the computed evidence and may only put it
+  into words: a reply that cites a metric the session never measured, or states a
+  number that is not in the evidence, is thrown away and template text is shown.
+  Everything works with no model and no API key.
 - A dashboard with a ledger of every experiment and, per experiment, the test that was fixed
-  before driving, the effect of each channel with its interval, and its full history.
+  before driving, the effect of each channel with its interval, and its full history;
+  and per session, the diagnosis with its evidence and alternatives.
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
 

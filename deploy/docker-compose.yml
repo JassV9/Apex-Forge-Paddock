@@ -62,6 +62,14 @@ services:
 
   engine:
     build: ../engine
+    environment:
+      # Who writes explanations (docs/adr/0010-diagnosis-and-explain.md). With nothing set
+      # there is no language model and the text comes from templates. Keys come from the
+      # shell that starts Compose and are never written to a file in this repository.
+      PADDOCK_LLM_PROVIDER: ${PADDOCK_LLM_PROVIDER:-}
+      PADDOCK_LLM_MODEL: ${PADDOCK_LLM_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:

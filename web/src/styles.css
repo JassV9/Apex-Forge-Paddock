@@ -181,3 +181,36 @@ textarea {
 textarea {
   min-height: 4.5rem;
 }
+
+.note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.hypotheses {
+  padding-left: 1.2rem;
+}
+
+.hypotheses > li {
+  margin-bottom: 1.2rem;
+  padding: 0.2rem 1rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.evidence {
+  color: var(--muted);
+  font-size: 0.9rem;
+}

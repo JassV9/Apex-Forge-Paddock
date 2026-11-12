@@ -37,6 +37,11 @@
       "items": {
         "$ref": "#/definitions/PredictionSpec"
       }
+    },
+    "hypothesis_key": {
+      "description": "Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",
+      "type": "string",
+      "minLength": 1
     }
   },
   "definitions": {

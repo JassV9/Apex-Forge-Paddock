@@ -314,7 +314,7 @@ Response-surface models need more data than one driver produces in a week; they 
 
 ### Where the LLM fits
 
-The LLM (Gemini by default, OpenRouter or none) receives an evidence pack of computed metrics with ids and must reply in a JSON schema: hypotheses, the metric ids each one cites, alternative explanations, candidate parameters, predicted directions, and a plain-language explanation. The validator rejects any reply that cites an unknown metric id or states a number that is not in the pack. The engine, not the LLM, scores, plans and decides.
+The LLM (Gemini by default, OpenRouter or none) receives an evidence pack: computed metrics with ids, and the hypotheses the engine built on them with their alternatives and candidate experiments. It must reply in a JSON schema: a plain-language summary and, per hypothesis, a reason with the evidence ids it cites. The validator rejects any reply that names a hypothesis, metric or item that is not in the pack, or states a number that is not in the pack. As built in phase 4 the hypotheses, alternatives, candidates and predicted directions come from deterministic code rather than from the model ([ADR 0010](adr/0010-diagnosis-and-explain.md)). The engine, not the LLM, scores, plans and decides.
 
 ## G. Master development prompt
 

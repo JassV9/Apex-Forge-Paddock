@@ -80,11 +80,15 @@ func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate
 	if err != nil {
 		return contracts.Experiment{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
+	cameFrom, err := originOf(ctx, s.database, int64(request.SessionId), request.HypothesisKey)
+	if err != nil {
+		return contracts.Experiment{}, err
+	}
 	parameterID := ids[request.Parameter]
 	id, err := s.store(ctx, draft{
 		carID: base.carID, trackID: base.trackID, kind: contracts.ExperimentKindOfat,
 		baselineVersion: base.versionID, variantValues: variant, parameterID: &parameterID,
-		clicks: request.Clicks, statement: strings.TrimSpace(request.Statement), source: "human",
+		clicks: request.Clicks, statement: strings.TrimSpace(request.Statement), origin: cameFrom,
 		predictions: request.Predictions,
 	})
 	if err != nil {

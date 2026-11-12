@@ -60,6 +60,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/diagnosis": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    /** The newest stored diagnosis of the session. */
+    get: operations["getDiagnosis"];
+    put?: never;
+    /**
+     * Diagnose the session now and keep the answer.
+     * @description Core sends the session's valid passes and the setup an experiment would start from to the engine. With setup data only passes driven on that setup count. Earlier diagnoses are kept; this one becomes the newest.
+     */
+    post: operations["diagnoseSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/experiments": {
     parameters: {
       query?: never;
@@ -146,6 +169,7 @@ export interface components {
     SetupItem: components["schemas"]["setup_item.schema"];
     Experiment: components["schemas"]["experiment.schema"];
     ExperimentCreate: components["schemas"]["experiment_create.schema"];
+    Diagnosis: components["schemas"]["diagnosis.schema"];
     ExperimentDecision: components["schemas"]["experiment_decision.schema"];
     Problem: {
       /** @description What went wrong, in words. */
@@ -211,6 +235,109 @@ export interface components {
       step: number;
       /** @description Raw value on the setup an experiment would start from. */
       value: number;
+    };
+    /**
+     * Alternative
+     * @description Another explanation of the same symptom that a setup change would not cure.
+     */
+    Alternative: {
+      /** @enum {string} */
+      kind: "driver_input" | "conditions";
+      statement: string;
+      /** @description True when the evidence speaks for this alternative; false when it could only not be ruled out. */
+      supported: boolean;
+      /** @description Ids of the evidence it rests on. */
+      evidence: string[];
+    };
+    /**
+     * Candidate
+     * @description One experiment that would test the hypothesis: one setup item moved by a number of clicks.
+     */
+    Candidate: {
+      /** @description Item id in the game's setup. */
+      parameter: string;
+      label: string;
+      /** @description Clicks to move the item by; negative lowers the raw value. */
+      clicks: number;
+      /** @description The rule of thumb behind the candidate. A prior, not a measurement. */
+      why: string;
+      /** @description Which way each response channel should move if the hypothesis is right. */
+      expects: {
+        channel: string;
+        /** @enum {string} */
+        direction: "decrease" | "increase";
+      }[];
+    };
+    /**
+     * Evidence
+     * @description One computed number: the mean of a metric over the valid passes of a corner class.
+     */
+    Evidence: {
+      /** @description Metric id and corner class, for example front_slip_mid_deg.slow. */
+      id: string;
+      /** @description Metric id. */
+      metric: string;
+      /** @enum {string} */
+      corner_class: "all" | "slow" | "medium" | "fast";
+      value: number;
+      /** @description Passes the mean is over. */
+      passes: number;
+    };
+    /**
+     * Hypothesis
+     * @description A testable statement about the car, with the evidence for it and what else could explain it.
+     */
+    Hypothesis: {
+      /** @description Stable id of the symptom, for example mid_understeer.slow. */
+      key: string;
+      statement: string;
+      /** @enum {string} */
+      phase: "brake" | "entry" | "mid" | "exit";
+      /** @enum {string} */
+      corner_class: "all" | "slow" | "medium" | "fast";
+      /** @description How far the symptom is beyond its threshold, lowered when an alternative is supported. Only for ranking. */
+      score: number;
+      /** @description Ids of the evidence the hypothesis rests on. */
+      evidence: string[];
+      /** @description Always includes driver input and conditions. */
+      alternatives: components["schemas"]["Alternative"][];
+      /** @description Experiments on this car that would test it, in the rule table's order. */
+      candidates: components["schemas"]["Candidate"][];
+      /** @description Knobs the rule table names that cannot be tested here, each with the reason. */
+      not_testable: string[];
+    };
+    /**
+     * Explanation
+     * @description The diagnosis in words. Written from the evidence pack by a language model or, without one, from templates. It carries no number that is not in the pack.
+     */
+    Explanation: {
+      /**
+       * @description Who wrote the text that is shown.
+       * @enum {string}
+       */
+      provider: "none" | "gemini" | "openrouter";
+      summary: string;
+      /** @description The hypotheses in the order the writer would test them, each with its reason. */
+      ranking: {
+        /** @description Key of a hypothesis of this diagnosis. */
+        hypothesis: string;
+        why: string;
+        /** @description Ids of the evidence the reason rests on. */
+        cites: string[];
+      }[];
+      /** @description Why a language model's reply was thrown away and the template text is shown instead; empty when nothing was rejected. */
+      rejected: string;
+    };
+    /**
+     * Diagnosis
+     * @description What a session's passes say about the car: computed evidence, ranked hypotheses with their alternatives and candidate experiments, and an explanation in words. Every number is in `evidence`; the explanation adds none.
+     */
+    "diagnosis.schema": {
+      /** @description The evidence pack: every computed number a hypothesis or the explanation may cite. */
+      evidence: components["schemas"]["Evidence"][];
+      /** @description Most strongly supported first. */
+      hypotheses: components["schemas"]["Hypothesis"][];
+      explanation: components["schemas"]["Explanation"];
     };
     /**
      * SuccessTest
@@ -363,6 +490,11 @@ export interface components {
         | "discarded";
       /** @description The hypothesis in words. */
       statement: string;
+      /**
+       * @description Where the hypothesis came from: the diagnosis rules, a language model, or the human.
+       * @enum {string}
+       */
+      source: "rules" | "llm" | "human";
       car_name: string;
       track_name: string;
       /** @description Setup item that is changed. */
@@ -399,6 +531,8 @@ export interface components {
       /** @description The hypothesis in words. */
       statement: string;
       predictions: components["schemas"]["PredictionSpec"][];
+      /** @description Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own. */
+      hypothesis_key?: string;
     };
     /**
      * ExperimentDecision
@@ -419,7 +553,16 @@ export interface components {
         "application/json": components["schemas"]["experiment.schema"];
       };
     };
-    /** @description The request was refused. 404: no such experiment. 409: not possible in the experiment's current state. 422: the request is not valid. 502: the engine did not answer. */
+    /** @description What the session's passes say about the car. */
+    Diagnosis: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["diagnosis.schema"];
+      };
+    };
+    /** @description The request was refused. 404: no such experiment, session or diagnosis. 409: not possible in the experiment's current state, or the session has no pass to diagnose yet. 422: the request is not valid. 502: the engine did not answer. */
     Problem: {
       headers: {
         [name: string]: unknown;
@@ -430,6 +573,7 @@ export interface components {
     };
   };
   parameters: {
+    SessionId: number;
     ExperimentId: number;
   };
   requestBodies: never;
@@ -499,6 +643,38 @@ export interface operations {
         };
       };
       422: components["responses"]["Problem"];
+    };
+  };
+  getDiagnosis: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components["responses"]["Diagnosis"];
+      404: components["responses"]["Problem"];
+    };
+  };
+  diagnoseSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: components["responses"]["Diagnosis"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
+      502: components["responses"]["Problem"];
     };
   };
   listExperiments: {

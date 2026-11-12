@@ -15,6 +15,7 @@ import (
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/api"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/config"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/diagnosis"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/engine"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/features"
@@ -72,13 +73,14 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := startFeatures(ctx, cfg, database, analysis, logger, metrics); err != nil {
 		return err
 	}
-	outbox := experiments.Outbox{Dir: cfg.OutboxDir}
+	ledger := experiments.NewService(database, analysis, experiments.Outbox{Dir: cfg.OutboxDir}, logger)
 	server := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: api.NewHandler(api.Deps{
 			Logger: logger, Version: version, Database: database,
 			Sessions:    store.NewReader(database),
-			Experiments: experiments.NewService(database, analysis, outbox, logger),
+			Experiments: ledger,
+			Diagnoses:   diagnosis.NewService(database, analysis, ledger, logger),
 			Metrics:     metrics.Handler,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,

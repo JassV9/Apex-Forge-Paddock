@@ -97,7 +97,7 @@ func proposeRecheck(ctx context.Context, tx *sql.Tx, exp record, original int64)
 	_, err = insertDraft(ctx, tx, draft{
 		carID: exp.carID, trackID: exp.trackID, kind: contracts.ExperimentKindRecheck,
 		baselineVersion: original, variantVersion: exp.variantVersion,
-		statement: recheckStatement, source: "rules",
+		statement: recheckStatement, origin: rulesOrigin(),
 		predictions: []contracts.PredictionSpec{},
 	}, baselineLabel, variantLabel)
 	return err

@@ -16,6 +16,13 @@ export const STATE_LABEL: Record<State, string> = {
   discarded: "Discarded",
 };
 
+/** Where the hypothesis came from. */
+export const SOURCE_TEXT: Record<Experiment["source"], string> = {
+  rules: "Hypothesis from the diagnosis rules.",
+  llm: "Hypothesis from a language model.",
+  human: "Hypothesis written by the driver.",
+};
+
 /** Most extensions core allows (experiments.MaxExtensions). Core enforces it; this hides the button. */
 const MAX_EXTENSIONS = 2;
 

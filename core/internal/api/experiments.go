@@ -155,6 +155,10 @@ func (e experimentRoutes) reply(w http.ResponseWriter, r *http.Request, status i
 // fail maps a service error to a status. What the caller got wrong is said in the reply;
 // what broke inside core is logged and not shown.
 func (e experimentRoutes) fail(w http.ResponseWriter, r *http.Request, err error) {
+	fail(w, r, e.logger, err)
+}
+
+func fail(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err error) {
 	status := http.StatusInternalServerError
 	switch {
 	case errors.Is(err, experiments.ErrNotFound):
@@ -164,13 +168,13 @@ func (e experimentRoutes) fail(w http.ResponseWriter, r *http.Request, err error
 	case errors.Is(err, experiments.ErrConflict):
 		status = http.StatusConflict
 	case errors.Is(err, engine.ErrUnavailable), errors.Is(err, engine.ErrRejected):
-		writeError(w, r, e.logger, http.StatusBadGateway, "the analysis engine did not answer", err)
+		writeError(w, r, logger, http.StatusBadGateway, "the analysis engine did not answer", err)
 		return
 	}
 	if status == http.StatusInternalServerError {
-		writeError(w, r, e.logger, status, "could not complete the request", err)
+		writeError(w, r, logger, status, "could not complete the request", err)
 		return
 	}
-	e.logger.InfoContext(r.Context(), "request refused", "path", r.URL.Path, "status", status, "reason", err.Error())
-	writeJSON(w, r, e.logger, status, problem{Error: err.Error()})
+	logger.InfoContext(r.Context(), "request refused", "path", r.URL.Path, "status", status, "reason", err.Error())
+	writeJSON(w, r, logger, status, problem{Error: err.Error()})
 }

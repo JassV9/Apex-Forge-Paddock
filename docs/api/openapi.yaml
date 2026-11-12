@@ -60,6 +60,33 @@ paths:
                   $ref: "#/components/schemas/SetupItem"
         "422":
           $ref: "#/components/responses/Problem"
+  /sessions/{id}/diagnosis:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: getDiagnosis
+      summary: The newest stored diagnosis of the session.
+      responses:
+        "200":
+          $ref: "#/components/responses/Diagnosis"
+        "404":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: diagnoseSession
+      summary: Diagnose the session now and keep the answer.
+      description: >
+        Core sends the session's valid passes and the setup an experiment would start from
+        to the engine. With setup data only passes driven on that setup count. Earlier
+        diagnoses are kept; this one becomes the newest.
+      responses:
+        "201":
+          $ref: "#/components/responses/Diagnosis"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "502":
+          $ref: "#/components/responses/Problem"
   /experiments:
     get:
       operationId: listExperiments
@@ -151,6 +178,13 @@ paths:
           $ref: "#/components/responses/Problem"
 components:
   parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
     ExperimentId:
       name: id
       in: path
@@ -165,10 +199,17 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Experiment"
+    Diagnosis:
+      description: What the session's passes say about the car.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Diagnosis"
     Problem:
       description: >
-        The request was refused. 404: no such experiment. 409: not possible in the
-        experiment's current state. 422: the request is not valid. 502: the engine did not
+        The request was refused. 404: no such experiment, session or diagnosis. 409: not
+        possible in the experiment's current state, or the session has no pass to
+        diagnose yet. 422: the request is not valid. 502: the engine did not
         answer.
       content:
         application/json:
@@ -185,6 +226,8 @@ components:
       $ref: "../../contracts/experiment.schema.json"
     ExperimentCreate:
       $ref: "../../contracts/experiment_create.schema.json"
+    Diagnosis:
+      $ref: "../../contracts/diagnosis.schema.json"
     ExperimentDecision:
       $ref: "../../contracts/experiment_decision.schema.json"
     Problem:

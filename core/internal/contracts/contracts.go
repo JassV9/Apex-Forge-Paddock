@@ -8,6 +8,164 @@ import "reflect"
 import "regexp"
 import "unicode/utf8"
 
+// Another explanation of the same symptom that a setup change would not cure.
+type Alternative struct {
+	// Ids of the evidence it rests on.
+	Evidence []string `json:"evidence"`
+
+	// Kind corresponds to the JSON schema field "kind".
+	Kind AlternativeKind `json:"kind"`
+
+	// Statement corresponds to the JSON schema field "statement".
+	Statement string `json:"statement"`
+
+	// True when the evidence speaks for this alternative; false when it could only
+	// not be ruled out.
+	Supported bool `json:"supported"`
+}
+
+type AlternativeKind string
+
+const AlternativeKindConditions AlternativeKind = "conditions"
+const AlternativeKindDriverInput AlternativeKind = "driver_input"
+
+var enumValues_AlternativeKind = []interface{}{
+	"driver_input",
+	"conditions",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AlternativeKind) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_AlternativeKind {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AlternativeKind, v)
+	}
+	*j = AlternativeKind(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Alternative) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["evidence"]; raw != nil && !ok {
+		return fmt.Errorf("field evidence in Alternative: required")
+	}
+	if _, ok := raw["kind"]; raw != nil && !ok {
+		return fmt.Errorf("field kind in Alternative: required")
+	}
+	if _, ok := raw["statement"]; raw != nil && !ok {
+		return fmt.Errorf("field statement in Alternative: required")
+	}
+	if _, ok := raw["supported"]; raw != nil && !ok {
+		return fmt.Errorf("field supported in Alternative: required")
+	}
+	type Plain Alternative
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Statement)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "statement", 1)
+	}
+	*j = Alternative(plain)
+	return nil
+}
+
+// One experiment that would test the hypothesis: one setup item moved by a number
+// of clicks.
+type Candidate struct {
+	// Clicks to move the item by; negative lowers the raw value.
+	Clicks int `json:"clicks"`
+
+	// Which way each response channel should move if the hypothesis is right.
+	Expects []Expectation `json:"expects"`
+
+	// Label corresponds to the JSON schema field "label".
+	Label string `json:"label"`
+
+	// Item id in the game's setup.
+	Parameter string `json:"parameter"`
+
+	// The rule of thumb behind the candidate. A prior, not a measurement.
+	Why string `json:"why"`
+}
+
+type CandidateExpectsElemDirection string
+
+const CandidateExpectsElemDirectionDecrease CandidateExpectsElemDirection = "decrease"
+const CandidateExpectsElemDirectionIncrease CandidateExpectsElemDirection = "increase"
+
+var enumValues_CandidateExpectsElemDirection = []interface{}{
+	"decrease",
+	"increase",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *CandidateExpectsElemDirection) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_CandidateExpectsElemDirection {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_CandidateExpectsElemDirection, v)
+	}
+	*j = CandidateExpectsElemDirection(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Candidate) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["clicks"]; raw != nil && !ok {
+		return fmt.Errorf("field clicks in Candidate: required")
+	}
+	if _, ok := raw["expects"]; raw != nil && !ok {
+		return fmt.Errorf("field expects in Candidate: required")
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in Candidate: required")
+	}
+	if _, ok := raw["parameter"]; raw != nil && !ok {
+		return fmt.Errorf("field parameter in Candidate: required")
+	}
+	if _, ok := raw["why"]; raw != nil && !ok {
+		return fmt.Errorf("field why in Candidate: required")
+	}
+	type Plain Candidate
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Parameter)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)
+	}
+	*j = Candidate(plain)
+	return nil
+}
+
 // The variant's effect on one channel: variant minus baseline per corner pass.
 type ChannelResult struct {
 	// Metric id.
@@ -179,6 +337,226 @@ func (j *ChannelResult) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "n_passes", 0)
 	}
 	*j = ChannelResult(plain)
+	return nil
+}
+
+// One changeable setup item, as the agent read it from the setup menu.
+type DiagnoseItem struct {
+	// F or R when the item belongs to one axle; empty otherwise.
+	Axle string `json:"axle"`
+
+	// Label corresponds to the JSON schema field "label".
+	Label string `json:"label"`
+
+	// Max corresponds to the JSON schema field "max".
+	Max float64 `json:"max"`
+
+	// Min corresponds to the JSON schema field "min".
+	Min float64 `json:"min"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name"`
+
+	// What the item does (arb, wing, camber, ...); empty when unknown.
+	Role string `json:"role"`
+
+	// Raw value times this is what the menu shows; negative when the car stores the
+	// value inverted.
+	ShownScale float64 `json:"shown_scale"`
+
+	// Step corresponds to the JSON schema field "step".
+	Step float64 `json:"step"`
+
+	// Raw value on the setup an experiment would start from.
+	Value float64 `json:"value"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *DiagnoseItem) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["axle"]; raw != nil && !ok {
+		return fmt.Errorf("field axle in DiagnoseItem: required")
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in DiagnoseItem: required")
+	}
+	if _, ok := raw["max"]; raw != nil && !ok {
+		return fmt.Errorf("field max in DiagnoseItem: required")
+	}
+	if _, ok := raw["min"]; raw != nil && !ok {
+		return fmt.Errorf("field min in DiagnoseItem: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in DiagnoseItem: required")
+	}
+	if _, ok := raw["role"]; raw != nil && !ok {
+		return fmt.Errorf("field role in DiagnoseItem: required")
+	}
+	if _, ok := raw["shown_scale"]; raw != nil && !ok {
+		return fmt.Errorf("field shown_scale in DiagnoseItem: required")
+	}
+	if _, ok := raw["step"]; raw != nil && !ok {
+		return fmt.Errorf("field step in DiagnoseItem: required")
+	}
+	if _, ok := raw["value"]; raw != nil && !ok {
+		return fmt.Errorf("field value in DiagnoseItem: required")
+	}
+	type Plain DiagnoseItem
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
+	}
+	*j = DiagnoseItem(plain)
+	return nil
+}
+
+// One valid corner pass.
+type DiagnosePass struct {
+	// Corner corresponds to the JSON schema field "corner".
+	Corner int `json:"corner"`
+
+	// Metric id to value; null when it could not be measured on this pass.
+	Metrics DiagnoseRequestPassesElemMetrics `json:"metrics"`
+
+	// Band of the corner's minimum speed.
+	SpeedClass DiagnoseRequestPassesElemSpeedClass `json:"speed_class"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *DiagnosePass) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in DiagnosePass: required")
+	}
+	if _, ok := raw["metrics"]; raw != nil && !ok {
+		return fmt.Errorf("field metrics in DiagnosePass: required")
+	}
+	if _, ok := raw["speed_class"]; raw != nil && !ok {
+		return fmt.Errorf("field speed_class in DiagnosePass: required")
+	}
+	type Plain DiagnosePass
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	*j = DiagnosePass(plain)
+	return nil
+}
+
+// Core asks the engine what a session's passes say about the car (POST /diagnose).
+type DiagnoseRequest struct {
+	// The changeable items of the car's setup; empty when the session has no setup
+	// data.
+	Items []DiagnoseItem `json:"items"`
+
+	// The session's valid passes with their features.
+	Passes []DiagnosePass `json:"passes"`
+}
+
+// Metric id to value; null when it could not be measured on this pass.
+type DiagnoseRequestPassesElemMetrics map[string]*float64
+
+type DiagnoseRequestPassesElemSpeedClass string
+
+const DiagnoseRequestPassesElemSpeedClassFast DiagnoseRequestPassesElemSpeedClass = "fast"
+const DiagnoseRequestPassesElemSpeedClassMedium DiagnoseRequestPassesElemSpeedClass = "medium"
+const DiagnoseRequestPassesElemSpeedClassSlow DiagnoseRequestPassesElemSpeedClass = "slow"
+
+var enumValues_DiagnoseRequestPassesElemSpeedClass = []interface{}{
+	"slow",
+	"medium",
+	"fast",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *DiagnoseRequestPassesElemSpeedClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_DiagnoseRequestPassesElemSpeedClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_DiagnoseRequestPassesElemSpeedClass, v)
+	}
+	*j = DiagnoseRequestPassesElemSpeedClass(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *DiagnoseRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["items"]; raw != nil && !ok {
+		return fmt.Errorf("field items in DiagnoseRequest: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in DiagnoseRequest: required")
+	}
+	type Plain DiagnoseRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = DiagnoseRequest(plain)
+	return nil
+}
+
+// What a session's passes say about the car: computed evidence, ranked hypotheses
+// with their alternatives and candidate experiments, and an explanation in words.
+// Every number is in `evidence`; the explanation adds none.
+type Diagnosis struct {
+	// The evidence pack: every computed number a hypothesis or the explanation may
+	// cite.
+	Evidence []Evidence `json:"evidence"`
+
+	// Explanation corresponds to the JSON schema field "explanation".
+	Explanation Explanation `json:"explanation"`
+
+	// Most strongly supported first.
+	Hypotheses []Hypothesis `json:"hypotheses"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Diagnosis) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["evidence"]; raw != nil && !ok {
+		return fmt.Errorf("field evidence in Diagnosis: required")
+	}
+	if _, ok := raw["explanation"]; raw != nil && !ok {
+		return fmt.Errorf("field explanation in Diagnosis: required")
+	}
+	if _, ok := raw["hypotheses"]; raw != nil && !ok {
+		return fmt.Errorf("field hypotheses in Diagnosis: required")
+	}
+	type Plain Diagnosis
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = Diagnosis(plain)
 	return nil
 }
 
@@ -517,6 +895,130 @@ func (j *EvaluateResponse) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// One computed number: the mean of a metric over the valid passes of a corner
+// class.
+type Evidence struct {
+	// CornerClass corresponds to the JSON schema field "corner_class".
+	CornerClass EvidenceCornerClass `json:"corner_class"`
+
+	// Metric id and corner class, for example front_slip_mid_deg.slow.
+	Id string `json:"id"`
+
+	// Metric id.
+	Metric string `json:"metric"`
+
+	// Passes the mean is over.
+	Passes int `json:"passes"`
+
+	// Value corresponds to the JSON schema field "value".
+	Value float64 `json:"value"`
+}
+
+type EvidenceCornerClass string
+
+const EvidenceCornerClassAll EvidenceCornerClass = "all"
+const EvidenceCornerClassFast EvidenceCornerClass = "fast"
+const EvidenceCornerClassMedium EvidenceCornerClass = "medium"
+const EvidenceCornerClassSlow EvidenceCornerClass = "slow"
+
+var enumValues_EvidenceCornerClass = []interface{}{
+	"all",
+	"slow",
+	"medium",
+	"fast",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *EvidenceCornerClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_EvidenceCornerClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_EvidenceCornerClass, v)
+	}
+	*j = EvidenceCornerClass(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Evidence) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner_class"]; raw != nil && !ok {
+		return fmt.Errorf("field corner_class in Evidence: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in Evidence: required")
+	}
+	if _, ok := raw["metric"]; raw != nil && !ok {
+		return fmt.Errorf("field metric in Evidence: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in Evidence: required")
+	}
+	if _, ok := raw["value"]; raw != nil && !ok {
+		return fmt.Errorf("field value in Evidence: required")
+	}
+	type Plain Evidence
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
+	}
+	if utf8.RuneCountInString(string(plain.Metric)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "metric", 1)
+	}
+	if 1 > plain.Passes {
+		return fmt.Errorf("field %s: must be >= %v", "passes", 1)
+	}
+	*j = Evidence(plain)
+	return nil
+}
+
+type Expectation struct {
+	// Channel corresponds to the JSON schema field "channel".
+	Channel string `json:"channel"`
+
+	// Direction corresponds to the JSON schema field "direction".
+	Direction CandidateExpectsElemDirection `json:"direction"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Expectation) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["channel"]; raw != nil && !ok {
+		return fmt.Errorf("field channel in Expectation: required")
+	}
+	if _, ok := raw["direction"]; raw != nil && !ok {
+		return fmt.Errorf("field direction in Expectation: required")
+	}
+	type Plain Expectation
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Channel)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "channel", 1)
+	}
+	*j = Expectation(plain)
+	return nil
+}
+
 // An experiment with its plan, results, verdict and history.
 type Experiment struct {
 	// Arms corresponds to the JSON schema field "arms".
@@ -563,6 +1065,10 @@ type Experiment struct {
 
 	// Results corresponds to the JSON schema field "results".
 	Results []ExperimentResult `json:"results"`
+
+	// Where the hypothesis came from: the diagnosis rules, a language model, or the
+	// human.
+	Source ExperimentSource `json:"source"`
 
 	// State corresponds to the JSON schema field "state".
 	State ExperimentState `json:"state"`
@@ -691,6 +1197,11 @@ type ExperimentCreate struct {
 	// Clicks to move it; negative is down. Never 0.
 	Clicks int `json:"clicks"`
 
+	// Key of the hypothesis in the session's latest diagnosis that this experiment
+	// tests. The hypothesis is then stored with its evidence and alternatives and
+	// marked as coming from the rules; without it the hypothesis is the human's own.
+	HypothesisKey *string `json:"hypothesis_key,omitempty,omitzero"`
+
 	// Setup item to change.
 	Parameter string `json:"parameter"`
 
@@ -729,6 +1240,9 @@ func (j *ExperimentCreate) UnmarshalJSON(value []byte) error {
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
+	}
+	if plain.HypothesisKey != nil && utf8.RuneCountInString(string(*plain.HypothesisKey)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "hypothesis_key", 1)
 	}
 	if utf8.RuneCountInString(string(plain.Parameter)) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)
@@ -1012,6 +1526,38 @@ func (j *ExperimentResult) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type ExperimentSource string
+
+const ExperimentSourceHuman ExperimentSource = "human"
+const ExperimentSourceLlm ExperimentSource = "llm"
+const ExperimentSourceRules ExperimentSource = "rules"
+
+var enumValues_ExperimentSource = []interface{}{
+	"rules",
+	"llm",
+	"human",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ExperimentSource) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ExperimentSource {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ExperimentSource, v)
+	}
+	*j = ExperimentSource(v)
+	return nil
+}
+
 type ExperimentState string
 
 const ExperimentStateAborted ExperimentState = "aborted"
@@ -1108,6 +1654,9 @@ func (j *Experiment) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["results"]; raw != nil && !ok {
 		return fmt.Errorf("field results in Experiment: required")
 	}
+	if _, ok := raw["source"]; raw != nil && !ok {
+		return fmt.Errorf("field source in Experiment: required")
+	}
 	if _, ok := raw["state"]; raw != nil && !ok {
 		return fmt.Errorf("field state in Experiment: required")
 	}
@@ -1132,6 +1681,120 @@ func (j *Experiment) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "id", 1)
 	}
 	*j = Experiment(plain)
+	return nil
+}
+
+// What a language model must answer when given an evidence pack. The engine
+// rejects a reply that names a hypothesis or cites evidence that is not in the
+// pack, or states a number the pack does not contain.
+type ExplainReply struct {
+	// The pack's hypotheses in the order the writer would test them.
+	Ranking []RankedReply `json:"ranking"`
+
+	// The diagnosis in two or three plain sentences.
+	Summary string `json:"summary"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ExplainReply) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ranking"]; raw != nil && !ok {
+		return fmt.Errorf("field ranking in ExplainReply: required")
+	}
+	if _, ok := raw["summary"]; raw != nil && !ok {
+		return fmt.Errorf("field summary in ExplainReply: required")
+	}
+	type Plain ExplainReply
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Summary)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "summary", 1)
+	}
+	if utf8.RuneCountInString(string(plain.Summary)) > 1200 {
+		return fmt.Errorf("field %s length: must be <= %d", "summary", 1200)
+	}
+	*j = ExplainReply(plain)
+	return nil
+}
+
+// The diagnosis in words. Written from the evidence pack by a language model or,
+// without one, from templates. It carries no number that is not in the pack.
+type Explanation struct {
+	// Who wrote the text that is shown.
+	Provider ExplanationProvider `json:"provider"`
+
+	// The hypotheses in the order the writer would test them, each with its reason.
+	Ranking []RankedHypothesis `json:"ranking"`
+
+	// Why a language model's reply was thrown away and the template text is shown
+	// instead; empty when nothing was rejected.
+	Rejected string `json:"rejected"`
+
+	// Summary corresponds to the JSON schema field "summary".
+	Summary string `json:"summary"`
+}
+
+type ExplanationProvider string
+
+const ExplanationProviderGemini ExplanationProvider = "gemini"
+const ExplanationProviderNone ExplanationProvider = "none"
+const ExplanationProviderOpenrouter ExplanationProvider = "openrouter"
+
+var enumValues_ExplanationProvider = []interface{}{
+	"none",
+	"gemini",
+	"openrouter",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ExplanationProvider) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ExplanationProvider {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ExplanationProvider, v)
+	}
+	*j = ExplanationProvider(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Explanation) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["provider"]; raw != nil && !ok {
+		return fmt.Errorf("field provider in Explanation: required")
+	}
+	if _, ok := raw["ranking"]; raw != nil && !ok {
+		return fmt.Errorf("field ranking in Explanation: required")
+	}
+	if _, ok := raw["rejected"]; raw != nil && !ok {
+		return fmt.Errorf("field rejected in Explanation: required")
+	}
+	if _, ok := raw["summary"]; raw != nil && !ok {
+		return fmt.Errorf("field summary in Explanation: required")
+	}
+	type Plain Explanation
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = Explanation(plain)
 	return nil
 }
 
@@ -1609,6 +2272,160 @@ func (j *Health) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s length: must be >= %d", "version", 1)
 	}
 	*j = Health(plain)
+	return nil
+}
+
+// A testable statement about the car, with the evidence for it and what else could
+// explain it.
+type Hypothesis struct {
+	// Always includes driver input and conditions.
+	Alternatives []Alternative `json:"alternatives"`
+
+	// Experiments on this car that would test it, in the rule table's order.
+	Candidates []Candidate `json:"candidates"`
+
+	// CornerClass corresponds to the JSON schema field "corner_class".
+	CornerClass HypothesisCornerClass `json:"corner_class"`
+
+	// Ids of the evidence the hypothesis rests on.
+	Evidence []string `json:"evidence"`
+
+	// Stable id of the symptom, for example mid_understeer.slow.
+	Key string `json:"key"`
+
+	// Knobs the rule table names that cannot be tested here, each with the reason.
+	NotTestable []string `json:"not_testable"`
+
+	// Phase corresponds to the JSON schema field "phase".
+	Phase HypothesisPhase `json:"phase"`
+
+	// How far the symptom is beyond its threshold, lowered when an alternative is
+	// supported. Only for ranking.
+	Score float64 `json:"score"`
+
+	// Statement corresponds to the JSON schema field "statement".
+	Statement string `json:"statement"`
+}
+
+type HypothesisCornerClass string
+
+const HypothesisCornerClassAll HypothesisCornerClass = "all"
+const HypothesisCornerClassFast HypothesisCornerClass = "fast"
+const HypothesisCornerClassMedium HypothesisCornerClass = "medium"
+const HypothesisCornerClassSlow HypothesisCornerClass = "slow"
+
+var enumValues_HypothesisCornerClass = []interface{}{
+	"all",
+	"slow",
+	"medium",
+	"fast",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *HypothesisCornerClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_HypothesisCornerClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_HypothesisCornerClass, v)
+	}
+	*j = HypothesisCornerClass(v)
+	return nil
+}
+
+type HypothesisPhase string
+
+const HypothesisPhaseBrake HypothesisPhase = "brake"
+const HypothesisPhaseEntry HypothesisPhase = "entry"
+const HypothesisPhaseExit HypothesisPhase = "exit"
+const HypothesisPhaseMid HypothesisPhase = "mid"
+
+var enumValues_HypothesisPhase = []interface{}{
+	"brake",
+	"entry",
+	"mid",
+	"exit",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *HypothesisPhase) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_HypothesisPhase {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_HypothesisPhase, v)
+	}
+	*j = HypothesisPhase(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Hypothesis) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["alternatives"]; raw != nil && !ok {
+		return fmt.Errorf("field alternatives in Hypothesis: required")
+	}
+	if _, ok := raw["candidates"]; raw != nil && !ok {
+		return fmt.Errorf("field candidates in Hypothesis: required")
+	}
+	if _, ok := raw["corner_class"]; raw != nil && !ok {
+		return fmt.Errorf("field corner_class in Hypothesis: required")
+	}
+	if _, ok := raw["evidence"]; raw != nil && !ok {
+		return fmt.Errorf("field evidence in Hypothesis: required")
+	}
+	if _, ok := raw["key"]; raw != nil && !ok {
+		return fmt.Errorf("field key in Hypothesis: required")
+	}
+	if _, ok := raw["not_testable"]; raw != nil && !ok {
+		return fmt.Errorf("field not_testable in Hypothesis: required")
+	}
+	if _, ok := raw["phase"]; raw != nil && !ok {
+		return fmt.Errorf("field phase in Hypothesis: required")
+	}
+	if _, ok := raw["score"]; raw != nil && !ok {
+		return fmt.Errorf("field score in Hypothesis: required")
+	}
+	if _, ok := raw["statement"]; raw != nil && !ok {
+		return fmt.Errorf("field statement in Hypothesis: required")
+	}
+	type Plain Hypothesis
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.Evidence != nil && len(plain.Evidence) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "evidence", 1)
+	}
+	if utf8.RuneCountInString(string(plain.Key)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "key", 1)
+	}
+	if 0 > plain.Score {
+		return fmt.Errorf("field %s: must be >= %v", "score", 0)
+	}
+	if utf8.RuneCountInString(string(plain.Statement)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "statement", 1)
+	}
+	*j = Hypothesis(plain)
 	return nil
 }
 
@@ -2437,6 +3254,85 @@ func (j *PredictionSpec) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "low", 0)
 	}
 	*j = PredictionSpec(plain)
+	return nil
+}
+
+type RankedHypothesis struct {
+	// Ids of the evidence the reason rests on.
+	Cites []string `json:"cites"`
+
+	// Key of a hypothesis of this diagnosis.
+	Hypothesis string `json:"hypothesis"`
+
+	// Why corresponds to the JSON schema field "why".
+	Why string `json:"why"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RankedHypothesis) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["cites"]; raw != nil && !ok {
+		return fmt.Errorf("field cites in RankedHypothesis: required")
+	}
+	if _, ok := raw["hypothesis"]; raw != nil && !ok {
+		return fmt.Errorf("field hypothesis in RankedHypothesis: required")
+	}
+	if _, ok := raw["why"]; raw != nil && !ok {
+		return fmt.Errorf("field why in RankedHypothesis: required")
+	}
+	type Plain RankedHypothesis
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Hypothesis)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "hypothesis", 1)
+	}
+	*j = RankedHypothesis(plain)
+	return nil
+}
+
+type RankedReply struct {
+	// Ids of evidence in the pack.
+	Cites []string `json:"cites"`
+
+	// Key of a hypothesis in the pack.
+	Hypothesis string `json:"hypothesis"`
+
+	// Why corresponds to the JSON schema field "why".
+	Why string `json:"why"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RankedReply) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["cites"]; raw != nil && !ok {
+		return fmt.Errorf("field cites in RankedReply: required")
+	}
+	if _, ok := raw["hypothesis"]; raw != nil && !ok {
+		return fmt.Errorf("field hypothesis in RankedReply: required")
+	}
+	if _, ok := raw["why"]; raw != nil && !ok {
+		return fmt.Errorf("field why in RankedReply: required")
+	}
+	type Plain RankedReply
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Hypothesis)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "hypothesis", 1)
+	}
+	if utf8.RuneCountInString(string(plain.Why)) > 600 {
+		return fmt.Errorf("field %s length: must be <= %d", "why", 600)
+	}
+	*j = RankedReply(plain)
 	return nil
 }
 

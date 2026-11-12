@@ -49,6 +49,41 @@ func TestPlanPostsTheContractAndDecodesTheReply(t *testing.T) {
 	}
 }
 
+func TestDiagnosePostsThePassesAndDecodesTheDiagnosis(t *testing.T) {
+	var got contracts.DiagnoseRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/diagnose" {
+			t.Errorf("engine was called with %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("request body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"evidence":[],"hypotheses":[],
+			"explanation":{"provider":"none","summary":"No symptom.","ranking":[],"rejected":""}}`))
+	}))
+	defer server.Close()
+	slip := 7.5
+	request := contracts.DiagnoseRequest{
+		Passes: []contracts.DiagnosePass{{
+			Corner: 3, SpeedClass: "slow",
+			Metrics: contracts.DiagnoseRequestPassesElemMetrics{"front_slip_mid_deg": &slip, "wheelspin": nil},
+		}},
+		Items: []contracts.DiagnoseItem{},
+	}
+
+	reply, err := New(server.URL).Diagnose(t.Context(), request)
+
+	if err != nil {
+		t.Fatalf("Diagnose: %v", err)
+	}
+	if len(got.Passes) != 1 || *got.Passes[0].Metrics["front_slip_mid_deg"] != 7.5 || got.Passes[0].Metrics["wheelspin"] != nil {
+		t.Errorf("engine received %+v", got)
+	}
+	if reply.Explanation.Provider != contracts.ExplanationProviderNone || reply.Explanation.Summary != "No symptom." {
+		t.Errorf("reply = %+v", reply)
+	}
+}
+
 func TestFailuresSayWhetherAskingAgainCanHelp(t *testing.T) {
 	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, `{"detail":"bad passes"}`, http.StatusUnprocessableEntity)

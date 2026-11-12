@@ -1,4 +1,5 @@
 import { CoreStatus } from "./components/CoreStatus";
+import { DiagnosisPage } from "./components/DiagnosisPage";
 import { ExperimentPage } from "./components/ExperimentPage";
 import { Ledger } from "./components/Ledger";
 import { ProposeForm } from "./components/ProposeForm";
@@ -14,6 +15,8 @@ function Page({ route }: { route: Route }) {
           <SessionList />
         </>
       );
+    case "session":
+      return <DiagnosisPage key={route.id} sessionId={route.id} />;
     case "ledger":
       return (
         <>
@@ -26,6 +29,8 @@ function Page({ route }: { route: Route }) {
         <>
           <h2>Propose an experiment</h2>
           <ProposeForm
+            key={window.location.hash}
+            {...(route.prefill === undefined ? {} : { prefill: route.prefill })}
             onProposed={(experiment) => {
               window.location.hash = experimentHref(experiment.id);
             }}

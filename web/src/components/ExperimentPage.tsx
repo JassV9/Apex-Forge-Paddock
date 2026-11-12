@@ -7,7 +7,7 @@ import {
   type ExperimentAction,
   fetchExperiment,
 } from "../api/client";
-import { availableSteps, changeText, type Step } from "../experimentText";
+import { availableSteps, changeText, SOURCE_TEXT, type Step } from "../experimentText";
 import {
   HistorySection,
   PlanSection,
@@ -123,6 +123,7 @@ export function ExperimentPage({ id, api = coreApi }: ExperimentPageProps) {
         {experiment.car_name}, {experiment.track_name}. {changeText(experiment)}.
       </p>
       <blockquote>{experiment.statement}</blockquote>
+      <p className="note">{SOURCE_TEXT[experiment.source]}</p>
       <Steps
         experiment={experiment}
         busy={busy}

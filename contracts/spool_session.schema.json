@@ -126,6 +126,8 @@
         "number",
         "name",
         "direction",
+        "start_m",
+        "end_m",
         "apex_m",
         "radius_m",
         "angle_deg",
@@ -147,6 +149,16 @@
             "L",
             "R"
           ]
+        },
+        "start_m": {
+          "description": "Where the corner itself starts (radius drops below the threshold), metres from the start line.",
+          "type": "number",
+          "minimum": 0
+        },
+        "end_m": {
+          "description": "Where the corner itself ends.",
+          "type": "number",
+          "minimum": 0
         },
         "apex_m": {
           "description": "Tightest point, metres from the start line.",

@@ -2,6 +2,27 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 2: measurement (2026-11-12)
+
+- engine: phase segmentation and driver-input metrics ported from v0's `analyze.lua`
+  (reproduces v0's own numbers on 14 reference passes), per-phase statistics with confidence,
+  and new channels: steering per g, front saturation index, yaw gain, exit speed at +100 m,
+  rear slip peak, wheelspin time, speed class.
+- engine: measurement model `y ~ arm + covariates + (1 | corner)` by feasible GLS, block
+  bootstrap over laps with calibrated intervals, ROPE classification, MDE calculator, robust
+  noise model (ADR 0008).
+- engine: `POST /features/session` reads a session's Parquet parts with DuckDB; contracts
+  `features_request`, `features_response`. The spool's corner map gains each corner's start
+  and end.
+- core: `cmd/spool2parquet` converts a spool session to Parquet without a database.
+- Acceptance simulations: identical setups produce a decision in 0.0 % of 200 experiments
+  (v0: 39 %); a 20 ms effect at n = 6, k = 10 is detected in 91.5 %. Speed-binned slip on the
+  real session: 7.67 degrees front below 100 km/h, 3.71 above 150.
+
+Known limits: all results are simulated or from v0's stored averages; no real experiment has
+been driven. Scatter over all passes of the real session is 82 ms, not the 28 ms of v0's push
+passes. Core does not call the engine yet (phase 3).
+
 ## Phase 1: capture and ingest (2026-11-11)
 
 - Contracts for the spool: `spool_session`, `spool_pass` (conditions, 24 raw channels as

@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "Apex Forge: Paddock analysis engine (features, statistics, diagnosis, sensitivity)."
 requires-python = ">=3.12"
 dependencies = [
+    "duckdb>=2.0.0",
     "fastapi>=0.115",
+    "numpy>=2.5.4",
     "pydantic>=2.9",
+    "scipy>=1.18.1",
     "uvicorn>=0.32",
 ]
 
@@ -13,9 +16,12 @@ dependencies = [
 dev = [
     "datamodel-code-generator>=0.26",
     "httpx2>=2.16.0",
+    "hypothesis>=6.170.15",
     "mypy>=1.13",
     "pytest>=8.3",
     "ruff>=0.17.4",
+    "scipy-stubs>=1.18.1.1",
+    "statsmodels>=0.15.0",
 ]
 
 [build-system]
@@ -33,3 +39,8 @@ files = ["paddock_engine", "tests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[[tool.mypy.overrides]]
+# statsmodels ships no type information; it is used only in tests, as an independent check.
+module = ["statsmodels.*"]
+ignore_missing_imports = true

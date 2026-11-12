@@ -112,17 +112,34 @@ boundary. `docs/api/openapi.yaml` describes core's REST API and refers to those 
 output differs from what the generators produce. The agent's Lua writes its lines by hand; its
 tests validate them against the same schema files.
 
-## What exists today (after phase 1)
+## The measurement path (phase 2)
+
+1. `engine/paddock_engine/phases/segment.py` cuts a pass into brake, entry, mid and exit
+   (ported from v0 and tested against its outputs).
+2. `features/` turns the samples and phases into named metrics: corner time, speeds, per-phase
+   axle slip with a confidence, driver inputs (brake point, trail braking, throttle pickup,
+   corrections), and the channels v0 lacked (steering per g, front saturation index, yaw
+   gain). A metric's name is its id everywhere else.
+3. `stats/` compares setups: one model over all corners,
+   `y ~ arm + covariates + (1 | corner)`, a block bootstrap over laps for the interval, and a
+   classification against a region of practical equivalence
+   ([ADR 0008](adr/0008-effect-model.md)). `stats/mde.py` says what a plan can detect before
+   it is driven; `stats/noise.py` measures the scatter per corner.
+
+The engine has no database access. Core sends it what it needs in the request and a path to
+the session's Parquet parts.
+
+## What exists today (after phase 2)
 
 | Piece | State |
 | --- | --- |
-| Contracts: health, spool session, spool pass, session summary; generators and drift check | Working, checked in CI |
+| Contracts: health, spool session, spool pass, session summary, features request and response; generators and drift check | Working, checked in CI |
 | agent: capture with conditions, incremental encoding, spool writer, status window, installer (`tools/install_agent.py`) | 72 offline tests pass; **unverified in game** |
 | core: ingest (tail, validate, Parquet, rows, metrics), `GET /health`, `GET /sessions`, `GET /metrics`, migrations for cars, tracks, corners, sessions, passes | Working, tested against a real PostgreSQL and in Docker |
-| engine: `GET /health` | Working, tested, `mypy --strict` |
+| engine: phases, features, speed-binned slip, effect model, bootstrap, ROPE, MDE, noise model, `POST /features/session` | Working, 60 tests, `mypy --strict`; acceptance numbers are from simulation |
 | web: core status and the list of recorded sessions | Working, tested |
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners, the same as v0 logged |
-| setups, experiments, features, stats, diagnosis, sensitivity, optimizer, more dashboard pages, ghost | Not started (phases 2 to 6) |
+| Core calling the engine (features job, evaluation), setups, experiments, diagnosis, sensitivity, optimizer, more dashboard pages, ghost | Not started (phases 3 to 6) |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.

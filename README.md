@@ -12,10 +12,11 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: phases 0 and 1 of 7 complete.** Capture and ingest work end to end and are tested;
-> the measurement and experiment engine is designed ([docs/design.md](docs/design.md)) and is
-> being built phase by phase. The [roadmap](#roadmap) below says exactly what exists today.
-> Nothing has been run inside Assetto Corsa yet.
+> **Status: phases 0 to 2 of 7 complete.** Capture, ingest and the measurement statistics work
+> and are tested; experiments, diagnosis and the sensitivity profile are designed
+> ([docs/design.md](docs/design.md)) and are being built phase by phase. The
+> [roadmap](#roadmap) below says exactly what exists today. Nothing has been run inside
+> Assetto Corsa yet, and no real experiment has been driven.
 
 ## The finding that started this
 
@@ -115,8 +116,8 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | --- | --- | --- |
 | 0 | Skeleton: layout, contracts + codegen, CI, Compose, ADRs, reused v0 capture code under test | **Done** |
 | 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (offline; unverified in game) |
-| 2 | Measurement: features, noise model, mixed model, minimum detectable effect. Target: false-verdict rate from 39% to under 10% | Next |
-| 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | Planned |
+| 2 | Measurement: features, noise model, mixed model, minimum detectable effect | **Done** (simulated: false decisions 39% to 0%) |
+| 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | Next |
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | Planned |
 | 5 | Sensitivity profile and experiment ranking | Planned |
 | 6 | Ghost Driver (research, optional): machine-driven test manoeuvres | Gated |
@@ -136,6 +137,12 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   Prometheus metrics.
 - The session that started this project, replayable by anyone: `make demo` ingests the real
   FA26 COTA log (136 passes, 17 corners) and lists it in the dashboard.
+- A measurement engine (Python) that estimates a setup's effect across all corners at once,
+  with a calibrated interval. On simulated experiments with my real scatter, identical setups
+  produce a decision in 0% of 200 runs (v0: 39%), and a 20 ms per corner effect is detected
+  in 91.5% ([how, and what was rejected](docs/adr/0008-effect-model.md)).
+- The audit's finding as a test: on the real session, front slip is 7.7° in slow corners and
+  3.7° in fast ones while rear slip stays near 3°.
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
 

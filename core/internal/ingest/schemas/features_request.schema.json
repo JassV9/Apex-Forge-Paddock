@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "features_request.schema.json",
+  "title": "FeaturesRequest",
+  "description": "Core asks the engine to compute the features of a session's corner passes (POST /features/session).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "track_length_m",
+    "driven_axle",
+    "corners",
+    "passes"
+  ],
+  "properties": {
+    "track_length_m": {
+      "description": "Lap length along the AI line.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "driven_axle": {
+      "description": "Which wheels are driven; decides where wheelspin is looked for.",
+      "type": "string",
+      "enum": [
+        "rear",
+        "front",
+        "all"
+      ]
+    },
+    "parquet_dir": {
+      "description": "Directory of the session's Parquet parts with raw samples. Left out when no pass has samples.",
+      "type": "string",
+      "minLength": 1
+    },
+    "corners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "title": "FeatureCorner",
+        "description": "Where a corner is, in metres from the start line.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "number",
+          "zone_start_m",
+          "start_m",
+          "end_m",
+          "apex_m",
+          "zone_end_m"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "zone_start_m": {
+            "description": "Where a pass of this corner starts.",
+            "type": "number",
+            "minimum": 0
+          },
+          "start_m": {
+            "description": "Where the corner itself starts.",
+            "type": "number",
+            "minimum": 0
+          },
+          "end_m": {
+            "description": "Where the corner itself ends.",
+            "type": "number",
+            "minimum": 0
+          },
+          "apex_m": {
+            "description": "Tightest point.",
+            "type": "number",
+            "minimum": 0
+          },
+          "zone_end_m": {
+            "description": "Where a pass of this corner ends.",
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "passes": {
+      "type": "array",
+      "items": {
+        "title": "FeaturePassInput",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "seq",
+          "corner",
+          "duration_s"
+        ],
+        "properties": {
+          "seq": {
+            "description": "Order of the pass within its session.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "corner": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "duration_s": {
+            "description": "Time from zone start to zone end.",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "legacy": {
+            "description": "The pass's LegacySummary (spool_pass.schema.json) when it was imported from Apex Forge v0 and has no raw samples.",
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

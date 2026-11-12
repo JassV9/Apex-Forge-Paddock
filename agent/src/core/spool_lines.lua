@@ -39,6 +39,7 @@ end
 local function cornerJson(c)
   return concat({
     '{"number":', int(c.id), ',"name":', quote(c.name), ',"direction":', quote(c.dir),
+    ',"start_m":', num(c.gStart, 2), ',"end_m":', num(c.gEnd, 2),
     ',"apex_m":', num(c.apex, 2), ',"radius_m":', num(c.radius, 2),
     ',"angle_deg":', num(c.angle, 1), ',"zone_start_m":', num(c.zStart, 2),
     ',"zone_end_m":', num(c.zEnd, 2), "}",

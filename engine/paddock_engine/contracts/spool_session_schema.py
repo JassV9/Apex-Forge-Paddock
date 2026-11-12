@@ -49,6 +49,12 @@ class SpoolCorner(BaseModel):
     number: int = Field(..., description="1-based, counted from the start line.", ge=1)
     name: str
     direction: Direction
+    start_m: float = Field(
+        ...,
+        description="Where the corner itself starts (radius drops below the threshold), metres from the start line.",
+        ge=0.0,
+    )
+    end_m: float = Field(..., description="Where the corner itself ends.", ge=0.0)
     apex_m: float = Field(..., description="Tightest point, metres from the start line.", ge=0.0)
     radius_m: float = Field(..., description="Radius at the apex.", gt=0.0)
     angle_deg: float = Field(..., description="Total change of heading through the corner.", ge=0.0)

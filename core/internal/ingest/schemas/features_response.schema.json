@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "features_response.schema.json",
+  "title": "FeaturesResponse",
+  "description": "The engine's features for each pass of a FeaturesRequest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "passes"
+  ],
+  "properties": {
+    "passes": {
+      "type": "array",
+      "items": {
+        "title": "PassFeatures",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "seq",
+          "valid",
+          "speed_class",
+          "metrics",
+          "flags"
+        ],
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "valid": {
+            "description": "False when the pass must not be used for comparisons.",
+            "type": "boolean"
+          },
+          "invalid_reason": {
+            "description": "Why the pass is not valid.",
+            "type": "string",
+            "minLength": 1
+          },
+          "speed_class": {
+            "description": "Band of the corner's minimum speed: below 100, 100 to 150, above 150 km/h.",
+            "type": "string",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ]
+          },
+          "metrics": {
+            "description": "Metric id to value. A metric that could not be measured on this pass is null.",
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "flags": {
+            "description": "Remarks about the pass, for people.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

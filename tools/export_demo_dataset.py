@@ -53,6 +53,8 @@ def session_line(log: dict[str, Any], corner_map: dict[str, Any]) -> dict[str, A
             "number": c["id"],
             "name": c["name"],
             "direction": c["dir"],
+            "start_m": round(c["gStart"], 2),
+            "end_m": round(c["gEnd"], 2),
             "apex_m": round(c["apex"], 2),
             "radius_m": round(c["radius"], 2),
             "angle_deg": round(c["angle"], 1),

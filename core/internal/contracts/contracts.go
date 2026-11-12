@@ -8,6 +8,277 @@ import "reflect"
 import "regexp"
 import "unicode/utf8"
 
+// Where a corner is, in metres from the start line.
+type FeatureCorner struct {
+	// Tightest point.
+	ApexM float64 `json:"apex_m"`
+
+	// Where the corner itself ends.
+	EndM float64 `json:"end_m"`
+
+	// Number corresponds to the JSON schema field "number".
+	Number int `json:"number"`
+
+	// Where the corner itself starts.
+	StartM float64 `json:"start_m"`
+
+	// Where a pass of this corner ends.
+	ZoneEndM float64 `json:"zone_end_m"`
+
+	// Where a pass of this corner starts.
+	ZoneStartM float64 `json:"zone_start_m"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeatureCorner) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["apex_m"]; raw != nil && !ok {
+		return fmt.Errorf("field apex_m in FeatureCorner: required")
+	}
+	if _, ok := raw["end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field end_m in FeatureCorner: required")
+	}
+	if _, ok := raw["number"]; raw != nil && !ok {
+		return fmt.Errorf("field number in FeatureCorner: required")
+	}
+	if _, ok := raw["start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field start_m in FeatureCorner: required")
+	}
+	if _, ok := raw["zone_end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field zone_end_m in FeatureCorner: required")
+	}
+	if _, ok := raw["zone_start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field zone_start_m in FeatureCorner: required")
+	}
+	type Plain FeatureCorner
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.ApexM {
+		return fmt.Errorf("field %s: must be >= %v", "apex_m", 0)
+	}
+	if 0 > plain.EndM {
+		return fmt.Errorf("field %s: must be >= %v", "end_m", 0)
+	}
+	if 1 > plain.Number {
+		return fmt.Errorf("field %s: must be >= %v", "number", 1)
+	}
+	if 0 > plain.StartM {
+		return fmt.Errorf("field %s: must be >= %v", "start_m", 0)
+	}
+	if 0 > plain.ZoneEndM {
+		return fmt.Errorf("field %s: must be >= %v", "zone_end_m", 0)
+	}
+	if 0 > plain.ZoneStartM {
+		return fmt.Errorf("field %s: must be >= %v", "zone_start_m", 0)
+	}
+	*j = FeatureCorner(plain)
+	return nil
+}
+
+type FeaturePassInput struct {
+	// Corner corresponds to the JSON schema field "corner".
+	Corner int `json:"corner"`
+
+	// Time from zone start to zone end.
+	DurationS float64 `json:"duration_s"`
+
+	// The pass's LegacySummary (spool_pass.schema.json) when it was imported from
+	// Apex Forge v0 and has no raw samples.
+	Legacy FeaturesRequestPassesElemLegacy `json:"legacy,omitempty,omitzero"`
+
+	// Order of the pass within its session.
+	Seq int `json:"seq"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeaturePassInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in FeaturePassInput: required")
+	}
+	if _, ok := raw["duration_s"]; raw != nil && !ok {
+		return fmt.Errorf("field duration_s in FeaturePassInput: required")
+	}
+	if _, ok := raw["seq"]; raw != nil && !ok {
+		return fmt.Errorf("field seq in FeaturePassInput: required")
+	}
+	type Plain FeaturePassInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 0 >= plain.DurationS {
+		return fmt.Errorf("field %s: must be > %v", "duration_s", 0)
+	}
+	if 1 > plain.Seq {
+		return fmt.Errorf("field %s: must be >= %v", "seq", 1)
+	}
+	*j = FeaturePassInput(plain)
+	return nil
+}
+
+// Core asks the engine to compute the features of a session's corner passes (POST
+// /features/session).
+type FeaturesRequest struct {
+	// Corners corresponds to the JSON schema field "corners".
+	Corners []FeatureCorner `json:"corners"`
+
+	// Which wheels are driven; decides where wheelspin is looked for.
+	DrivenAxle FeaturesRequestDrivenAxle `json:"driven_axle"`
+
+	// Directory of the session's Parquet parts with raw samples. Left out when no
+	// pass has samples.
+	ParquetDir *string `json:"parquet_dir,omitempty,omitzero"`
+
+	// Passes corresponds to the JSON schema field "passes".
+	Passes []FeaturePassInput `json:"passes"`
+
+	// Lap length along the AI line.
+	TrackLengthM float64 `json:"track_length_m"`
+}
+
+type FeaturesRequestDrivenAxle string
+
+const FeaturesRequestDrivenAxleAll FeaturesRequestDrivenAxle = "all"
+const FeaturesRequestDrivenAxleFront FeaturesRequestDrivenAxle = "front"
+const FeaturesRequestDrivenAxleRear FeaturesRequestDrivenAxle = "rear"
+
+var enumValues_FeaturesRequestDrivenAxle = []interface{}{
+	"rear",
+	"front",
+	"all",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeaturesRequestDrivenAxle) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_FeaturesRequestDrivenAxle {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_FeaturesRequestDrivenAxle, v)
+	}
+	*j = FeaturesRequestDrivenAxle(v)
+	return nil
+}
+
+// The pass's LegacySummary (spool_pass.schema.json) when it was imported from Apex
+// Forge v0 and has no raw samples.
+type FeaturesRequestPassesElemLegacy map[string]interface{}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeaturesRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in FeaturesRequest: required")
+	}
+	if _, ok := raw["driven_axle"]; raw != nil && !ok {
+		return fmt.Errorf("field driven_axle in FeaturesRequest: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in FeaturesRequest: required")
+	}
+	if _, ok := raw["track_length_m"]; raw != nil && !ok {
+		return fmt.Errorf("field track_length_m in FeaturesRequest: required")
+	}
+	type Plain FeaturesRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.Corners != nil && len(plain.Corners) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "corners", 1)
+	}
+	if plain.ParquetDir != nil && utf8.RuneCountInString(string(*plain.ParquetDir)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "parquet_dir", 1)
+	}
+	if 0 >= plain.TrackLengthM {
+		return fmt.Errorf("field %s: must be > %v", "track_length_m", 0)
+	}
+	*j = FeaturesRequest(plain)
+	return nil
+}
+
+// The engine's features for each pass of a FeaturesRequest.
+type FeaturesResponse struct {
+	// Passes corresponds to the JSON schema field "passes".
+	Passes []PassFeatures `json:"passes"`
+}
+
+// Metric id to value. A metric that could not be measured on this pass is null.
+type FeaturesResponsePassesElemMetrics map[string]*float64
+
+type FeaturesResponsePassesElemSpeedClass string
+
+const FeaturesResponsePassesElemSpeedClassFast FeaturesResponsePassesElemSpeedClass = "fast"
+const FeaturesResponsePassesElemSpeedClassMedium FeaturesResponsePassesElemSpeedClass = "medium"
+const FeaturesResponsePassesElemSpeedClassSlow FeaturesResponsePassesElemSpeedClass = "slow"
+
+var enumValues_FeaturesResponsePassesElemSpeedClass = []interface{}{
+	"slow",
+	"medium",
+	"fast",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeaturesResponsePassesElemSpeedClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_FeaturesResponsePassesElemSpeedClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_FeaturesResponsePassesElemSpeedClass, v)
+	}
+	*j = FeaturesResponsePassesElemSpeedClass(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeaturesResponse) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in FeaturesResponse: required")
+	}
+	type Plain FeaturesResponse
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = FeaturesResponse(plain)
+	return nil
+}
+
 // Liveness reply of a Paddock process (GET /health on core and on the engine).
 type Health struct {
 	// Which process answered.
@@ -371,6 +642,62 @@ func (j *PassConditions) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type PassFeatures struct {
+	// Remarks about the pass, for people.
+	Flags []string `json:"flags"`
+
+	// Why the pass is not valid.
+	InvalidReason *string `json:"invalid_reason,omitempty,omitzero"`
+
+	// Metric id to value. A metric that could not be measured on this pass is null.
+	Metrics FeaturesResponsePassesElemMetrics `json:"metrics"`
+
+	// Seq corresponds to the JSON schema field "seq".
+	Seq int `json:"seq"`
+
+	// Band of the corner's minimum speed: below 100, 100 to 150, above 150 km/h.
+	SpeedClass FeaturesResponsePassesElemSpeedClass `json:"speed_class"`
+
+	// False when the pass must not be used for comparisons.
+	Valid bool `json:"valid"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassFeatures) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["flags"]; raw != nil && !ok {
+		return fmt.Errorf("field flags in PassFeatures: required")
+	}
+	if _, ok := raw["metrics"]; raw != nil && !ok {
+		return fmt.Errorf("field metrics in PassFeatures: required")
+	}
+	if _, ok := raw["seq"]; raw != nil && !ok {
+		return fmt.Errorf("field seq in PassFeatures: required")
+	}
+	if _, ok := raw["speed_class"]; raw != nil && !ok {
+		return fmt.Errorf("field speed_class in PassFeatures: required")
+	}
+	if _, ok := raw["valid"]; raw != nil && !ok {
+		return fmt.Errorf("field valid in PassFeatures: required")
+	}
+	type Plain PassFeatures
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.InvalidReason != nil && utf8.RuneCountInString(string(*plain.InvalidReason)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "invalid_reason", 1)
+	}
+	if 1 > plain.Seq {
+		return fmt.Errorf("field %s: must be >= %v", "seq", 1)
+	}
+	*j = PassFeatures(plain)
+	return nil
+}
+
 // Raw channels at up to 60 Hz as column arrays of equal length n.
 type PassSamples struct {
 	// Columns corresponds to the JSON schema field "columns".
@@ -728,6 +1055,9 @@ type SpoolCorner struct {
 	// Direction corresponds to the JSON schema field "direction".
 	Direction SpoolCornerDirection `json:"direction"`
 
+	// Where the corner itself ends.
+	EndM float64 `json:"end_m"`
+
 	// Name corresponds to the JSON schema field "name".
 	Name string `json:"name"`
 
@@ -736,6 +1066,10 @@ type SpoolCorner struct {
 
 	// Radius at the apex.
 	RadiusM float64 `json:"radius_m"`
+
+	// Where the corner itself starts (radius drops below the threshold), metres from
+	// the start line.
+	StartM float64 `json:"start_m"`
 
 	// Where a pass of this corner ends (includes the traction area).
 	ZoneEndM float64 `json:"zone_end_m"`
@@ -789,6 +1123,9 @@ func (j *SpoolCorner) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["direction"]; raw != nil && !ok {
 		return fmt.Errorf("field direction in SpoolCorner: required")
 	}
+	if _, ok := raw["end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field end_m in SpoolCorner: required")
+	}
 	if _, ok := raw["name"]; raw != nil && !ok {
 		return fmt.Errorf("field name in SpoolCorner: required")
 	}
@@ -797,6 +1134,9 @@ func (j *SpoolCorner) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["radius_m"]; raw != nil && !ok {
 		return fmt.Errorf("field radius_m in SpoolCorner: required")
+	}
+	if _, ok := raw["start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field start_m in SpoolCorner: required")
 	}
 	if _, ok := raw["zone_end_m"]; raw != nil && !ok {
 		return fmt.Errorf("field zone_end_m in SpoolCorner: required")
@@ -815,11 +1155,17 @@ func (j *SpoolCorner) UnmarshalJSON(value []byte) error {
 	if 0 > plain.ApexM {
 		return fmt.Errorf("field %s: must be >= %v", "apex_m", 0)
 	}
+	if 0 > plain.EndM {
+		return fmt.Errorf("field %s: must be >= %v", "end_m", 0)
+	}
 	if 1 > plain.Number {
 		return fmt.Errorf("field %s: must be >= %v", "number", 1)
 	}
 	if 0 >= plain.RadiusM {
 		return fmt.Errorf("field %s: must be > %v", "radius_m", 0)
+	}
+	if 0 > plain.StartM {
+		return fmt.Errorf("field %s: must be >= %v", "start_m", 0)
 	}
 	if 0 > plain.ZoneEndM {
 		return fmt.Errorf("field %s: must be >= %v", "zone_end_m", 0)

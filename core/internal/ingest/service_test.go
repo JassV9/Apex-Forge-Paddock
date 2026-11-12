@@ -230,3 +230,18 @@ func writeChunk(t *testing.T, spool, session, name, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestConvertSessionWritesTheSamePartsWithoutADatabase(t *testing.T) {
+	out := t.TempDir()
+
+	parts, err := ConvertSession(filepath.Join(sampleSpool, "sample-session"), out,
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	if err != nil || parts != 3 {
+		t.Fatalf("ConvertSession = %d parts, err=%v; want 3", parts, err)
+	}
+	rows, err := parquet.ReadFile[sampleRow](filepath.Join(out, "000002.parquet"))
+	if err != nil || len(rows) == 0 || rows[0].Seq != 1 {
+		t.Errorf("first part: %d rows, err=%v", len(rows), err)
+	}
+}

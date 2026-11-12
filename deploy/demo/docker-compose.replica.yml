@@ -1,0 +1,83 @@
+# A rehearsal of the Azure replica on this machine: `make demo-replica`.
+#
+# infra/azure/main.tf runs the demo as one replica whose containers share localhost and
+# start together after an init container. This file is the same layout in Compose, so that
+# layout is tested without a cloud account: every service joins the network of `postgres`,
+# nothing waits for anything else, and a container that exits early is restarted, as the
+# platform does. Only nginx's port is published (docs/adr/0012-read-only-demo.md).
+name: paddock-replica
+
+x-in-replica: &in-replica
+  network_mode: "service:postgres"
+  restart: on-failure
+  depends_on:
+    dataset:
+      condition: service_completed_successfully
+
+services:
+  # The init container: copies the recorded session into the spool, opens the volumes.
+  dataset:
+    build:
+      context: ../..
+      dockerfile: deploy/demo/data.Dockerfile
+    volumes:
+      - spool:/spool
+      - data:/data
+      - outbox:/outbox
+
+  # Owns the replica's network, so the one published port is declared here; it is nginx's.
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: paddock
+      POSTGRES_PASSWORD: paddock # local rehearsal only; Azure generates its own
+      POSTGRES_DB: paddock
+    ports:
+      - "127.0.0.1:5173:8088"
+
+  engine:
+    <<: *in-replica
+    build: ../../engine
+    environment:
+      PADDOCK_LLM_PROVIDER: none
+    volumes:
+      - data:/data
+
+  core:
+    <<: *in-replica
+    build: ../../core
+    environment:
+      PADDOCK_HTTP_ADDR: ":8080"
+      PADDOCK_DATABASE_URL: postgres://paddock:paddock@localhost:5432/paddock?sslmode=disable
+      PADDOCK_ENGINE_URL: http://localhost:8000
+      PADDOCK_SPOOL_DIR: /spool
+      PADDOCK_DATA_DIR: /data
+      PADDOCK_OUTBOX_DIR: /outbox
+    volumes:
+      - spool:/spool
+      - data:/data
+      - outbox:/outbox
+
+  web:
+    <<: *in-replica
+    build:
+      context: ../../web
+      dockerfile: Dockerfile.demo
+    environment:
+      PADDOCK_WEB_PORT: "8088"
+      PADDOCK_CORE_URL: http://localhost:8080
+
+  seed:
+    <<: *in-replica
+    image: curlimages/curl:latest
+    environment:
+      PADDOCK_CORE_URL: http://localhost:8080
+      PADDOCK_SEED_HOLD: "1"
+    volumes:
+      - ./seed.sh:/seed.sh:ro
+    entrypoint: ["/bin/sh", "/seed.sh"]
+
+volumes:
+  spool:
+  data:
+  outbox:

@@ -3,13 +3,15 @@
 
 COMPOSE       := docker compose -f deploy/docker-compose.yml
 COMPOSE_DEMO  := docker compose -p paddock-demo -f deploy/docker-compose.yml -f deploy/docker-compose.demo.yml
+COMPOSE_REPLICA := docker compose -f deploy/demo/docker-compose.replica.yml
 SCHEMAS       := $(wildcard contracts/*.schema.json)
 GO_JSONSCHEMA := github.com/atombender/go-jsonschema@v0.24.1
 PY_CONTRACTS  := engine/paddock_engine/contracts
 GO_SCHEMAS    := core/internal/ingest/schemas
 RUFF          := uv run --project engine ruff
 
-.PHONY: help setup dev down demo demo-down test test-agent test-core test-engine test-web test-e2e \
+.PHONY: help setup dev down demo demo-down demo-replica \
+        demo-replica-check demo-replica-down test test-agent test-core test-engine test-web test-e2e \
         lint lint-core lint-python lint-web gen gen-go gen-python gen-web gen-check
 
 help:
@@ -18,6 +20,8 @@ help:
 	@echo "down       stop the dev stack"
 	@echo "demo       the same stack on the recorded sessions in datasets/demo (no game needed)"
 	@echo "demo-down  stop the demo stack and delete its data"
+	@echo "demo-replica  the public demo as it is deployed: read-only, one replica, http://localhost:5173"
+	@echo "demo-replica-check  reads are answered, writes refused (demo-replica-down stops it)"
 	@echo "test       run every test suite"
 	@echo "test-e2e   experiments through the mocked game, core and the engine (needs PostgreSQL)"
 	@echo "lint       run every linter and type checker"
@@ -41,6 +45,16 @@ demo:
 
 demo-down:
 	$(COMPOSE_DEMO) down --volumes
+
+# The layout of infra/azure on this machine: one network, no start order, restarts.
+demo-replica:
+	$(COMPOSE_REPLICA) up --build --detach
+
+demo-replica-check:
+	sh deploy/demo/smoke.sh
+
+demo-replica-down:
+	$(COMPOSE_REPLICA) down --volumes
 
 test: test-agent test-core test-engine test-web
 

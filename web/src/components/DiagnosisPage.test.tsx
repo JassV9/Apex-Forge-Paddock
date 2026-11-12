@@ -97,6 +97,13 @@ describe("DiagnosisPage", () => {
     });
   });
 
+  it("shows the stored diagnosis in the read-only demo, without a way to run it", async () => {
+    render(<DiagnosisPage sessionId={3} api={apiWith()} readOnly />);
+
+    expect(await screen.findByRole("listitem", { name: "mid_understeer.slow" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Diagnose/ })).toBeNull();
+  });
+
   it("says what core refused", async () => {
     const refusal = new Error("session 3 has no valid pass with computed features yet");
     const api = apiWith({ load: () => Promise.resolve(null), run: () => Promise.reject(refusal) });

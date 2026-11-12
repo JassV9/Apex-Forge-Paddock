@@ -26,6 +26,8 @@ const coreApi: DiagnosisApi = {
 interface DiagnosisPageProps {
   sessionId: number;
   api?: DiagnosisApi;
+  /** The public demo: the stored diagnosis is shown and cannot be run again. */
+  readOnly?: boolean;
 }
 
 type State = { kind: "loading" } | { kind: "none" } | { kind: "ready"; diagnosis: Diagnosis };
@@ -35,7 +37,7 @@ function messageOf(error: unknown): string {
 }
 
 /** What a session's passes say about the car: hypotheses to test, never a fix to apply. */
-export function DiagnosisPage({ sessionId, api = coreApi }: DiagnosisPageProps) {
+export function DiagnosisPage({ sessionId, api = coreApi, readOnly = false }: DiagnosisPageProps) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
@@ -83,11 +85,13 @@ export function DiagnosisPage({ sessionId, api = coreApi }: DiagnosisPageProps) 
     <article>
       <h2>Session #{sessionId}: diagnosis</h2>
       {state.kind === "none" && <p>This session has not been diagnosed yet.</p>}
-      <section className="steps">
-        <button disabled={busy} onClick={diagnose}>
-          {state.kind === "ready" ? "Diagnose again" : "Diagnose this session"}
-        </button>
-      </section>
+      {!readOnly && (
+        <section className="steps">
+          <button disabled={busy} onClick={diagnose}>
+            {state.kind === "ready" ? "Diagnose again" : "Diagnose this session"}
+          </button>
+        </section>
+      )}
       {problem !== "" && <p role="alert">{problem}</p>}
       {state.kind === "ready" && (
         <>

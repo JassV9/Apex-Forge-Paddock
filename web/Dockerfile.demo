@@ -1,0 +1,17 @@
+# Production image of the dashboard for the public, read-only demo
+# (docs/adr/0012-read-only-demo.md). Static files behind nginx, which lets only reads
+# through to core. The development image is ./Dockerfile.
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+# The pages hide what a visitor cannot do. nginx is what enforces it.
+ENV VITE_READ_ONLY=1
+RUN npm run build
+
+FROM nginxinc/nginx-unprivileged:stable-alpine
+COPY nginx.demo.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/dist /usr/share/nginx/html
+ENV PADDOCK_WEB_PORT=8088 PADDOCK_CORE_URL=http://localhost:8080
+EXPOSE 8088

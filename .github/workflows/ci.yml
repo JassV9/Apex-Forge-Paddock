@@ -15,6 +15,7 @@ concurrency:
 env:
   GO_VERSION: "1.27"
   NODE_VERSION: "24"
+  TERRAFORM_VERSION: "1.17.1"
 
 jobs:
   contracts:
@@ -138,6 +139,34 @@ jobs:
       - run: cd web && npm run build
       - name: Dependency audit
         run: cd web && npm audit --audit-level=high
+
+  demo:
+    name: Read-only demo (replica layout)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the demo laid out as the Azure replica
+        run: make demo-replica
+      - name: Reads are answered, writes are refused
+        run: make demo-replica-check
+      - name: Logs
+        if: failure()
+        run: docker compose -f deploy/demo/docker-compose.replica.yml logs --tail 80
+
+  infra:
+    name: Terraform (format and validate, never applied)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/azure
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      - run: terraform fmt -check -diff
+      - run: terraform init -backend=false -input=false -lockfile=readonly
+      - run: terraform validate
 
   secrets:
     name: Secret scan

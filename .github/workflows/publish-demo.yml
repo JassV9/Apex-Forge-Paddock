@@ -1,0 +1,49 @@
+# Builds the four images of the public demo and pushes them to GitHub's container registry.
+# Started by hand only: nothing is published by a push. infra/azure deploys what this pushed
+# (docs/runbooks/deploy-demo.md).
+name: Publish demo images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Build and push
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: core
+            context: core
+            file: core/Dockerfile
+          - image: engine
+            context: engine
+            file: engine/Dockerfile
+          - image: web-demo
+            context: web
+            file: web/Dockerfile.demo
+          - image: demo-data
+            context: .
+            file: deploy/demo/data.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Registry path in lower case
+        run: echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          build-args: VERSION=${{ github.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.image }}:demo
+            ${{ env.REGISTRY }}/${{ matrix.image }}:${{ github.sha }}

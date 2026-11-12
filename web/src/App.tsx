@@ -6,9 +6,10 @@ import { Ledger } from "./components/Ledger";
 import { ProposeForm } from "./components/ProposeForm";
 import { Scorecard } from "./components/Scorecard";
 import { SessionList } from "./components/SessionList";
+import { READ_ONLY } from "./config";
 import { experimentHref, type Route, useRoute } from "./hooks/useRoute";
 
-function Page({ route }: { route: Route }) {
+function Page({ route, readOnly }: { route: Route; readOnly: boolean }) {
   switch (route.page) {
     case "sessions":
       return (
@@ -18,7 +19,7 @@ function Page({ route }: { route: Route }) {
         </>
       );
     case "session":
-      return <DiagnosisPage key={route.id} sessionId={route.id} />;
+      return <DiagnosisPage key={route.id} sessionId={route.id} readOnly={readOnly} />;
     case "ledger":
       return (
         <>
@@ -35,6 +36,7 @@ function Page({ route }: { route: Route }) {
         </>
       );
     case "propose":
+      if (readOnly) return <p>Experiments cannot be proposed in the read-only demo.</p>;
       return (
         <>
           <h2>Propose an experiment</h2>
@@ -52,7 +54,8 @@ function Page({ route }: { route: Route }) {
   }
 }
 
-export function App() {
+/** `readOnly` is the public demo: recorded data, and nothing a visitor can change. */
+export function App({ readOnly = READ_ONLY }: { readOnly?: boolean }) {
   const route = useRoute();
   return (
     <main>
@@ -63,11 +66,17 @@ export function App() {
           <a href="#/">Sessions</a>
           <a href="#/experiments">Ledger</a>
           <a href="#/garage">Garage</a>
-          <a href="#/propose">Propose</a>
+          {!readOnly && <a href="#/propose">Propose</a>}
         </nav>
         <CoreStatus />
+        {readOnly && (
+          <p role="note">
+            Read-only demo on a recorded session. Proposing and running experiments needs the game
+            and a local install.
+          </p>
+        )}
       </header>
-      <Page route={route} />
+      <Page route={route} readOnly={readOnly} />
     </main>
   );
 }

@@ -200,7 +200,34 @@ The rules, the thresholds and what was rejected are in
 Why it is built this way, and what is missing (the 20+ experiment optimizer, tracks and
 conditions), is in [ADR 0011](adr/0011-sensitivity-and-ranking.md).
 
-## What exists today (after phase 5)
+## The public demo (phase 7)
+
+The demo mode can be shown to strangers without giving them the API. Nothing in core or
+the engine knows about it.
+
+```mermaid
+flowchart LR
+  V[visitor] -- "HTTPS" --> N
+  subgraph R["one replica, shared localhost"]
+    I["dataset<br/>(init container)"] -. "copies the spool" .-> C
+    N["nginx + dashboard<br/>GET only, rate limited"] -- "/api/ reads" --> C[core]
+    S[seeder] -- "POST diagnosis" --> C
+    C --> E[engine]
+    C --> P[(PostgreSQL)]
+  end
+```
+
+- nginx is the only container with ingress. `POST`, `PUT`, `PATCH` and `DELETE` under
+  `/api/` are answered 403 there; `/api/metrics` is 404.
+- The dashboard is built with `VITE_READ_ONLY=1` and hides what a visitor cannot do.
+- The replica keeps nothing. A new one ingests the recorded session again and the seeder
+  diagnoses it from inside.
+- `deploy/demo/docker-compose.replica.yml` is this layout in Compose and
+  `infra/azure` is the same in Terraform. The first runs in CI; the second is validated
+  and has never been applied ([ADR 0012](adr/0012-read-only-demo.md),
+  [runbook](runbooks/deploy-demo.md)).
+
+## What exists today (after phase 7)
 
 | Piece | State |
 | --- | --- |
@@ -208,9 +235,11 @@ conditions), is in [ADR 0011](adr/0011-sensitivity-and-ranking.md).
 | agent: capture with conditions, setup catalog and setup lines, run-plan window, setup loading with read-back and rollback, block and lap tags, installer (`tools/install_agent.py`) | 97 offline tests pass; **unverified in game** |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
 | engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 132 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
-| web: sessions, diagnosis page with what to test next, propose form (also filled from a candidate, with its predicted gain), experiment page with its full history, ledger with the scorecard, garage | Working, 75 tests |
+| web: sessions, diagnosis page with what to test next, propose form (also filled from a candidate, with its predicted gain), experiment page with its full history, ledger with the scorecard, garage; a read-only build | Working, 78 tests |
 | End to end: the Lua agent on the mocked game, core and the engine through a diagnosis, three experiments, and the profile, ranking and scorecard they leave (`make test-e2e`) | Passes locally and in CI |
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
+| Read-only demo: nginx door, replica layout in Compose, smoke test (`make demo-replica`, `make demo-replica-check`) | Working locally and in CI |
+| Azure deployment of the demo (`infra/azure`, `.github/workflows/publish-demo.yml`) | Terraform validated; **never applied, nothing published** |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver | Not started (phase 6, gated on the game) |
 
@@ -225,6 +254,7 @@ phase that first uses it.
 | engine | 8000 | `PADDOCK_LLM_PROVIDER` (`none`, `gemini` or `openrouter`; unset: Gemini when its key is present, otherwise no model), `PADDOCK_LLM_MODEL` (model id; default per provider), `GEMINI_API_KEY`, `OPENROUTER_API_KEY` (environment, or the OS keyring under service `paddock` when the `keyring` package is installed) |
 | web (dev server) | 5173 | `PADDOCK_CORE_URL` (default `http://localhost:8080`), target of the `/api` proxy |
 | PostgreSQL | 5432 | Set in `deploy/docker-compose.yml` |
+| web (demo image, nginx) | 8088 | `PADDOCK_WEB_PORT` (default `8088`), `PADDOCK_CORE_URL` (default `http://localhost:8080`); built with `VITE_READ_ONLY=1` |
 
 In Docker, `PADDOCK_SPOOL_HOST` is the host folder mounted read-only as core's spool and
 `PADDOCK_OUTBOX_HOST` the host folder mounted as its outbox. The engine mounts core's data

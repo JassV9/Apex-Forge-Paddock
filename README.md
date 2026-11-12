@@ -12,10 +12,16 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: phases 0 to 5 of 7 complete.** Capture, ingest, the measurement statistics,
-> experiments, diagnosis and the sensitivity profile work and are tested. The
+> **Status: built and tested offline; not yet run in the game.** Capture, ingest, the
+> measurement statistics, experiments, diagnosis, the sensitivity profile and a read-only
+> demo work and are tested (phases 0 to 5 and 7; phase 6 is optional research). The
 > [roadmap](#roadmap) below says exactly what exists today. Nothing has been run inside
-> Assetto Corsa yet, and no real experiment has been driven.
+> Assetto Corsa yet, no real experiment has been driven, and the demo is not deployed.
+
+![The ledger, one experiment and the garage of measured effects](docs/img/experiment-loop.gif)
+
+*Three experiments on a simulated car, driven by the end-to-end test: the real Lua agent,
+Go service and Python engine, with a mocked game. Not Assetto Corsa.*
 
 ## The finding that started this
 
@@ -38,7 +44,9 @@ n=5: identical setups flagged slowerWins 33%
 n=8: identical setups flagged slowerWins 26%
 ```
 
-Tuning thresholds cannot fix that. The method had to change.
+Tuning thresholds cannot fix that. The method had to change. The whole story, with what
+each finding became and where it is tested, is the
+[case study](docs/case-study-v0-regressions.md).
 
 ## What Paddock does instead
 
@@ -64,6 +72,13 @@ flowchart LR
   reply that invents a number is rejected. The system runs fully without one.
 - **It scores itself.** Every prediction is checked against its result, so "how often is this
   tool right?" becomes a number.
+
+On the session that started all this, the diagnosis now says what v0 never could: the
+understeer is real, and the driver's steering explains it as well as the car does.
+
+![Diagnosis of the recorded COTA session in the read-only demo](docs/img/demo-diagnosis.png)
+
+*The read-only demo on the real recorded session (`make demo-replica`).*
 
 ## Architecture
 
@@ -120,7 +135,7 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | **Done** (on the real COTA session; hosted models unverified) |
 | 5 | Sensitivity profile and experiment ranking: pooled effects with intervals, flagged priors, expected gain per lap | **Done** (on a simulated car; the 20+ experiment optimizer is not built) |
 | 6 | Ghost Driver (research, optional): machine-driven test manoeuvres | Gated |
-| 7 | Public read-only demo on recorded data | Planned |
+| 7 | Public read-only demo on recorded data, case study | **Done locally** (read-only door tested in CI; Terraform for Azure validated, **never applied**) |
 
 Each phase has written acceptance criteria ([docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md),
 section 5) and ends with a demo script in [docs/demos/](docs/demos/).
@@ -172,6 +187,13 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   a garage of measured effects; and a scorecard of predictions that came true.
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
+- A demo that can go on the internet without becoming writable. nginx lets only reads
+  through, so the rule holds for every route, including ones written later; core has no
+  demo mode to drift. It is one disposable replica that keeps nothing, described in
+  Terraform for Azure Container Apps and rehearsed in Compose. CI starts that replica on
+  every push and checks that reads answer and writes get a 403
+  ([ADR 0012](docs/adr/0012-read-only-demo.md), [runbook](docs/runbooks/deploy-demo.md)).
+  **It has not been deployed**: no cloud account is used from this repository.
 
 Nothing in this repository has been run inside Assetto Corsa yet, and the docs say so wherever
 it matters ([first-run checklist](docs/runbooks/agent-in-game.md)).
@@ -188,6 +210,7 @@ make test-e2e  # three experiments through agent, core and engine (needs Postgre
 make lint    # golangci-lint, ruff, mypy --strict, eslint, prettier
 make gen     # regenerate Go, Python and TypeScript types from contracts/
 make demo    # full stack in Docker on a recorded session, http://localhost:5173
+make demo-replica  # the read-only public demo, laid out as it would run on Azure
 make dev     # the same stack, ingesting what the in-game agent writes
 ```
 
@@ -201,7 +224,9 @@ make dev     # the same stack, ingesting what the in-game agent writes
 | [`web/`](web/) | React dashboard |
 | [`agent/`](agent/) | CSP Lua agent, mock CSP API, and offline tests on real fixtures |
 | [`datasets/demo/`](datasets/demo/) | The real v0 session as a replayable spool |
-| [`docs/`](docs/) | [Architecture](docs/architecture.md), [design](docs/design.md), [v0 audit](docs/audit-v0.md), [ADRs](docs/adr/), [API](docs/api/openapi.yaml), [onboarding](docs/onboarding.md) |
+| [`deploy/`](deploy/) | Compose files: development, demo, and the read-only replica with its smoke test |
+| [`infra/azure/`](infra/azure/) | Terraform for the public demo (validated, never applied) |
+| [`docs/`](docs/) | [Architecture](docs/architecture.md), [design](docs/design.md), [v0 audit](docs/audit-v0.md), [case study](docs/case-study-v0-regressions.md), [ADRs](docs/adr/), [API](docs/api/openapi.yaml), [onboarding](docs/onboarding.md) |
 | [`tools/`](tools/) | Scripts, including the verdict-noise simulation above |
 
 ## How it is built

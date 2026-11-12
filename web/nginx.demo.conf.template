@@ -1,0 +1,38 @@
+# The public demo's only door. The image's entrypoint fills in ${PADDOCK_WEB_PORT} and
+# ${PADDOCK_CORE_URL} from the environment when the container starts.
+# Some reads make core work (the sensitivity profile is rebuilt on every read), so the
+# API is rate limited per client address. Behind a platform proxy every visitor may share
+# one address; the limit then caps the whole demo, which still protects core.
+limit_req_zone $binary_remote_addr zone=api:1m rate=20r/s;
+
+server {
+    listen ${PADDOCK_WEB_PORT};
+    server_tokens off;
+    root /usr/share/nginx/html;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+
+    # Read-only: a request that would change anything is answered 403 here and never
+    # reaches core.
+    location /api/ {
+        limit_except GET {
+            deny all;
+        }
+        limit_req zone=api burst=40 nodelay;
+        limit_req_status 429;
+        proxy_pass ${PADDOCK_CORE_URL}/;
+        proxy_set_header Host $host;
+        proxy_read_timeout 60s;
+    }
+
+    # Core's metrics are for the operator, not for visitors.
+    location = /api/metrics {
+        return 404;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}

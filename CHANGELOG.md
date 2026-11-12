@@ -2,6 +2,33 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 7: read-only demo and case study (2026-11-12)
+
+Phase 6 (Ghost Driver) is optional and gated on the game; it was not started.
+
+- web: `web/Dockerfile.demo` serves the built dashboard from nginx, which proxies `/api/`
+  for `GET` only, answers 404 for the metrics and rate limits the API. A build flag
+  (`VITE_READ_ONLY`) hides the Propose link and the Diagnose button and says why.
+- deploy: `deploy/demo/` holds the demo as one replica: a dataset image that copies the
+  recorded session into a volume, a seeder that diagnoses it from inside, a Compose file
+  with the layout of the Azure replica (`make demo-replica`) and a smoke test of the
+  read-only door (`make demo-replica-check`).
+- infra: `infra/azure` describes that replica for Azure Container Apps in Terraform:
+  one app, five containers, ingress to nginx only, a generated database password in the
+  app's secrets, scale to zero.
+- CI: a job that starts the replica and runs the smoke test, and a job that runs
+  `terraform fmt -check` and `terraform validate`. A workflow started by hand publishes
+  the four images to GitHub's registry.
+- docs: the case study `docs/case-study-v0-regressions.md`, ADR 0012, a deploy runbook,
+  screenshots and a GIF in the README.
+
+Not done: the demo is **not deployed**. The Terraform was validated, never applied, and
+the publish workflow was never started, so whether Azure accepts the configuration is
+unknown. The GIF is frames from the end-to-end test's simulated car, not a recording of
+the game. Known oddity: in the Garage a channel with no decision band is classed against
+zero, so an effect of exactly zero reads "Inconclusive" there and "negligible" on the
+experiment's page. Not verified: anything in Assetto Corsa.
+
 ## Phase 5: sensitivity profile and ranking (2026-11-12)
 
 - Contracts: `sensitivity_request`, `sensitivity_response`, `sensitivity_profile`,

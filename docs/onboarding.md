@@ -53,6 +53,9 @@ needs is missing.
 ```bash
 make demo        # the full stack on a recorded session; open http://localhost:5173
 make demo-down
+make demo-replica        # the read-only public demo (docs/runbooks/deploy-demo.md)
+make demo-replica-check  # reads are answered, writes are refused
+make demo-replica-down
 ```
 
 The page says "Core dev is running." (local builds report version `dev`) and lists one

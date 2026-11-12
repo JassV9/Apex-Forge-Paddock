@@ -9,7 +9,7 @@ PY_CONTRACTS  := engine/paddock_engine/contracts
 GO_SCHEMAS    := core/internal/ingest/schemas
 RUFF          := uv run --project engine ruff
 
-.PHONY: help setup dev down demo demo-down test test-agent test-core test-engine test-web \
+.PHONY: help setup dev down demo demo-down test test-agent test-core test-engine test-web test-e2e \
         lint lint-core lint-python lint-web gen gen-go gen-python gen-web gen-check
 
 help:
@@ -19,6 +19,7 @@ help:
 	@echo "demo       the same stack on the recorded sessions in datasets/demo (no game needed)"
 	@echo "demo-down  stop the demo stack and delete its data"
 	@echo "test       run every test suite"
+	@echo "test-e2e   experiments through the mocked game, core and the engine (needs PostgreSQL)"
 	@echo "lint       run every linter and type checker"
 	@echo "gen        regenerate code from contracts/ and docs/api/openapi.yaml"
 	@echo "gen-check  fail if generated code is out of date (CI)"
@@ -45,6 +46,11 @@ test: test-agent test-core test-engine test-web
 
 test-agent:
 	cd agent && uv run pytest
+
+# The whole chain: the Lua agent on the mocked game, core and the engine. Needs Go, PostgreSQL
+# (PADDOCK_TEST_DATABASE_URL) and the engine's virtual environment; without them it fails.
+test-e2e:
+	cd agent && PADDOCK_E2E_REQUIRED=1 uv run pytest tests/e2e
 
 test-core:
 	cd core && go test ./...

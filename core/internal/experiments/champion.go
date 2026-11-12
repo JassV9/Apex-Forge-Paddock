@@ -16,6 +16,36 @@ const RecheckEvery = 3
 
 const recheckStatement = "Re-check: the current setup is still faster than the original baseline."
 
+// anchor makes sure the experiment is measured against the champion before its setups go on
+// the car. The first experiment of a car and track makes its baseline the champion and the
+// original. Later ones must start from the champion (a re-check must end on it); a proposal
+// that the ledger has moved past is refused.
+func anchor(ctx context.Context, tx *sql.Tx, exp record) error {
+	expected := exp.baselineVersion
+	if exp.kind == contracts.ExperimentKindRecheck {
+		expected = exp.variantVersion
+	}
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO champion (car_id, track_id, setup_version_id, original_version_id, accepted_since_check)
+		 VALUES ($1, $2, $3, $3, 0) ON CONFLICT (car_id, track_id) DO NOTHING`,
+		exp.carID, exp.trackID, expected)
+	if err != nil {
+		return fmt.Errorf("anchor champion: %w", err)
+	}
+	var champion int64
+	err = tx.QueryRowContext(ctx,
+		`SELECT setup_version_id FROM champion WHERE car_id = $1 AND track_id = $2 FOR UPDATE`,
+		exp.carID, exp.trackID).Scan(&champion)
+	if err != nil {
+		return fmt.Errorf("read champion: %w", err)
+	}
+	if champion != expected {
+		return fmt.Errorf("experiment %d was proposed against a setup that is no longer the champion; "+
+			"discard it and propose it again: %w", exp.id, ErrConflict)
+	}
+	return nil
+}
+
 // promote makes the experiment's variant the champion of its car and track. A re-check that
 // is accepted confirms the champion instead. When RecheckEvery experiments were accepted
 // since the last check, a re-check is proposed.

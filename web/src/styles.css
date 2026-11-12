@@ -1,0 +1,183 @@
+:root {
+  color-scheme: dark;
+  --ground: #101418;
+  --panel: #1a2026;
+  --line: #2c3640;
+  --text: #e6eaee;
+  --muted: #9aa7b3;
+  --accent: #ff7a1a;
+  --good: #4cc38a;
+  --bad: #f2555a;
+  --warn: #e5b93c;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font:
+    16px/1.5 system-ui,
+    "Segoe UI",
+    sans-serif;
+}
+
+main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+h2 {
+  margin-top: 2rem;
+}
+
+h3 {
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+a {
+  color: var(--accent);
+}
+
+nav {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0.75rem 0;
+}
+
+header p {
+  margin: 0.25rem 0;
+  color: var(--muted);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+}
+
+th,
+td {
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+blockquote {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+}
+
+[role="alert"] {
+  color: var(--bad);
+}
+
+.state {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.state-accepted {
+  color: var(--good);
+  border-color: var(--good);
+}
+
+.state-rejected,
+.state-reverted,
+.state-aborted {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.state-tradeoff,
+.state-inconclusive {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.state-running,
+.state-evaluating {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+button {
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #101418;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+form {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 36rem;
+}
+
+label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+}
+
+input,
+select,
+textarea {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+textarea {
+  min-height: 4.5rem;
+}

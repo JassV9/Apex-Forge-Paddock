@@ -135,8 +135,8 @@ func TestRejectedExperimentPutsTheBaselineBackOnTheCar(t *testing.T) {
 		last.Label != baselineLabel(t, exp) || last.Values["ARB_FRONT"] != 3 {
 		t.Errorf("revision %d, %d blocks, last block %+v", plan.Revision, len(plan.Blocks), last)
 	}
-	if champions := f.count(t, `SELECT count(*) FROM champion`); champions != 0 {
-		t.Error("a rejected variant became champion")
+	if champion, _ := championValue(t, f); champion != 3 {
+		t.Errorf("champion ARB_FRONT %v: a rejected variant became champion", champion)
 	}
 }
 
@@ -195,12 +195,12 @@ func TestDriverCanKeepTheBaselineOnAnInconclusiveResult(t *testing.T) {
 
 func TestDriverDecidesATradeoff(t *testing.T) {
 	cases := map[string]struct {
-		accept    bool
-		state     State
-		champions int
+		accept   bool
+		state    State
+		champion float64 // ARB_FRONT of the champion afterwards; the baseline has 3
 	}{
-		"accepts":  {true, Accepted, 1},
-		"declines": {false, Reverted, 0},
+		"accepts":  {true, Accepted, 2},
+		"declines": {false, Reverted, 3},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -218,8 +218,8 @@ func TestDriverDecidesATradeoff(t *testing.T) {
 			if decided.Verdict.DecidedBy != contracts.VerdictSummaryDecidedByDriver {
 				t.Errorf("verdict = %+v", decided.Verdict)
 			}
-			if got := f.count(t, `SELECT count(*) FROM champion`); got != tc.champions {
-				t.Errorf("%d champions, want %d", got, tc.champions)
+			if got, _ := championValue(t, f); got != tc.champion {
+				t.Errorf("champion ARB_FRONT %v, want %v", got, tc.champion)
 			}
 			if _, err := f.service.Decide(t.Context(), int64(exp.Id), true); !errors.Is(err, ErrConflict) {
 				t.Errorf("deciding twice: err = %v, want ErrConflict", err)

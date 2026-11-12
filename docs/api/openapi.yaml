@@ -35,6 +35,31 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SessionSummary"
+  /sessions/{id}/setup:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      operationId: listSetupItems
+      summary: The changeable items of the setup an experiment on this session would start from.
+      description: >
+        The setup is the champion of the session's car and track, or before their first
+        experiment the setup the session's latest pass was driven on.
+      responses:
+        "200":
+          description: The items, by label.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SetupItem"
+        "422":
+          $ref: "#/components/responses/Problem"
   /experiments:
     get:
       operationId: listExperiments
@@ -154,6 +179,8 @@ components:
       $ref: "../../contracts/health.schema.json"
     SessionSummary:
       $ref: "../../contracts/session_summary.schema.json"
+    SetupItem:
+      $ref: "../../contracts/setup_item.schema.json"
     Experiment:
       $ref: "../../contracts/experiment.schema.json"
     ExperimentCreate:

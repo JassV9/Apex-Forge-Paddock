@@ -30,6 +30,11 @@ func (f *fakeExperiments) List(context.Context) ([]contracts.Experiment, error) 
 	return nil, f.err
 }
 
+func (f *fakeExperiments) SetupItems(_ context.Context, sessionID int64) ([]contracts.SetupItem, error) {
+	f.calls = append(f.calls, fmt.Sprintf("setup items %d", sessionID))
+	return []contracts.SetupItem{{Name: "ARB_FRONT", Label: "Front ARB", Max: 4, Step: 1, Value: 3}}, f.err
+}
+
 func (f *fakeExperiments) Create(_ context.Context, request contracts.ExperimentCreate) (contracts.Experiment, error) {
 	return f.answer("create "+request.Parameter, 7)
 }
@@ -177,6 +182,28 @@ func TestExperimentErrorsBecomeStatusCodes(t *testing.T) {
 				t.Errorf("status %d (want %d), error %q", recorder.Code, tt.wantCode, body.Error)
 			}
 		})
+	}
+}
+
+func TestSetupItemsOfASession(t *testing.T) {
+	service := &fakeExperiments{}
+	deps := testDeps()
+	deps.Experiments = service
+
+	recorder := send(t, NewHandler(deps), http.MethodGet, "/sessions/4/setup", "")
+
+	var items []contracts.SetupItem
+	if err := json.Unmarshal(recorder.Body.Bytes(), &items); err != nil {
+		t.Fatalf("body is not a list of setup items: %s", recorder.Body)
+	}
+	if recorder.Code != http.StatusOK || len(items) != 1 || items[0].Name != "ARB_FRONT" {
+		t.Errorf("status %d, items %+v", recorder.Code, items)
+	}
+	if len(service.calls) != 1 || service.calls[0] != "setup items 4" {
+		t.Errorf("service calls = %v", service.calls)
+	}
+	if code := send(t, NewHandler(deps), http.MethodGet, "/sessions/abc/setup", "").Code; code != http.StatusUnprocessableEntity {
+		t.Errorf("session id that is not a number: status %d", code)
 	}
 }
 

@@ -182,3 +182,15 @@ def test_noise_model_is_robust_to_a_few_slow_passes() -> None:
 def test_noise_model_needs_repeated_passes() -> None:
     with pytest.raises(ValueError, match="3 passes"):
         noise_model([Observation(1, "A", 5.0), Observation(2, "A", 6.0)])
+
+
+def test_a_channel_that_never_moves_has_an_effect_of_exactly_zero() -> None:
+    """Counts such as lockups are 0 on every pass of most experiments: that is "no effect",
+    not "cannot be estimated"."""
+    rows = simulate_abab(np.random.default_rng(1), 0.0, corners=7)
+    still = [Observation(r.corner, r.arm, 0.0, r.block, r.lap, r.covariates) for r in rows]
+
+    effect = estimate_effects(still, BASELINE, rope=0.05)[0]
+
+    assert (effect.estimate, effect.ci_low, effect.ci_high) == (0.0, 0.0, 0.0)
+    assert effect.effect_class is EffectClass.NEGLIGIBLE

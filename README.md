@@ -117,8 +117,8 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | 0 | Skeleton: layout, contracts + codegen, CI, Compose, ADRs, reused v0 capture code under test | **Done** |
 | 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (offline; unverified in game) |
 | 2 | Measurement: features, noise model, mixed model, minimum detectable effect | **Done** (simulated: false decisions 39% to 0%) |
-| 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | Next |
-| 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | Planned |
+| 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (end to end on a simulated car; unverified in game) |
+| 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | Next |
 | 5 | Sensitivity profile and experiment ranking | Planned |
 | 6 | Ghost Driver (research, optional): machine-driven test manoeuvres | Gated |
 | 7 | Public read-only demo on recorded data | Planned |
@@ -143,6 +143,17 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   in 91.5% ([how, and what was rejected](docs/adr/0008-effect-model.md)).
 - The audit's finding as a test: on the real session, front slip is 7.7° in slow corners and
   3.7° in fast ones while rear slip stays near 3°.
+- Experiments from proposal to verdict: a state machine in Go where every move is one
+  transaction with a logged reason, interleaved A-B-A-B blocks under random code names so the
+  driver does not know which setup is the baseline, automatic revert of anything that is not
+  clearly better, and a re-check of the current setup against the original after three
+  accepted changes ([the rules](docs/adr/0009-experiments.md)).
+- An end-to-end test that runs the real Lua agent, the Go service and the Python engine
+  through three experiments on a simulated car (`make test-e2e`). It caught a design error
+  that every unit test had passed: after a rejected experiment, the next one would have
+  started from the rejected setup ([demo script](docs/demos/phase-3.md)).
+- A dashboard with a ledger of every experiment and, per experiment, the test that was fixed
+  before driving, the effect of each channel with its interval, and its full history.
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
 
@@ -157,6 +168,7 @@ Full walkthrough: [docs/onboarding.md](docs/onboarding.md).
 ```bash
 make setup   # install dependencies for every module
 make test    # Lua (under LuaJIT), Go, Python, TypeScript
+make test-e2e  # three experiments through agent, core and engine (needs PostgreSQL)
 make lint    # golangci-lint, ruff, mypy --strict, eslint, prettier
 make gen     # regenerate Go, Python and TypeScript types from contracts/
 make demo    # full stack in Docker on a recorded session, http://localhost:5173
@@ -168,7 +180,7 @@ make dev     # the same stack, ingesting what the in-game agent writes
 | Path | Contents |
 | --- | --- |
 | [`contracts/`](contracts/) | JSON Schema for every type that crosses a process boundary |
-| [`core/`](core/) | Go monolith: ingest, API, store and migrations today; setups and experiments next |
+| [`core/`](core/) | Go monolith: ingest, setups, experiments, API, store and migrations |
 | [`engine/`](engine/) | Python analysis engine |
 | [`web/`](web/) | React dashboard |
 | [`agent/`](agent/) | CSP Lua agent, mock CSP API, and offline tests on real fixtures |

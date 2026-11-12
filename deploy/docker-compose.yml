@@ -5,6 +5,11 @@
 # writes to, for example (PowerShell):
 #   $env:PADDOCK_SPOOL_HOST = "$HOME/Documents/Assetto Corsa/paddock/spool"
 # Unset, an empty ./data/spool is used and nothing is ingested.
+#
+# Core writes the run plan and the setups of an experiment for the agent. Point
+# PADDOCK_OUTBOX_HOST at the agent's outbox, for example:
+#   $env:PADDOCK_OUTBOX_HOST = "$HOME/Documents/Assetto Corsa/paddock/outbox"
+# Unset, ./data/outbox is used and the agent never sees a run plan.
 name: paddock
 
 services:
@@ -31,6 +36,8 @@ services:
       PADDOCK_DATABASE_URL: postgres://paddock:paddock@postgres:5432/paddock?sslmode=disable
       PADDOCK_SPOOL_DIR: /spool
       PADDOCK_DATA_DIR: /data
+      PADDOCK_ENGINE_URL: http://engine:8000
+      PADDOCK_OUTBOX_DIR: /outbox
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -41,15 +48,26 @@ services:
         read_only: true
         bind:
           create_host_path: true
+      - type: bind
+        source: ${PADDOCK_OUTBOX_HOST:-../data/outbox}
+        target: /outbox
+        bind:
+          create_host_path: true
       - core-data:/data
     depends_on:
       postgres:
         condition: service_healthy
+      engine:
+        condition: service_started
 
   engine:
     build: ../engine
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      # read-only, at the same path as in core: core hands the engine the directory of a
+      # session's Parquet files, and the engine reads the raw samples from there
+      - core-data:/data:ro
 
   web:
     build: ../web

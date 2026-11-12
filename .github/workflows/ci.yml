@@ -92,6 +92,35 @@ jobs:
           uv export --no-dev --no-emit-project --format requirements-txt -o requirements.txt
           uvx pip-audit --requirement requirements.txt --require-hashes --disable-pip
 
+  e2e:
+    name: End to end (agent, core, engine)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: paddock
+          POSTGRES_PASSWORD: paddock
+          POSTGRES_DB: paddock_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U paddock" --health-interval 2s
+          --health-timeout 2s --health-retries 15
+    env:
+      PADDOCK_TEST_DATABASE_URL: postgres://paddock:paddock@localhost:5432/paddock_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: core/go.sum
+      - uses: astral-sh/setup-uv@v6
+      - run: cd engine && uv sync
+      - run: cd agent && uv sync
+      - name: Experiments through the mocked game, core and the engine
+        run: make test-e2e
+
   web:
     name: Web (TypeScript)
     runs-on: ubuntu-latest

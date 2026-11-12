@@ -2855,6 +2855,63 @@ func (j *SessionSummary) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// One changeable item of the setup an experiment would start from.
+type SetupItem struct {
+	// Name shown in the game's setup screen.
+	Label string `json:"label"`
+
+	// Highest raw value.
+	Max float64 `json:"max"`
+
+	// Lowest raw value.
+	Min float64 `json:"min"`
+
+	// Item id in the game's setup, for example ARB_FRONT.
+	Name string `json:"name"`
+
+	// Raw value of one click.
+	Step float64 `json:"step"`
+
+	// Raw value on the setup an experiment would start from.
+	Value float64 `json:"value"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SetupItem) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in SetupItem: required")
+	}
+	if _, ok := raw["max"]; raw != nil && !ok {
+		return fmt.Errorf("field max in SetupItem: required")
+	}
+	if _, ok := raw["min"]; raw != nil && !ok {
+		return fmt.Errorf("field min in SetupItem: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in SetupItem: required")
+	}
+	if _, ok := raw["step"]; raw != nil && !ok {
+		return fmt.Errorf("field step in SetupItem: required")
+	}
+	if _, ok := raw["value"]; raw != nil && !ok {
+		return fmt.Errorf("field value in SetupItem: required")
+	}
+	type Plain SetupItem
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
+	}
+	*j = SetupItem(plain)
+	return nil
+}
+
 // One item of the car's setup menu, as the game reports it.
 type SetupParameter struct {
 	// F or R when the item belongs to one axle.

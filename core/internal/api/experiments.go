@@ -27,6 +27,7 @@ type Experiments interface {
 	Revert(ctx context.Context, id int64) (contracts.Experiment, error)
 	Abort(ctx context.Context, id int64) (contracts.Experiment, error)
 	Discard(ctx context.Context, id int64) (contracts.Experiment, error)
+	SetupItems(ctx context.Context, sessionID int64) ([]contracts.SetupItem, error)
 }
 
 const maxRequestBody = 1 << 20
@@ -46,6 +47,7 @@ func registerExperiments(mux *http.ServeMux, logger *slog.Logger, service Experi
 		"extend": service.Extend, "revert": service.Revert, "abort": service.Abort,
 		"discard": service.Discard,
 	}}
+	mux.HandleFunc("GET /sessions/{id}/setup", routes.setupItems)
 	mux.HandleFunc("GET /experiments", routes.list)
 	mux.HandleFunc("POST /experiments", routes.create)
 	mux.HandleFunc("GET /experiments/{id}", routes.get)
@@ -63,6 +65,20 @@ func (e experimentRoutes) list(w http.ResponseWriter, r *http.Request) {
 		list = []contracts.Experiment{} // an empty list is [], never null
 	}
 	writeJSON(w, r, e.logger, http.StatusOK, list)
+}
+
+func (e experimentRoutes) setupItems(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeJSON(w, r, e.logger, http.StatusUnprocessableEntity, problem{Error: "no such session"})
+		return
+	}
+	items, err := e.experiments.SetupItems(r.Context(), id)
+	if err != nil {
+		e.fail(w, r, err)
+		return
+	}
+	writeJSON(w, r, e.logger, http.StatusOK, items)
 }
 
 func (e experimentRoutes) create(w http.ResponseWriter, r *http.Request) {

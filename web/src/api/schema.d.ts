@@ -38,12 +38,119 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    /**
+     * The changeable items of the setup an experiment on this session would start from.
+     * @description The setup is the champion of the session's car and track, or before their first experiment the setup the session's latest pass was driven on.
+     */
+    get: operations["listSetupItems"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/experiments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The ledger. Every experiment, newest first, whatever its outcome. */
+    get: operations["listExperiments"];
+    put?: never;
+    /** Propose an experiment. One setup item, moved by some clicks. */
+    post: operations["createExperiment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/experiments/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ExperimentId"];
+      };
+      cookie?: never;
+    };
+    /** One experiment. */
+    get: operations["getExperiment"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/experiments/{id}/{action}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ExperimentId"];
+        /** @description plan: ask the engine what an A-B-A-B plan can detect (proposed to planned). start: write the run plan and both setups for the agent (planned to running). evaluate: have the engine judge the driven passes (running to accepted, tradeoff, inconclusive, or rejected and then reverted). extend: two more blocks for an inconclusive experiment, at most twice. revert: go back to the baseline (inconclusive, tradeoff, or the current champion). abort: stop a running experiment. discard: drop an experiment that was not driven. */
+        action: "plan" | "start" | "evaluate" | "extend" | "revert" | "abort" | "discard";
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Move an experiment along its state machine. */
+    post: operations["actOnExperiment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/experiments/{id}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ExperimentId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The driver's call on a trade-off. */
+    post: operations["decideExperiment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
     Health: components["schemas"]["health.schema"];
     SessionSummary: components["schemas"]["session_summary.schema"];
+    SetupItem: components["schemas"]["setup_item.schema"];
+    Experiment: components["schemas"]["experiment.schema"];
+    ExperimentCreate: components["schemas"]["experiment_create.schema"];
+    ExperimentDecision: components["schemas"]["experiment_decision.schema"];
+    Problem: {
+      /** @description What went wrong, in words. */
+      error: string;
+    };
     /**
      * Health
      * @description Liveness reply of a Paddock process (GET /health on core and on the engine).
@@ -87,9 +194,244 @@ export interface components {
       /** @description Different corners with at least one pass. */
       corners: number;
     };
+    /**
+     * SetupItem
+     * @description One changeable item of the setup an experiment would start from.
+     */
+    "setup_item.schema": {
+      /** @description Item id in the game's setup, for example ARB_FRONT. */
+      name: string;
+      /** @description Name shown in the game's setup screen. */
+      label: string;
+      /** @description Lowest raw value. */
+      min: number;
+      /** @description Highest raw value. */
+      max: number;
+      /** @description Raw value of one click. */
+      step: number;
+      /** @description Raw value on the setup an experiment would start from. */
+      value: number;
+    };
+    /**
+     * SuccessTest
+     * @description The test an experiment must pass, fixed before driving.
+     */
+    SuccessTest: {
+      /** @description Metric id of the primary response. */
+      channel: string;
+      /** @description Half-width of the band of effects too small to matter, in the channel's unit. */
+      rope: number;
+      /** @description Confidence level of the interval. */
+      level: number;
+      /**
+       * @description Which direction is an improvement.
+       * @enum {string}
+       */
+      better: "lower" | "higher";
+    };
+    /**
+     * GuardrailSpec
+     * @description A channel that must not get worse by more than a tolerance.
+     */
+    GuardrailSpec: {
+      /** @description Metric id. */
+      channel: string;
+      /** @description Allowed change in the bad direction, in the channel's unit. */
+      tolerance: number;
+      /**
+       * @description Which direction is bad.
+       * @enum {string}
+       */
+      worse: "higher" | "lower";
+    };
+    /**
+     * PredictionSpec
+     * @description What the hypothesis expects of one channel, written before driving.
+     */
+    PredictionSpec: {
+      /** @description Metric id. */
+      channel: string;
+      /** @enum {string} */
+      direction: "decrease" | "increase";
+      /** @description Smallest expected size of the change. */
+      low: number;
+      /** @description Largest expected size of the change. */
+      high: number;
+    };
+    /**
+     * ExperimentArm
+     * @description One setup of the experiment.
+     */
+    ExperimentArm: {
+      /** @description Code name shown to the driver. */
+      label: string;
+      is_baseline: boolean;
+      setup_version_id: number;
+      /** @description Raw value of the changed item on this arm. */
+      value: number;
+    };
+    /**
+     * PlanSummary
+     * @description What the plan can answer, computed before driving.
+     */
+    PlanSummary: {
+      sigma: number;
+      /** @enum {string} */
+      sigma_source: "measured" | "assumed";
+      passes_per_arm: number;
+      mde_detect: number;
+      mde_decide: number;
+    };
+    /**
+     * ExperimentBlock
+     * @description One block of the run plan and how much of it is driven.
+     */
+    ExperimentBlock: {
+      order: number;
+      /** @description Code name of the setup to load. */
+      label: string;
+      laps_target: number;
+      /** @description Push laps driven in this block (the out-lap does not count). */
+      laps_done: number;
+      /** @description Corner passes recorded in this block. */
+      passes: number;
+    };
+    /**
+     * ExperimentResult
+     * @description The measured effect on one channel.
+     */
+    ExperimentResult: {
+      channel: string;
+      /** @enum {string} */
+      role: "primary" | "guardrail" | "driver_input" | "prediction";
+      /** @enum {string} */
+      corner_class: "all" | "slow" | "medium" | "fast";
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+      n_passes: number;
+      /** @enum {string} */
+      effect_class: "positive" | "negative" | "negligible" | "inconclusive";
+    };
+    /**
+     * VerdictSummary
+     * @description How the experiment ended.
+     */
+    VerdictSummary: {
+      /** @enum {string} */
+      decision: "accepted" | "rejected" | "tradeoff" | "inconclusive" | "reverted" | "aborted";
+      reason: string;
+      /** @enum {string} */
+      decided_by: "engine" | "driver";
+      /** @description RFC 3339, UTC. */
+      decided_at: string;
+      prediction_hits: number;
+      prediction_total: number;
+    };
+    /**
+     * ExperimentEvent
+     * @description One state transition.
+     */
+    ExperimentEvent: {
+      /** @description State before; empty for the creation. */
+      from: string;
+      to: string;
+      reason: string;
+      /** @description RFC 3339, UTC. */
+      at: string;
+    };
+    /**
+     * Experiment
+     * @description An experiment with its plan, results, verdict and history.
+     */
+    "experiment.schema": {
+      id: number;
+      /** @enum {string} */
+      kind: "ofat" | "factorial" | "recheck";
+      /** @enum {string} */
+      state:
+        | "proposed"
+        | "planned"
+        | "running"
+        | "evaluating"
+        | "accepted"
+        | "rejected"
+        | "tradeoff"
+        | "inconclusive"
+        | "reverted"
+        | "aborted"
+        | "discarded";
+      /** @description The hypothesis in words. */
+      statement: string;
+      car_name: string;
+      track_name: string;
+      /** @description Setup item that is changed. */
+      parameter: string;
+      /** @description What the setup menu calls it. */
+      parameter_label: string;
+      /** @description Clicks the variant moves it; negative is down. */
+      clicks: number;
+      success_test: components["schemas"]["SuccessTest"];
+      guardrails: components["schemas"]["GuardrailSpec"][];
+      predictions: components["schemas"]["PredictionSpec"][];
+      arms: components["schemas"]["ExperimentArm"][];
+      plan?: components["schemas"]["PlanSummary"];
+      blocks: components["schemas"]["ExperimentBlock"][];
+      results: components["schemas"]["ExperimentResult"][];
+      verdict?: components["schemas"]["VerdictSummary"];
+      events: components["schemas"]["ExperimentEvent"][];
+      /** @description Times the plan was extended after an inconclusive result (at most 2). */
+      extensions: number;
+      /** @description RFC 3339, UTC. */
+      created_at: string;
+    };
+    /**
+     * ExperimentCreate
+     * @description A proposed experiment: one knob, one or more clicks, against the setup a session was driven on.
+     */
+    "experiment_create.schema": {
+      /** @description Core's id of the session whose latest setup is the baseline. */
+      session_id: number;
+      /** @description Setup item to change. */
+      parameter: string;
+      /** @description Clicks to move it; negative is down. Never 0. */
+      clicks: number;
+      /** @description The hypothesis in words. */
+      statement: string;
+      predictions: components["schemas"]["PredictionSpec"][];
+    };
+    /**
+     * ExperimentDecision
+     * @description The driver's call on a trade-off.
+     */
+    "experiment_decision.schema": {
+      /** @description True keeps the variant; false goes back to the baseline. */
+      accept: boolean;
+    };
   };
-  responses: never;
-  parameters: never;
+  responses: {
+    /** @description The experiment as it is after the request. */
+    Experiment: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["experiment.schema"];
+      };
+    };
+    /** @description The request was refused. 404: no such experiment. 409: not possible in the experiment's current state. 422: the request is not valid. 502: the engine did not answer. */
+    Problem: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["Problem"];
+      };
+    };
+  };
+  parameters: {
+    ExperimentId: number;
+  };
   requestBodies: never;
   headers: never;
   pathItems: never;
@@ -134,6 +476,121 @@ export interface operations {
           "application/json": components["schemas"]["session_summary.schema"][];
         };
       };
+    };
+  };
+  listSetupItems: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The items, by label. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["setup_item.schema"][];
+        };
+      };
+      422: components["responses"]["Problem"];
+    };
+  };
+  listExperiments: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Every experiment with its plan, results, verdict and history. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["experiment.schema"][];
+        };
+      };
+    };
+  };
+  createExperiment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["experiment_create.schema"];
+      };
+    };
+    responses: {
+      201: components["responses"]["Experiment"];
+      422: components["responses"]["Problem"];
+    };
+  };
+  getExperiment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ExperimentId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components["responses"]["Experiment"];
+      404: components["responses"]["Problem"];
+    };
+  };
+  actOnExperiment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ExperimentId"];
+        /** @description plan: ask the engine what an A-B-A-B plan can detect (proposed to planned). start: write the run plan and both setups for the agent (planned to running). evaluate: have the engine judge the driven passes (running to accepted, tradeoff, inconclusive, or rejected and then reverted). extend: two more blocks for an inconclusive experiment, at most twice. revert: go back to the baseline (inconclusive, tradeoff, or the current champion). abort: stop a running experiment. discard: drop an experiment that was not driven. */
+        action: "plan" | "start" | "evaluate" | "extend" | "revert" | "abort" | "discard";
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components["responses"]["Experiment"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
+      502: components["responses"]["Problem"];
+    };
+  };
+  decideExperiment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ExperimentId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["experiment_decision.schema"];
+      };
+    };
+    responses: {
+      200: components["responses"]["Experiment"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
+      422: components["responses"]["Problem"];
     };
   };
 }

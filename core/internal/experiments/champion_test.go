@@ -2,6 +2,7 @@ package experiments
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
@@ -53,8 +54,8 @@ func TestThreeAcceptedExperimentsProposeAReCheckAgainstTheOriginal(t *testing.T)
 		t.Fatalf("newest experiment = %s, %s, parameter %q", recheck.Kind, recheck.State, recheck.Parameter)
 	}
 	champion, original := championValue(t, f)
-	if champion != 4 || original != 3 {
-		t.Errorf("champion ARB_FRONT %v, original %v, want 4 and 3", champion, original)
+	if champion != 1 || original != 3 {
+		t.Errorf("champion ARB_FRONT %v, original %v, want 1 (3 - 1 - 2 + 1) and 3", champion, original)
 	}
 	versions := map[bool]int{}
 	for _, arm := range recheck.Arms {
@@ -83,8 +84,8 @@ func TestAcceptedReCheckConfirmsTheChampion(t *testing.T) {
 	if confirmed.State != Accepted {
 		t.Fatalf("state %s", confirmed.State)
 	}
-	if champion, _ := championValue(t, f); champion != 4 {
-		t.Errorf("champion ARB_FRONT %v, want 4 kept", champion)
+	if champion, _ := championValue(t, f); champion != 1 {
+		t.Errorf("champion ARB_FRONT %v, want 1 kept", champion)
 	}
 	if since := f.count(t, `SELECT accepted_since_check FROM champion`); since != 0 {
 		t.Errorf("accepted since the check = %d, want 0", since)
@@ -137,10 +138,104 @@ func TestOnlyTheCurrentChampionCanBeRolledBack(t *testing.T) {
 	if err != nil || rolledBack.State != Reverted {
 		t.Fatalf("state %s, err %v", rolledBack.State, err)
 	}
-	if champion, _ := championValue(t, f); champion != 3 {
-		t.Errorf("champion ARB_FRONT %v, want the second experiment's baseline 3", champion)
+	if champion, _ := championValue(t, f); champion != 2 {
+		t.Errorf("champion ARB_FRONT %v, want the second experiment's baseline 2", champion)
 	}
 	if since := f.count(t, `SELECT accepted_since_check FROM champion`); since != 1 {
 		t.Errorf("accepted since the check = %d, want 1", since)
+	}
+}
+
+func TestTheNextExperimentStartsFromTheChampionNotTheLastPass(t *testing.T) {
+	tests := []struct {
+		name     string
+		decision contracts.EvaluateResponseDecision
+		wantBase float64 // ARB_FRONT of the next experiment's baseline
+	}{
+		{"rejected: the baseline stays", rejected, 3},
+		{"accepted: the variant is the new baseline", accepted, 2},
+	}
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			f := newFixture(t, fmt.Sprintf("champion_baseline_%d", i))
+			first := f.run(t, -1, test.decision)
+			// The last laps of the experiment were driven on its variant.
+			lastPassOnVariant(t, f, first)
+
+			next := f.propose(t, 1)
+
+			for _, arm := range next.Arms {
+				if arm.IsBaseline && arm.Value != test.wantBase {
+					t.Errorf("baseline ARB_FRONT %v, want %v", arm.Value, test.wantBase)
+				}
+			}
+		})
+	}
+}
+
+// lastPassOnVariant marks the session's newest pass as driven on the experiment's variant.
+func lastPassOnVariant(t *testing.T, f *fixture, exp contracts.Experiment) {
+	t.Helper()
+	for _, arm := range exp.Arms {
+		if arm.IsBaseline {
+			continue
+		}
+		_, err := f.database.ExecContext(t.Context(),
+			`UPDATE corner_pass SET setup_version_id = $1
+			 WHERE id = (SELECT id FROM corner_pass WHERE session_id = $2 ORDER BY seq DESC LIMIT 1)`,
+			arm.SetupVersionId, f.sessionID)
+		if err != nil {
+			t.Fatalf("mark the last pass: %v", err)
+		}
+	}
+}
+
+func TestAProposalTheLedgerMovedPastCannotStart(t *testing.T) {
+	f := newFixture(t, "champion_stale")
+	stale := f.propose(t, 1) // proposed against ARB_FRONT 3
+	if _, err := f.service.Plan(t.Context(), int64(stale.Id)); err != nil {
+		t.Fatal(err)
+	}
+	f.run(t, -1, accepted) // the champion is now ARB_FRONT 2
+
+	_, err := f.service.Start(t.Context(), int64(stale.Id))
+
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("starting a stale proposal: err = %v, want ErrConflict", err)
+	}
+	if planned := f.count(t, `SELECT count(*) FROM experiment WHERE id = $1 AND state = 'planned'`, stale.Id); planned != 1 {
+		t.Error("the refused start changed the experiment")
+	}
+}
+
+func TestSetupItemsAreTheChangeableItemsOfTheNextBaseline(t *testing.T) {
+	f := newFixture(t, "setup_items")
+	f.run(t, -1, accepted) // the champion now has ARB_FRONT 2
+	if _, err := f.database.ExecContext(t.Context(),
+		`UPDATE setup_parameter SET excluded = true WHERE name = 'ARB_REAR'`); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := f.service.SetupItems(t.Context(), int64(f.sessionID))
+
+	if err != nil || len(items) == 0 {
+		t.Fatalf("%d items, err %v", len(items), err)
+	}
+	if all := f.count(t, `SELECT count(*) FROM setup_parameter`); len(items) != all-1 {
+		t.Errorf("%d items of %d: only the excluded item must be left out", len(items), all)
+	}
+	for i, item := range items {
+		if item.Name == "ARB_REAR" {
+			t.Error("an excluded item is offered for an experiment")
+		}
+		if item.Name == "ARB_FRONT" && (item.Value != 2 || item.Min != 0 || item.Max != 4 || item.Step != 1) {
+			t.Errorf("ARB_FRONT = %+v, want the champion's value 2 in 0..4", item)
+		}
+		if i > 0 && items[i-1].Label > item.Label {
+			t.Errorf("items are not sorted by label: %q before %q", items[i-1].Label, item.Label)
+		}
+	}
+	if _, err := f.service.SetupItems(t.Context(), 999); !errors.Is(err, ErrInvalid) {
+		t.Errorf("unknown session: err = %v, want ErrInvalid", err)
 	}
 }

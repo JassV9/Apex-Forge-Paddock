@@ -43,6 +43,11 @@ unless Assetto Corsa with the COTA track is installed. Core's database tests are
 `PADDOCK_TEST_DATABASE_URL` points at a PostgreSQL database; CI always runs them. See
 `docs/runbooks/local-dev.md` for how to run them locally.
 
+With that variable set, the agent suite also runs the end-to-end test: the Lua agent on the
+mocked game, core built from source and the engine, through three experiments (about 90
+seconds). `make test-e2e` runs only that test and fails instead of skipping when something it
+needs is missing.
+
 ## 3. Start the stack
 
 ```bash
@@ -71,7 +76,7 @@ conventions. `docs/audit-v0.md` explains why the project exists.
 | --- | --- | --- |
 | `contracts/` | JSON Schema for every cross-process type | `spool_pass.schema.json` |
 | `agent/` | CSP Lua agent and its offline tests | `src/game/agent.lua`, then `tests/test_agent.py` |
-| `core/` | Go monolith | `cmd/paddock/main.go`, then `internal/ingest/service.go` |
+| `core/` | Go monolith | `cmd/paddock/main.go`, then `internal/ingest/service.go` and `internal/experiments/service.go` |
 | `engine/` | Python analysis engine | `paddock_engine/app.py` |
 | `web/` | React dashboard | `src/App.tsx` |
 | `docs/api/openapi.yaml` | Core's REST API, written before the code | — |

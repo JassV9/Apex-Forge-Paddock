@@ -2,6 +2,35 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 3: experiments (2026-11-12)
+
+- Contracts: setup catalog and setup lines in the spool, `runplan`, `experiment` with its
+  create and decision requests, `setup_item`, and the engine's plan and evaluate requests and
+  responses. OpenAPI 0.3.0 with the experiment routes.
+- engine: `POST /plan` (what an A-B-A-B plan can detect) and `POST /evaluate` (effect and
+  interval per channel, guardrail checks, prediction score, decision). A channel that never
+  moves has an effect of exactly zero instead of failing the fit.
+- core: setup catalog and content-hashed setup versions; features worker on the `jobs` table;
+  experiment state machine with an event per move; outbox (run plan and setup files, never
+  overwritten); champion per car and track, rollback, and a re-check against the original
+  after three accepted experiments. Routes: `/experiments`, `/experiments/{id}`, its actions
+  and decision, `/sessions/{id}/setup`.
+- agent: reads the run plan in the pits, loads a block's setup through the setup spinners
+  with read-back and rollback, tags passes with block and lap only while that setup is on the
+  car, and keeps its position across restarts.
+- web: propose form, experiment page (test, blind setups, run plan, results, verdict, full
+  history) and ledger.
+- End-to-end test (`make test-e2e`, also in CI): the Lua agent on the mocked game, core and
+  the engine through three experiments. It found that a new experiment's baseline was taken
+  from the latest pass, which can be a rejected variant; every experiment now starts from the
+  champion (ADR 0009).
+- Compose: core calls the engine and writes the outbox; the engine reads core's Parquet
+  volume.
+
+Not verified: anything in Assetto Corsa; effect sizes in the end-to-end test are planted in a
+simulation. Not done: OpenTelemetry traces. The demo dataset has no setup data, so the demo
+stack has no experiments to show.
+
 ## Phase 2: measurement (2026-11-12)
 
 - engine: phase segmentation and driver-input metrics ported from v0's `analyze.lua`

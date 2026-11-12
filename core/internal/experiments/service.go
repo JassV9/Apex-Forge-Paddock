@@ -188,7 +188,7 @@ func (s *Service) Plan(ctx context.Context, id int64) (contracts.Experiment, err
 }
 
 // Start puts the run plan and both setups into the outbox for the agent. Only one experiment
-// at a time can have its setups on the car.
+// at a time can have its setups on the car, and it must start from the champion.
 func (s *Service) Start(ctx context.Context, id int64) (contracts.Experiment, error) {
 	return s.act(ctx, id, true, func(tx *sql.Tx, exp record) error {
 		other, err := otherOccupying(ctx, tx, id)
@@ -197,6 +197,9 @@ func (s *Service) Start(ctx context.Context, id int64) (contracts.Experiment, er
 		}
 		if other != 0 {
 			return fmt.Errorf("experiment %d is still on the car: %w", other, ErrConflict)
+		}
+		if err := anchor(ctx, tx, exp); err != nil {
+			return err
 		}
 		if err := move(ctx, tx, id, exp.state, Running, "Run plan and setups written for the agent."); err != nil {
 			return err

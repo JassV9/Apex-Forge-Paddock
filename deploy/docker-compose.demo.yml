@@ -8,3 +8,10 @@ services:
         source: ../datasets/demo/spool
         target: /spool
         read_only: true
+      # no game to read them: run plans and setups stay inside the demo project
+      - type: volume
+        source: demo-outbox
+        target: /outbox
+
+volumes:
+  demo-outbox:

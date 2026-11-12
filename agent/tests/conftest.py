@@ -88,11 +88,17 @@ def _fill_mock(rt: Any, root: Path, track: Track) -> Any:
     return mock
 
 
-@pytest.fixture
-def agent(rt: Any, track: Track, tmp_path: Path) -> Agent:
-    rt.globals().MOCK = _fill_mock(rt, tmp_path, track)
+def boot_agent(rt: Any, track: Track, documents: Path) -> Agent:
+    """Start PaddockAgent.lua on the mocked CSP. `documents` stands in for the game's folder
+    in Documents (Documents/Assetto Corsa)."""
+    rt.globals().MOCK = _fill_mock(rt, documents, track)
     rt.execute(f'dofile("{TESTS_DIR.as_posix()}/mock_csp.lua")')
     drive = rt.eval('require("drive")')
     drive.boot()
     drive.profile(to_lua(rt, CAR))
-    return Agent(rt=rt, mock=rt.globals().MOCK, drive=drive, spool_root=tmp_path / "paddock/spool")
+    return Agent(rt=rt, mock=rt.globals().MOCK, drive=drive, spool_root=documents / "paddock/spool")
+
+
+@pytest.fixture
+def agent(rt: Any, track: Track, tmp_path: Path) -> Agent:
+    return boot_agent(rt, track, tmp_path)

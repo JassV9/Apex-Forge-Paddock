@@ -45,7 +45,7 @@ flowchart LR
 | Boundary | Transport | Contract |
 | --- | --- | --- |
 | agent to core | Files: the agent writes numbered chunk files of JSON lines to `Documents/Assetto Corsa/paddock/spool/<session-id>/`; core tails the directory and never writes to it ([ADR 0003](adr/0003-spool-transport.md)) | `contracts/spool_session.schema.json`, `contracts/spool_pass.schema.json` |
-| core to agent | Files: setup `.ini` files and `runplan.json`, read by the agent at most once per second, in the pits only (phase 3) | `contracts/*.schema.json` |
+| core to agent | Files: `runplan.json` and setup `.ini` files in `Documents/Assetto Corsa/paddock/outbox/`, read by the agent every two seconds, in the pits only ([ADR 0009](adr/0009-experiments.md)) | `contracts/runplan.schema.json` |
 | core to engine | HTTP/JSON on localhost; long work goes through the `jobs` table, claimed with `SELECT ... FOR UPDATE SKIP LOCKED` ([ADR 0006](adr/0006-no-kafka-no-kubernetes.md)) | `contracts/*.schema.json` |
 | web to core | REST | `docs/api/openapi.yaml` |
 
@@ -129,17 +129,45 @@ tests validate them against the same schema files.
 The engine has no database access. Core sends it what it needs in the request and a path to
 the session's Parquet parts.
 
-## What exists today (after phase 2)
+## The experiment path (phase 3)
+
+1. **Propose.** `POST /experiments` names a session, one setup item and a number of clicks.
+   Core takes the champion of that car and track as the baseline (before the first
+   experiment: the setup of the session's latest pass), makes the variant with
+   `setups.Step`, and stores the hypothesis, the predictions, the success test and the
+   guardrails. Nothing changes them later.
+2. **Plan.** Core asks the engine (`POST /plan`) what four interleaved blocks can detect and
+   stores the blocks. The two setups get random code names.
+3. **Start.** Core writes `runplan.json` and one setup file per arm into the outbox. Only one
+   experiment can be on the car, and it must start from the champion.
+4. **Drive.** In the pits the agent shows the block to load; "Load Setup X" sets the values
+   through the setup spinners with read-back and rollback. Passes are tagged with block and
+   lap only while that setup is on the car; lap 0 is the out-lap.
+5. **Features.** Ingest queues a job per spool file; core's features worker sends the passes
+   to the engine (`POST /features/session`) and stores the metrics on `corner_pass`.
+6. **Evaluate.** Core sends the valid push-lap passes with their covariates to
+   `POST /evaluate`. The engine returns an effect and interval per channel, the guardrail
+   checks, the prediction score and a decision; core stores them and moves the state.
+7. **Settle.** Accepted: the variant is the champion. Rejected: reverted in the same
+   transaction. Trade-off: the driver decides. Inconclusive: extend (twice at most) or revert.
+   Reverting appends a zero-lap block that tells the agent to load the baseline. After three
+   accepted experiments core proposes a re-check of the champion against the original.
+
+Every move writes an `experiment_event` with its reason. The rules and what was rejected are
+in [ADR 0009](adr/0009-experiments.md).
+
+## What exists today (after phase 3)
 
 | Piece | State |
 | --- | --- |
-| Contracts: health, spool session, spool pass, session summary, features request and response; generators and drift check | Working, checked in CI |
-| agent: capture with conditions, incremental encoding, spool writer, status window, installer (`tools/install_agent.py`) | 72 offline tests pass; **unverified in game** |
-| core: ingest (tail, validate, Parquet, rows, metrics), `GET /health`, `GET /sessions`, `GET /metrics`, migrations for cars, tracks, corners, sessions, passes | Working, tested against a real PostgreSQL and in Docker |
-| engine: phases, features, speed-binned slip, effect model, bootstrap, ROPE, MDE, noise model, `POST /features/session` | Working, 60 tests, `mypy --strict`; acceptance numbers are from simulation |
-| web: core status and the list of recorded sessions | Working, tested |
-| Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners, the same as v0 logged |
-| Core calling the engine (features job, evaluation), setups, experiments, diagnosis, sensitivity, optimizer, more dashboard pages, ghost | Not started (phases 3 to 6) |
+| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan and evaluate requests and responses; generators and drift check | Working, checked in CI |
+| agent: capture with conditions, setup catalog and setup lines, run-plan window, setup loading with read-back and rollback, block and lap tags, installer (`tools/install_agent.py`) | 96 offline tests pass; **unverified in game** |
+| core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, REST API for sessions and experiments, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
+| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, `POST /features/session`, `POST /plan`, `POST /evaluate` | Working, 78 tests, `mypy --strict`; acceptance numbers are from simulation |
+| web: sessions, propose form, experiment page with its full history, ledger | Working, 46 tests |
+| End to end: the Lua agent on the mocked game, core and the engine through three experiments (`make test-e2e`) | Passes locally and in CI |
+| Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so no experiments |
+| Diagnosis, explanations, sensitivity, optimizer, ghost | Not started (phases 4 to 6) |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.
@@ -148,10 +176,12 @@ phase that first uses it.
 
 | Process | Port | Environment variables |
 | --- | --- | --- |
-| core | 8080 | `PADDOCK_DATABASE_URL` (required), `PADDOCK_HTTP_ADDR` (default `:8080`), `PADDOCK_SPOOL_DIR` (the agent's spool; unset turns ingest off), `PADDOCK_DATA_DIR` (Parquet files; default `data`) |
+| core | 8080 | `PADDOCK_DATABASE_URL` (required), `PADDOCK_HTTP_ADDR` (default `:8080`), `PADDOCK_SPOOL_DIR` (the agent's spool; unset turns ingest off), `PADDOCK_DATA_DIR` (Parquet files; default `data`), `PADDOCK_ENGINE_URL` (unset: no features, experiments cannot be planned or judged), `PADDOCK_OUTBOX_DIR` (the agent's outbox; unset: nothing is written for the agent) |
 | engine | 8000 | — |
 | web (dev server) | 5173 | `PADDOCK_CORE_URL` (default `http://localhost:8080`), target of the `/api` proxy |
 | PostgreSQL | 5432 | Set in `deploy/docker-compose.yml` |
 
-In Docker, `PADDOCK_SPOOL_HOST` is the host folder mounted read-only as core's spool. Every
-port is bound to `127.0.0.1`. Nothing needs a cloud service to run locally.
+In Docker, `PADDOCK_SPOOL_HOST` is the host folder mounted read-only as core's spool and
+`PADDOCK_OUTBOX_HOST` the host folder mounted as its outbox. The engine mounts core's data
+volume read-only at the same path, because core hands it the directory of a session's Parquet
+files. Every port is bound to `127.0.0.1`. Nothing needs a cloud service to run locally.

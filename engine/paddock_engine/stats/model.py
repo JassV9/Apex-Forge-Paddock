@@ -61,6 +61,19 @@ def _group_variance(
     return max(0.0, between - residual / harmonic_size)
 
 
+def _shrinkage(residual: float, group: float, counts: FloatArray) -> FloatArray:
+    """How far each corner's passes are pulled towards the corner's own mean (0: not at all).
+
+    A channel with no scatter at all (a count that is 0 on every pass) has nothing to weigh:
+    the plain regression is exact, so the answer is 0 instead of 0 / 0.
+    """
+    total = residual + counts * group
+    scattered = total > 0
+    ratio = np.divide(residual, total, out=np.ones_like(total), where=scattered)
+    shrink: FloatArray = np.where(scattered, 1.0 - np.sqrt(ratio), 0.0)
+    return shrink
+
+
 def fit_random_intercept(y: FloatArray, x: FloatArray, groups: IntArray) -> Fit:
     """Fit y = intercept + x @ b + u[group] + e. `groups` holds codes 0..G-1."""
     counts = np.bincount(groups).astype(np.float64)
@@ -71,10 +84,9 @@ def fit_random_intercept(y: FloatArray, x: FloatArray, groups: IntArray) -> Fit:
     _, residual = _residual_variance(within_y, within_x, len(counts))
 
     group = _group_variance(y_means, x_means, counts, residual)
-    if group is None:
-        theta = np.ones(len(counts))  # corner levels not identified: use them as fixed effects
-    else:
-        theta = 1.0 - np.sqrt(residual / (residual + counts * group))
+    # Corner levels that are not identified are used as fixed effects (no shrinkage).
+    fixed = np.ones(len(counts))
+    theta = fixed if group is None else _shrinkage(residual, group, counts)
     weight = theta[groups]
     design = np.column_stack([1.0 - weight, x - weight[:, None] * x_means[groups]])
     coefficients, *_ = np.linalg.lstsq(design, y - weight * y_means[groups], rcond=None)

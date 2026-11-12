@@ -63,16 +63,23 @@ type baseline struct {
 	values    setups.Values
 }
 
-// baselineOf is the setup the session's latest pass was driven on.
+// baselineOf is the setup a new experiment on the session's car and track starts from: the
+// champion, or before the first experiment the setup the session's latest pass was driven on.
+// The latest pass alone is not enough: after a rejected experiment it may be the rejected
+// variant, because no lap is driven on the baseline that goes back on the car.
 func baselineOf(ctx context.Context, q querier, sessionID int64) (baseline, error) {
 	var base baseline
 	var values []byte
 	err := q.QueryRowContext(ctx,
 		`SELECT s.car_id, s.track_id, v.id, v."values"
 		 FROM session s
-		 JOIN corner_pass p ON p.session_id = s.id
-		 JOIN setup_version v ON v.id = p.setup_version_id
-		 WHERE s.id = $1 ORDER BY p.seq DESC LIMIT 1`, sessionID).
+		 JOIN setup_version v ON v.id = COALESCE(
+		     (SELECT c.setup_version_id FROM champion c
+		      WHERE c.car_id = s.car_id AND c.track_id = s.track_id),
+		     (SELECT p.setup_version_id FROM corner_pass p
+		      WHERE p.session_id = s.id AND p.setup_version_id IS NOT NULL
+		      ORDER BY p.seq DESC LIMIT 1))
+		 WHERE s.id = $1`, sessionID).
 		Scan(&base.carID, &base.trackID, &base.versionID, &values)
 	if errors.Is(err, sql.ErrNoRows) {
 		return baseline{}, fmt.Errorf("session %d has no pass with a recorded setup: %w", sessionID, ErrInvalid)

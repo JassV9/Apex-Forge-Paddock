@@ -1,4 +1,5 @@
 import type { Diagnosis, Evidence, Hypothesis } from "../api/client";
+import { clicksText } from "../experimentText";
 import { proposeHref } from "../hooks/useRoute";
 
 const WRITER: Record<Diagnosis["explanation"]["provider"], string> = {
@@ -11,11 +12,6 @@ const ALTERNATIVE: Record<Hypothesis["alternatives"][number]["kind"], string> = 
   driver_input: "Driver input",
   conditions: "Conditions",
 };
-
-function clicksText(clicks: number): string {
-  const size = Math.abs(clicks);
-  return `${clicks < 0 ? "−" : "+"}${String(size)} ${size === 1 ? "click" : "clicks"}`;
-}
 
 /** The diagnosis in words, who wrote them, and why a model's reply was thrown away. */
 export function ExplanationSection({ diagnosis }: { diagnosis: Diagnosis }) {

@@ -83,6 +83,8 @@ game. Logs of both processes are printed when a step times out.
 | Core logs `spool line rejected` | A line in the spool breaks the contract | The log has the session, file, line number and the rule; `paddock_ingest_rejects_total{reason}` counts them |
 | A session never appears | `PADDOCK_SPOOL_DIR` (native) or `PADDOCK_SPOOL_HOST` (Docker) points at the wrong folder, or its first file `000001.jsonl` is missing | Core logs the spool folder at start; later files without the session line are rejected as `unknown_session` |
 | `POST /sessions/{id}/diagnosis` answers 409 | The session's features are still being computed, or it has no valid pass on its baseline setup | Wait and retry; check `PADDOCK_ENGINE_URL` and core's log |
+| The Garage or "What to test next" says it could not be loaded | The engine did not answer: the profile is rebuilt by the engine on every read | Check the engine is up and `PADDOCK_ENGINE_URL`; core's log has the reason |
+| An experiment is finished but the Garage does not show it | Only one-item experiments that reached a verdict count; aborted ones and re-checks do not | Nothing to fix |
 | The diagnosis says "gemini gave no reply" or "The reply was rejected" | The hosted model failed or wrote something that is not in the evidence | Nothing to fix: the template text is shown. Set `PADDOCK_LLM_PROVIDER=none` to stop asking |
 | `POST /experiments/{id}/evaluate` answers 409 "features of N passes are not computed yet" | The features worker has not caught up, or the engine is down | Wait and retry; check `PADDOCK_ENGINE_URL` and core's log |
 | `POST /experiments/{id}/start` answers 409 "no longer the champion" | Another experiment was accepted or rolled back since this one was proposed | Discard it and propose it again |

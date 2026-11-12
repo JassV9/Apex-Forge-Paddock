@@ -55,8 +55,10 @@ const EMPTY: Draft = {
 
 function draftFrom(prefill: Prefill | undefined): Draft {
   if (prefill === undefined) return EMPTY;
-  const { parameter, clicks, statement, hypothesisKey } = prefill;
-  return { ...EMPTY, parameter, clicks, statement, hypothesisKey };
+  const { parameter, clicks, statement, hypothesisKey, gain } = prefill;
+  const predicted =
+    gain === undefined ? {} : { gainLow: String(gain.low), gainHigh: String(gain.high) };
+  return { ...EMPTY, parameter, clicks, statement, hypothesisKey, ...predicted };
 }
 
 /** The request body for a draft. The prediction is optional and is on corner time. */

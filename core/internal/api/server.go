@@ -31,6 +31,9 @@ type Deps struct {
 	Experiments Experiments
 	// Diagnoses serves the /sessions/{id}/diagnosis routes; nil leaves them out.
 	Diagnoses Diagnoses
+	// Garage serves /sensitivity, /scorecard and /sessions/{id}/proposals; nil leaves
+	// them out.
+	Garage Garage
 	// Metrics serves GET /metrics for Prometheus; nil leaves the route out.
 	Metrics http.Handler
 }
@@ -45,6 +48,9 @@ func NewHandler(deps Deps) http.Handler {
 	}
 	if deps.Diagnoses != nil {
 		registerDiagnoses(mux, deps.Logger, deps.Diagnoses)
+	}
+	if deps.Garage != nil {
+		registerGarage(mux, deps.Logger, deps.Garage)
 	}
 	if deps.Metrics != nil {
 		mux.Handle("GET /metrics", deps.Metrics)

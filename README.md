@@ -12,9 +12,8 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: phases 0 to 4 of 7 complete.** Capture, ingest, the measurement statistics,
-> experiments and diagnosis work and are tested; the sensitivity profile is designed
-> ([docs/design.md](docs/design.md)) and is next. The
+> **Status: phases 0 to 5 of 7 complete.** Capture, ingest, the measurement statistics,
+> experiments, diagnosis and the sensitivity profile work and are tested. The
 > [roadmap](#roadmap) below says exactly what exists today. Nothing has been run inside
 > Assetto Corsa yet, and no real experiment has been driven.
 
@@ -119,7 +118,7 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | 2 | Measurement: features, noise model, mixed model, minimum detectable effect | **Done** (simulated: false decisions 39% to 0%) |
 | 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (end to end on a simulated car; unverified in game) |
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | **Done** (on the real COTA session; hosted models unverified) |
-| 5 | Sensitivity profile and experiment ranking | Next |
+| 5 | Sensitivity profile and experiment ranking: pooled effects with intervals, flagged priors, expected gain per lap | **Done** (on a simulated car; the 20+ experiment optimizer is not built) |
 | 6 | Ghost Driver (research, optional): machine-driven test manoeuvres | Gated |
 | 7 | Public read-only demo on recorded data | Planned |
 
@@ -157,13 +156,20 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   explains it as well as the car does, with the numbers that say so. Its output is a
   list of experiments to run, never a fix to apply
   ([ADR 0010](docs/adr/0010-diagnosis-and-explain.md), [demo script](docs/demos/phase-4.md)).
+- A memory of what each setup item does. Finished experiments are pooled into a
+  per-car profile with intervals; a simulated car's linear, negligible and non-linear
+  items are recovered. A number borrowed from a similar car is shrunk, widened and
+  always shown as a prior. The next experiment is ranked by expected gain per lap, and
+  a change the car already showed to do nothing is left out with the reason
+  ([ADR 0011](docs/adr/0011-sensitivity-and-ranking.md), [demo script](docs/demos/phase-5.md)).
 - A language model behind a gate. It gets the computed evidence and may only put it
   into words: a reply that cites a metric the session never measured, or states a
   number that is not in the evidence, is thrown away and template text is shown.
   Everything works with no model and no API key.
 - A dashboard with a ledger of every experiment and, per experiment, the test that was fixed
   before driving, the effect of each channel with its interval, and its full history;
-  and per session, the diagnosis with its evidence and alternatives.
+  per session, the diagnosis with its evidence, alternatives and what to test next;
+  a garage of measured effects; and a scorecard of predictions that came true.
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
 

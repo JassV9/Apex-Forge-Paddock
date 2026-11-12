@@ -63,6 +63,16 @@ func (c *Client) Diagnose(ctx context.Context, request contracts.DiagnoseRequest
 	return post[contracts.Diagnosis](ctx, c, "/diagnose", request)
 }
 
+// Sensitivity pools a car's measured effects and borrowed priors into its profile.
+func (c *Client) Sensitivity(ctx context.Context, request contracts.SensitivityRequest) (contracts.SensitivityResponse, error) {
+	return post[contracts.SensitivityResponse](ctx, c, "/sensitivity/update", request)
+}
+
+// Propose ranks candidate experiments by what the profile expects of them.
+func (c *Client) Propose(ctx context.Context, request contracts.ProposeRequest) (contracts.Proposals, error) {
+	return post[contracts.Proposals](ctx, c, "/propose", request)
+}
+
 func post[T any](ctx context.Context, c *Client, path string, body any) (T, error) {
 	var reply T
 	if c.baseURL == "" {

@@ -1,8 +1,10 @@
 import { CoreStatus } from "./components/CoreStatus";
 import { DiagnosisPage } from "./components/DiagnosisPage";
 import { ExperimentPage } from "./components/ExperimentPage";
+import { Garage } from "./components/Garage";
 import { Ledger } from "./components/Ledger";
 import { ProposeForm } from "./components/ProposeForm";
+import { Scorecard } from "./components/Scorecard";
 import { SessionList } from "./components/SessionList";
 import { experimentHref, type Route, useRoute } from "./hooks/useRoute";
 
@@ -21,7 +23,15 @@ function Page({ route }: { route: Route }) {
       return (
         <>
           <h2>Ledger</h2>
+          <Scorecard />
           <Ledger />
+        </>
+      );
+    case "garage":
+      return (
+        <>
+          <h2>Garage</h2>
+          <Garage />
         </>
       );
     case "propose":
@@ -52,6 +62,7 @@ export function App() {
         <nav aria-label="Pages">
           <a href="#/">Sessions</a>
           <a href="#/experiments">Ledger</a>
+          <a href="#/garage">Garage</a>
           <a href="#/propose">Propose</a>
         </nav>
         <CoreStatus />

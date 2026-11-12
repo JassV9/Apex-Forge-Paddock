@@ -83,6 +83,65 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/proposals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    /**
+     * The experiments the session's newest diagnosis names, ranked.
+     * @description Each change is ranked by the improvement the car's sensitivity profile expects of it per lap of driving. A change this car measured as negligible or as worse is listed under skipped with the reason; a prior from another car never rules a change out.
+     */
+    get: operations["getProposals"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sensitivity": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Every car's sensitivity profile, rebuilt from the finished experiments.
+     * @description One row per item, clicks, channel and corner class: pooled from the car's own finished one-factor experiments, or a prior from another car's item with the same job, flagged is_prior. The profiles are rebuilt and stored on every request.
+     */
+    get: operations["listSensitivity"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/scorecard": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** How often the predictions written down before an experiment came true. */
+    get: operations["getScorecard"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/experiments": {
     parameters: {
       query?: never;
@@ -171,6 +230,9 @@ export interface components {
     ExperimentCreate: components["schemas"]["experiment_create.schema"];
     Diagnosis: components["schemas"]["diagnosis.schema"];
     ExperimentDecision: components["schemas"]["experiment_decision.schema"];
+    SensitivityProfile: components["schemas"]["sensitivity_profile.schema"];
+    Proposals: components["schemas"]["proposals.schema"];
+    Scorecard: components["schemas"]["scorecard.schema"];
     Problem: {
       /** @description What went wrong, in words. */
       error: string;
@@ -338,6 +400,140 @@ export interface components {
       /** @description Most strongly supported first. */
       hypotheses: components["schemas"]["Hypothesis"][];
       explanation: components["schemas"]["Explanation"];
+    };
+    /**
+     * Proposal
+     * @description A candidate experiment with what is expected of it and what it costs to find out.
+     */
+    Proposal: {
+      parameter: string;
+      label: string;
+      clicks: number;
+      why: string;
+      hypotheses: string[];
+      /**
+       * @description What the expectation rests on: this car's own measurement, a prior from another car, or nothing yet.
+       * @enum {string}
+       */
+      basis: "measured" | "prior" | "none";
+      /** @description Car the prior comes from; empty otherwise. */
+      prior_source: string;
+      /** @description Expected improvement beyond the band of practical equivalence, per corner pass, in the channel's unit. Wide uncertainty raises it: an unknown knob is worth a look. */
+      expected_gain: number;
+      /** @description Low end of the interval of the improvement; negative means it may make things worse. */
+      gain_low: number;
+      gain_high: number;
+      /** @description Laps an A-B-A-B experiment needs to decide an effect of the expected size, out-laps included. */
+      laps_needed: number;
+      /** @description Expected gain divided by laps needed: what the list is ordered by. */
+      value_per_lap: number;
+    };
+    /**
+     * SkippedCandidate
+     * @description A candidate that is not proposed, with the reason.
+     */
+    SkippedCandidate: {
+      parameter: string;
+      label: string;
+      clicks: number;
+      reason: string;
+    };
+    /**
+     * Proposals
+     * @description The candidate experiments of a session's diagnosis in the order worth running them.
+     */
+    "proposals.schema": {
+      /**
+       * @description How much is known about this car: fewer than 5, 5 to 19, or 20 and more finished experiments.
+       * @enum {string}
+       */
+      stage: "cold_start" | "learning" | "optimizing";
+      /** @description Best value per lap first. */
+      ranked: components["schemas"]["Proposal"][];
+      /** @description Candidates measured on this car as negligible or worse. */
+      skipped: components["schemas"]["SkippedCandidate"][];
+    };
+    /**
+     * SensitivityEffect
+     * @description What moving one setup item by some clicks does to one channel on this car: a pooled measurement, or a prior transferred from another car and flagged as one.
+     */
+    SensitivityEffect: {
+      /** @description Item id in the game's setup. */
+      parameter: string;
+      /** @description Clicks moved; negative lowers the raw value. Never 0. */
+      clicks: number;
+      /** @description Metric id. */
+      channel: string;
+      /** @enum {string} */
+      corner_class: "all" | "slow" | "medium" | "fast";
+      /** @description Variant minus baseline, in the channel's unit, per corner pass. */
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+      n_passes: number;
+      /** @enum {string} */
+      effect_class: "positive" | "negative" | "negligible" | "inconclusive";
+      /** @description True when the item's other measured clicks show the response is not a straight line. */
+      nonlinear: boolean;
+      /** @description Why it is flagged non-linear, or how a prior was derived; empty otherwise. */
+      note: string;
+      /** @description True when this was not measured on this car. */
+      is_prior: boolean;
+      /** @description Name of the car a prior was transferred from; empty for a measurement. */
+      prior_source: string;
+      /** @description The experiments the measurement is pooled from; empty for a prior. */
+      experiment_ids: number[];
+    };
+    /**
+     * SensitivityProfile
+     * @description A car's sensitivity profile as the dashboard shows it.
+     */
+    "sensitivity_profile.schema": {
+      car_id: number;
+      car_name: string;
+      /** @description Finished one-item experiments the profile is built from. */
+      experiments: number;
+      model_version: string;
+      /** @description What the setup menu calls each item, by item id. */
+      labels: {
+        [key: string]: string;
+      };
+      /** @description Measurements first, then priors. */
+      effects: components["schemas"]["SensitivityEffect"][];
+    };
+    /**
+     * SourceScore
+     * @description How often the predictions of hypotheses from one source held.
+     */
+    SourceScore: {
+      /** @enum {string} */
+      source: "rules" | "llm" | "human";
+      experiments: number;
+      predictions_total: number;
+      predictions_hit: number;
+    };
+    /**
+     * StateCount
+     * @description Experiments in one state.
+     */
+    StateCount: {
+      state: string;
+      count: number;
+    };
+    /**
+     * Scorecard
+     * @description How often this tool was right: every prediction against its result, and where every experiment ended.
+     */
+    "scorecard.schema": {
+      experiments: number;
+      /** @description Experiments with a verdict. */
+      judged: number;
+      predictions_total: number;
+      predictions_hit: number;
+      /** @description The same, by where the hypothesis came from. */
+      by_source: components["schemas"]["SourceScore"][];
+      /** @description Experiments by their current state. */
+      by_state: components["schemas"]["StateCount"][];
     };
     /**
      * SuccessTest
@@ -675,6 +871,71 @@ export interface operations {
       404: components["responses"]["Problem"];
       409: components["responses"]["Problem"];
       502: components["responses"]["Problem"];
+    };
+  };
+  getProposals: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Ranked and skipped candidates. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["proposals.schema"];
+        };
+      };
+      404: components["responses"]["Problem"];
+      502: components["responses"]["Problem"];
+    };
+  };
+  listSensitivity: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description One profile per car. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["sensitivity_profile.schema"][];
+        };
+      };
+      502: components["responses"]["Problem"];
+    };
+  };
+  getScorecard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Counts over the whole ledger, by hypothesis source and by state. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["scorecard.schema"];
+        };
+      };
     };
   };
   listExperiments: {

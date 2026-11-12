@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "proposals.schema.json",
+  "title": "Proposals",
+  "description": "The candidate experiments of a session's diagnosis in the order worth running them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stage",
+    "ranked",
+    "skipped"
+  ],
+  "properties": {
+    "stage": {
+      "description": "How much is known about this car: fewer than 5, 5 to 19, or 20 and more finished experiments.",
+      "type": "string",
+      "enum": [
+        "cold_start",
+        "learning",
+        "optimizing"
+      ]
+    },
+    "ranked": {
+      "description": "Best value per lap first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Proposal"
+      }
+    },
+    "skipped": {
+      "description": "Candidates measured on this car as negligible or worse.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SkippedCandidate"
+      }
+    }
+  },
+  "definitions": {
+    "Proposal": {
+      "title": "Proposal",
+      "description": "A candidate experiment with what is expected of it and what it costs to find out.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "why",
+        "hypotheses",
+        "basis",
+        "prior_source",
+        "expected_gain",
+        "gain_low",
+        "gain_high",
+        "laps_needed",
+        "value_per_lap"
+      ],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "type": "integer"
+        },
+        "why": {
+          "type": "string"
+        },
+        "hypotheses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "basis": {
+          "description": "What the expectation rests on: this car's own measurement, a prior from another car, or nothing yet.",
+          "type": "string",
+          "enum": [
+            "measured",
+            "prior",
+            "none"
+          ]
+        },
+        "prior_source": {
+          "description": "Car the prior comes from; empty otherwise.",
+          "type": "string"
+        },
+        "expected_gain": {
+          "description": "Expected improvement beyond the band of practical equivalence, per corner pass, in the channel's unit. Wide uncertainty raises it: an unknown knob is worth a look.",
+          "type": "number"
+        },
+        "gain_low": {
+          "description": "Low end of the interval of the improvement; negative means it may make things worse.",
+          "type": "number"
+        },
+        "gain_high": {
+          "type": "number"
+        },
+        "laps_needed": {
+          "description": "Laps an A-B-A-B experiment needs to decide an effect of the expected size, out-laps included.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "value_per_lap": {
+          "description": "Expected gain divided by laps needed: what the list is ordered by.",
+          "type": "number"
+        }
+      }
+    },
+    "SkippedCandidate": {
+      "title": "SkippedCandidate",
+      "description": "A candidate that is not proposed, with the reason.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "reason"
+      ],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

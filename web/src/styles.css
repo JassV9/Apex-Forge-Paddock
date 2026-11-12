@@ -214,3 +214,50 @@ textarea {
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+tr.prior td {
+  color: var(--muted);
+}
+
+.interval line {
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.interval circle {
+  fill: currentColor;
+}
+
+.interval .zero {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.interval-negative,
+.interval-positive {
+  color: var(--accent);
+}
+
+.interval-negligible {
+  color: var(--good);
+}
+
+.interval-inconclusive {
+  color: var(--muted);
+}
+
+/* A prior is drawn hollow and dashed: it is not a measurement. */
+.interval-prior {
+  color: var(--muted);
+}
+
+.interval-prior line:not(.zero) {
+  stroke-dasharray: 2 5;
+}
+
+.interval-prior circle {
+  fill: var(--panel);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}

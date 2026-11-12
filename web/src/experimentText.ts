@@ -43,6 +43,12 @@ export function changeText(experiment: Experiment): string {
   return `${name} ${direction}${String(clicks)} ${clicks === 1 ? "click" : "clicks"}`;
 }
 
+/** A signed number of clicks: "−1 click", "+2 clicks". */
+export function clicksText(clicks: number): string {
+  const size = Math.abs(clicks);
+  return `${clicks < 0 ? "−" : "+"}${String(size)} ${size === 1 ? "click" : "clicks"}`;
+}
+
 /** A number with its sign, to three decimals. */
 export function signed(value: number): string {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";

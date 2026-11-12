@@ -112,6 +112,34 @@ describe("ProposeForm", () => {
     });
   });
 
+  it("starts the prediction from the gain the car's profile expects", async () => {
+    const api = apiWith();
+    const prefill = {
+      sessionId: 3,
+      parameter: "ARB_FRONT",
+      clicks: -1,
+      statement: "Understeer in slow corners. Test: a softer front bar.",
+      hypothesisKey: "mid_understeer.slow",
+      gain: { low: 0.016, high: 0.026 },
+    };
+    render(<ProposeForm api={api} prefill={prefill} onProposed={vi.fn()} />);
+
+    await screen.findByRole("option", { name: /Front ARB/ });
+    expect(screen.getByLabelText(/Predicted gain per corner pass/)).toHaveValue(0.016);
+    expect(screen.getByLabelText("to")).toHaveValue(0.026);
+    fireEvent.click(screen.getByRole("button", { name: "Propose experiment" }));
+
+    await vi.waitFor(() => {
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          predictions: [
+            { channel: "corner_time_s", direction: "decrease", low: 0.016, high: 0.026 },
+          ],
+        }),
+      );
+    });
+  });
+
   it("asks for a session when none was recorded", async () => {
     render(
       <ProposeForm api={apiWith({ sessions: () => Promise.resolve([]) })} onProposed={vi.fn()} />,

@@ -15,11 +15,17 @@ from paddock_engine.contracts.features_response_schema import FeaturesResponse
 from paddock_engine.contracts.health_schema import Health, Service, Status
 from paddock_engine.contracts.plan_request_schema import PlanRequest
 from paddock_engine.contracts.plan_response_schema import PlanResponse
+from paddock_engine.contracts.proposals_schema import Proposals
+from paddock_engine.contracts.propose_request_schema import ProposeRequest
+from paddock_engine.contracts.sensitivity_request_schema import SensitivityRequest
+from paddock_engine.contracts.sensitivity_response_schema import SensitivityResponse
 from paddock_engine.diagnosis.report import report
 from paddock_engine.experiments.evaluate import evaluate
 from paddock_engine.experiments.plan import plan
 from paddock_engine.explain.config import Choice, from_env
 from paddock_engine.features.session import session_features
+from paddock_engine.optimize.rank import propose
+from paddock_engine.sensitivity.profile import update
 
 
 def create_app(llm: Choice | None = None) -> FastAPI:
@@ -46,5 +52,13 @@ def create_app(llm: Choice | None = None) -> FastAPI:
     @app.post("/diagnose")
     def diagnose_session(request: DiagnoseRequest) -> Diagnosis:
         return report(request, writer)
+
+    @app.post("/sensitivity/update")
+    def sensitivity(request: SensitivityRequest) -> SensitivityResponse:
+        return update(request)
+
+    @app.post("/propose")
+    def next_experiments(request: ProposeRequest) -> Proposals:
+        return propose(request)
 
     return app

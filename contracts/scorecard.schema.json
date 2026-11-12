@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "scorecard.schema.json",
+  "title": "Scorecard",
+  "description": "How often this tool was right: every prediction against its result, and where every experiment ended.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "experiments",
+    "judged",
+    "predictions_total",
+    "predictions_hit",
+    "by_source",
+    "by_state"
+  ],
+  "properties": {
+    "experiments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "judged": {
+      "description": "Experiments with a verdict.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "predictions_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "predictions_hit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "by_source": {
+      "description": "The same, by where the hypothesis came from.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SourceScore"
+      }
+    },
+    "by_state": {
+      "description": "Experiments by their current state.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/StateCount"
+      }
+    }
+  },
+  "definitions": {
+    "SourceScore": {
+      "title": "SourceScore",
+      "description": "How often the predictions of hypotheses from one source held.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "experiments",
+        "predictions_total",
+        "predictions_hit"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "rules",
+            "llm",
+            "human"
+          ]
+        },
+        "experiments": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "predictions_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "predictions_hit": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "StateCount": {
+      "title": "StateCount",
+      "description": "Experiments in one state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "count"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

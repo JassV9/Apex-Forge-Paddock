@@ -149,9 +149,10 @@ def result(exp: dict[str, Any], channel: str) -> dict[str, Any]:
     return next(r for r in exp["results"] if r["channel"] == channel and r["corner_class"] == "all")
 
 
-def check_diagnosis(rig: Rig) -> None:
+def check_diagnosis(rig: Rig) -> int:
     """The baseline session is diagnosed without a language model, once its features are
-    computed: every reference is in the evidence pack and candidates are real setup items."""
+    computed: every reference is in the evidence pack and candidates are real setup items.
+    Returns the session's id."""
     backend = rig.backend
     session = backend.get("/sessions")[0]["id"]
     path = f"/sessions/{session}/diagnosis"
@@ -171,6 +172,37 @@ def check_diagnosis(rig: Rig) -> None:
         assert {a["kind"] for a in hypothesis["alternatives"]} == {"driver_input", "conditions"}
         assert {c["parameter"] for c in hypothesis["candidates"]} <= items
     assert backend.get(path) == diagnosis, "core kept what the engine answered"
+    return int(session)
+
+
+def check_garage(rig: Rig, session: int) -> None:
+    """What the three experiments taught: the car's sensitivity profile, the ranking of the
+    diagnosed session's candidates against it, and the prediction scorecard."""
+    backend = rig.backend
+    (profile,) = backend.get("/sensitivity")
+    assert profile["experiments"] == 3 and not any(e["is_prior"] for e in profile["effects"])
+    on_time = {
+        (e["parameter"], e["clicks"]): e
+        for e in profile["effects"]
+        if e["channel"] == "corner_time_s" and e["corner_class"] == "all"
+    }
+    assert on_time[("ARB_FRONT", -1)]["effect_class"] == "negative"
+    assert on_time[("ARB_FRONT", 1)]["effect_class"] == "positive"
+    assert on_time[("ARB_REAR", -1)]["effect_class"] == "inconclusive"
+    assert all(len(e["experiment_ids"]) == 1 and e["n_passes"] > 0 for e in on_time.values())
+
+    proposals = backend.get(f"/sessions/{session}/proposals")
+    assert proposals["stage"] == "cold_start"
+    for proposal in proposals["ranked"]:
+        measured = (proposal["parameter"], proposal["clicks"]) in on_time
+        assert (proposal["basis"] == "measured") == measured, proposal
+    skipped = {(s["parameter"], s["clicks"]) for s in proposals["skipped"]}
+    assert skipped <= {("ARB_FRONT", 1)}, "only the change measured as slower is ruled out"
+
+    card = backend.get("/scorecard")
+    assert (card["experiments"], card["judged"]) == (3, 3)
+    assert card["predictions_total"] == 3 and card["predictions_hit"] >= 1
+    assert card["by_state"] == [{"state": "reverted", "count": 3}]
 
 
 def test_three_experiments_through_the_whole_stack(rig: Rig) -> None:
@@ -183,7 +215,7 @@ def test_three_experiments_through_the_whole_stack(rig: Rig) -> None:
         lambda: [s for s in backend.get("/sessions") if s["passes"] == 4 * CORNERS],
     )
 
-    check_diagnosis(rig)
+    session = check_diagnosis(rig)
 
     # 1. A softer front bar is faster, but the rear slides more: a trade-off for the driver.
     softer = rig.run_experiment("ARB_FRONT", -1, "A softer front bar gives the front more grip.")
@@ -232,3 +264,5 @@ def test_three_experiments_through_the_whole_stack(rig: Rig) -> None:
     assert [exp["state"] for exp in ledger] == ["reverted", "reverted", "reverted"]
     assert [exp["parameter"] for exp in ledger] == ["ARB_REAR", "ARB_FRONT", "ARB_FRONT"]
     assert all(event["reason"] for exp in ledger for event in exp["events"])
+
+    check_garage(rig, session)

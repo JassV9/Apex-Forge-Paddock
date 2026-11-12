@@ -1,15 +1,27 @@
 import { useEffect, useState } from "react";
 
-import { type Diagnosis, fetchDiagnosis, runDiagnosis } from "../api/client";
+import {
+  type Diagnosis,
+  fetchDiagnosis,
+  fetchProposals,
+  type Proposals,
+  runDiagnosis,
+} from "../api/client";
 import { ExplanationSection, HypothesesSection } from "./DiagnosisDetails";
+import { ProposalsSection } from "./ProposalsSection";
 
 /** The calls the page makes; injected in tests, the real client by default. */
 export interface DiagnosisApi {
   load: (sessionId: number) => Promise<Diagnosis | null>;
   run: (sessionId: number) => Promise<Diagnosis>;
+  proposals: (sessionId: number) => Promise<Proposals | null>;
 }
 
-const coreApi: DiagnosisApi = { load: fetchDiagnosis, run: runDiagnosis };
+const coreApi: DiagnosisApi = {
+  load: fetchDiagnosis,
+  run: runDiagnosis,
+  proposals: fetchProposals,
+};
 
 interface DiagnosisPageProps {
   sessionId: number;
@@ -27,6 +39,8 @@ export function DiagnosisPage({ sessionId, api = coreApi }: DiagnosisPageProps) 
   const [state, setState] = useState<State>({ kind: "loading" });
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
+  // A new diagnosis may name other experiments: the ranking is loaded again.
+  const [runs, setRuns] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +68,7 @@ export function DiagnosisPage({ sessionId, api = coreApi }: DiagnosisPageProps) 
       .then((diagnosis) => {
         setState({ kind: "ready", diagnosis });
         setProblem("");
+        setRuns((count) => count + 1);
       })
       .catch((error: unknown) => {
         setProblem(messageOf(error));
@@ -77,6 +92,12 @@ export function DiagnosisPage({ sessionId, api = coreApi }: DiagnosisPageProps) 
       {state.kind === "ready" && (
         <>
           <ExplanationSection diagnosis={state.diagnosis} />
+          <ProposalsSection
+            key={runs}
+            sessionId={sessionId}
+            diagnosis={state.diagnosis}
+            load={api.proposals}
+          />
           <HypothesesSection diagnosis={state.diagnosis} sessionId={sessionId} />
         </>
       )}

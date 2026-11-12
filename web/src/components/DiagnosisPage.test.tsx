@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Diagnosis } from "../api/client";
+import type { Diagnosis, Proposals } from "../api/client";
 import { parseRoute } from "../hooks/useRoute";
 import { diagnosis } from "../test-data";
 import { type DiagnosisApi, DiagnosisPage } from "./DiagnosisPage";
@@ -10,6 +10,7 @@ function apiWith(change: Partial<DiagnosisApi> = {}): DiagnosisApi {
   return {
     load: () => Promise.resolve(diagnosis),
     run: vi.fn(() => Promise.resolve(diagnosis)),
+    proposals: () => Promise.resolve(null),
     ...change,
   };
 }
@@ -76,6 +77,24 @@ describe("DiagnosisPage", () => {
     expect(await screen.findByRole("listitem", { name: "mid_understeer.slow" })).toBeVisible();
     expect(api.run).toHaveBeenCalledWith(3);
     expect(screen.getByRole("button", { name: "Diagnose again" })).toBeEnabled();
+  });
+
+  it("ranks the experiments, and ranks them again after a new diagnosis", async () => {
+    const ranking: Proposals = {
+      stage: "cold_start",
+      ranked: [],
+      skipped: [{ parameter: "ARB_FRONT", label: "Front ARB", clicks: -1, reason: "Measured." }],
+    };
+    const proposals = vi.fn(() => Promise.resolve(ranking));
+    render(<DiagnosisPage sessionId={3} api={apiWith({ proposals })} />);
+
+    expect(await screen.findByRole("region", { name: "What to test next" })).toBeVisible();
+    expect(proposals).toHaveBeenCalledExactlyOnceWith(3);
+    fireEvent.click(screen.getByRole("button", { name: "Diagnose again" }));
+
+    await vi.waitFor(() => {
+      expect(proposals).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("says what core refused", async () => {

@@ -8,6 +8,11 @@ export type SetupItem = components["schemas"]["SetupItem"];
 export type Diagnosis = components["schemas"]["Diagnosis"];
 export type Hypothesis = Diagnosis["hypotheses"][number];
 export type Evidence = Diagnosis["evidence"][number];
+export type SensitivityProfile = components["schemas"]["SensitivityProfile"];
+export type SensitivityEffect = SensitivityProfile["effects"][number];
+export type Proposals = components["schemas"]["Proposals"];
+export type Proposal = Proposals["ranked"][number];
+export type Scorecard = components["schemas"]["Scorecard"];
 export type Experiment = components["schemas"]["Experiment"];
 export type ExperimentCreate = components["schemas"]["ExperimentCreate"];
 export type ExperimentResult = components["schemas"]["ExperimentResult"];
@@ -53,6 +58,24 @@ export async function runDiagnosis(sessionId: number): Promise<Diagnosis> {
     params: { path: { id: sessionId } },
   });
   return unwrap(reply, "POST /sessions/{id}/diagnosis");
+}
+
+/** The session's candidate experiments, ranked; null when it was never diagnosed. */
+export async function fetchProposals(sessionId: number): Promise<Proposals | null> {
+  const reply = await coreApi.GET("/sessions/{id}/proposals", {
+    params: { path: { id: sessionId } },
+  });
+  if (reply.response.status === 404) return null;
+  return unwrap(reply, "GET /sessions/{id}/proposals");
+}
+
+/** Every car's sensitivity profile, rebuilt from the finished experiments. */
+export async function fetchSensitivity(): Promise<SensitivityProfile[]> {
+  return unwrap(await coreApi.GET("/sensitivity"), "GET /sensitivity");
+}
+
+export async function fetchScorecard(): Promise<Scorecard> {
+  return unwrap(await coreApi.GET("/scorecard"), "GET /scorecard");
 }
 
 export async function fetchExperiments(): Promise<Experiment[]> {

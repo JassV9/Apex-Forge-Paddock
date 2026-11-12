@@ -7,6 +7,7 @@ describe("parseRoute", () => {
     ["", { page: "sessions" }],
     ["#/", { page: "sessions" }],
     ["#/experiments", { page: "ledger" }],
+    ["#/garage", { page: "garage" }],
     ["#/propose", { page: "propose" }],
     ["#/experiments/12", { page: "experiment", id: 12 }],
     ["#/experiments/0", { page: "sessions" }],
@@ -40,5 +41,20 @@ describe("parseRoute", () => {
     };
 
     expect(parseRoute(proposeHref(prefill))).toEqual({ page: "propose", prefill });
+  });
+
+  it("carries the gain the profile expects, and drops one that is not a range", () => {
+    const plain = {
+      sessionId: 2,
+      parameter: "ARB_FRONT",
+      clicks: -1,
+      hypothesisKey: "",
+      statement: "Softer.",
+    };
+    const prefill = { ...plain, gain: { low: 0.012, high: 0.031 } };
+
+    expect(parseRoute(proposeHref(prefill))).toEqual({ page: "propose", prefill });
+    const backwards = proposeHref({ ...prefill, gain: { low: 0.05, high: 0.01 } });
+    expect(parseRoute(backwards)).toEqual({ page: "propose", prefill: plain });
   });
 });

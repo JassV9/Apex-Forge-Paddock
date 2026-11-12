@@ -2,6 +2,34 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 5: sensitivity profile and ranking (2026-11-12)
+
+- Contracts: `sensitivity_request`, `sensitivity_response`, `sensitivity_profile`,
+  `propose_request`, `proposals`, `scorecard`. OpenAPI with `GET /sensitivity`,
+  `GET /sessions/{id}/proposals` and `GET /scorecard`.
+- engine: `POST /sensitivity/update`. Repeated experiments on one change are pooled by
+  precision and classed against the band the experiments are judged with; a response that is
+  not mirrored or does not double is flagged non-linear; another car's effect becomes a
+  prior, shrunk towards zero, widened and flagged, and is replaced by the car's own
+  measurement.
+- engine: `POST /propose`. Candidates are ranked by expected gain beyond the band per lap of
+  driving. A change this car measured as negligible or as worse is listed as skipped with
+  the reason; a prior or an unclear measurement never rules a change out.
+- core: `sensitivity_effect` table (migration 00005), rebuilt from the finished experiments
+  on every read. Effects are lent between cars only for an item that is each car's one item
+  for a job, with the click restated when a menu runs the other way. Scorecard from the
+  newest engine verdict of each experiment.
+- web: Garage page (effects with interval bars, priors worded and drawn as priors), "What to
+  test next" on the diagnosis page with the prediction handed to the propose form, the
+  scorecard above the ledger.
+- The end-to-end test now checks the profile, the ranking and the scorecard after its three
+  experiments.
+
+Not built: the surrogate model with Thompson sampling for cars with 20 or more experiments;
+a profile per track or conditions. Not verified: anything in Assetto Corsa. The acceptance
+numbers are from a simulated driver with 8 ms of scatter; a human's 28 ms rarely allows the
+class "negligible". The similarity weights between cars are judgement.
+
 ## Phase 4: diagnosis and explanation (2026-11-12)
 
 - Contracts: `diagnose_request`, `diagnosis`, `explain_reply`; `experiment` gains `source`

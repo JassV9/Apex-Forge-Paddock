@@ -20,6 +20,7 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/features"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/ingest"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/sensitivity"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/store"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/telemetry"
 )
@@ -73,19 +74,26 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := startFeatures(ctx, cfg, database, analysis, logger, metrics); err != nil {
 		return err
 	}
-	ledger := experiments.NewService(database, analysis, experiments.Outbox{Dir: cfg.OutboxDir}, logger)
 	server := &http.Server{
-		Addr: cfg.HTTPAddr,
-		Handler: api.NewHandler(api.Deps{
-			Logger: logger, Version: version, Database: database,
-			Sessions:    store.NewReader(database),
-			Experiments: ledger,
-			Diagnoses:   diagnosis.NewService(database, analysis, ledger, logger),
-			Metrics:     metrics.Handler,
-		}),
+		Addr:              cfg.HTTPAddr,
+		Handler:           api.NewHandler(services(cfg, database, analysis, logger, metrics)),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 	return serve(ctx, server, logger)
+}
+
+// services wires everything the API serves to the database and the engine.
+func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) api.Deps {
+	ledger := experiments.NewService(database, analysis, experiments.Outbox{Dir: cfg.OutboxDir}, logger)
+	diagnoses := diagnosis.NewService(database, analysis, ledger, logger)
+	return api.Deps{
+		Logger: logger, Version: version, Database: database,
+		Sessions:    store.NewReader(database),
+		Experiments: ledger,
+		Diagnoses:   diagnoses,
+		Garage:      sensitivity.NewService(database, analysis, diagnoses, logger),
+		Metrics:     metrics.Handler,
+	}
 }
 
 func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (*sql.DB, error) {

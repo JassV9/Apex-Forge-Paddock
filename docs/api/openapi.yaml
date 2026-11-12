@@ -87,6 +87,58 @@ paths:
           $ref: "#/components/responses/Problem"
         "502":
           $ref: "#/components/responses/Problem"
+  /sessions/{id}/proposals:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: getProposals
+      summary: The experiments the session's newest diagnosis names, ranked.
+      description: >
+        Each change is ranked by the improvement the car's sensitivity profile expects of
+        it per lap of driving. A change this car measured as negligible or as worse is
+        listed under skipped with the reason; a prior from another car never rules a
+        change out.
+      responses:
+        "200":
+          description: Ranked and skipped candidates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposals"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "502":
+          $ref: "#/components/responses/Problem"
+  /sensitivity:
+    get:
+      operationId: listSensitivity
+      summary: Every car's sensitivity profile, rebuilt from the finished experiments.
+      description: >
+        One row per item, clicks, channel and corner class: pooled from the car's own
+        finished one-factor experiments, or a prior from another car's item with the same
+        job, flagged is_prior. The profiles are rebuilt and stored on every request.
+      responses:
+        "200":
+          description: One profile per car.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SensitivityProfile"
+        "502":
+          $ref: "#/components/responses/Problem"
+  /scorecard:
+    get:
+      operationId: getScorecard
+      summary: How often the predictions written down before an experiment came true.
+      responses:
+        "200":
+          description: Counts over the whole ledger, by hypothesis source and by state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scorecard"
   /experiments:
     get:
       operationId: listExperiments
@@ -230,6 +282,12 @@ components:
       $ref: "../../contracts/diagnosis.schema.json"
     ExperimentDecision:
       $ref: "../../contracts/experiment_decision.schema.json"
+    SensitivityProfile:
+      $ref: "../../contracts/sensitivity_profile.schema.json"
+    Proposals:
+      $ref: "../../contracts/proposals.schema.json"
+    Scorecard:
+      $ref: "../../contracts/scorecard.schema.json"
     Problem:
       type: object
       additionalProperties: false

@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "propose_request.schema.json",
+  "title": "ProposeRequest",
+  "description": "Core asks the engine in which order to run candidate experiments (POST /propose).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidates",
+    "effects",
+    "channel",
+    "better",
+    "rope",
+    "sigma",
+    "corners",
+    "laps_per_block",
+    "experiments"
+  ],
+  "properties": {
+    "candidates": {
+      "description": "Candidates of the session's latest diagnosis, one per item and clicks.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProposeCandidate"
+      }
+    },
+    "effects": {
+      "description": "The car's sensitivity profile.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SensitivityEffect"
+      }
+    },
+    "channel": {
+      "description": "The channel experiments are judged on.",
+      "type": "string",
+      "minLength": 1
+    },
+    "better": {
+      "type": "string",
+      "enum": [
+        "lower",
+        "higher"
+      ]
+    },
+    "rope": {
+      "description": "Band of practical equivalence of that channel.",
+      "type": "number",
+      "minimum": 0
+    },
+    "sigma": {
+      "description": "Pass-to-pass scatter of that channel.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "corners": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "laps_per_block": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "experiments": {
+      "description": "Finished experiments on this car.",
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "definitions": {
+    "ProposeCandidate": {
+      "title": "ProposeCandidate",
+      "description": "One experiment the diagnosis suggests.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "why",
+        "hypotheses"
+      ],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "type": "integer"
+        },
+        "why": {
+          "description": "The rule of thumb behind it.",
+          "type": "string"
+        },
+        "hypotheses": {
+          "description": "Keys of the hypotheses it would test.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "SensitivityEffect": {
+      "title": "SensitivityEffect",
+      "description": "What moving one setup item by some clicks does to one channel on this car: a pooled measurement, or a prior transferred from another car and flagged as one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "clicks",
+        "channel",
+        "corner_class",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes",
+        "effect_class",
+        "nonlinear",
+        "note",
+        "is_prior",
+        "prior_source",
+        "experiment_ids"
+      ],
+      "properties": {
+        "parameter": {
+          "description": "Item id in the game's setup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "clicks": {
+          "description": "Clicks moved; negative lowers the raw value. Never 0.",
+          "type": "integer"
+        },
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "description": "Variant minus baseline, in the channel's unit, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_class": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "negligible",
+            "inconclusive"
+          ]
+        },
+        "nonlinear": {
+          "description": "True when the item's other measured clicks show the response is not a straight line.",
+          "type": "boolean"
+        },
+        "note": {
+          "description": "Why it is flagged non-linear, or how a prior was derived; empty otherwise.",
+          "type": "string"
+        },
+        "is_prior": {
+          "description": "True when this was not measured on this car.",
+          "type": "boolean"
+        },
+        "prior_source": {
+          "description": "Name of the car a prior was transferred from; empty for a measurement.",
+          "type": "string"
+        },
+        "experiment_ids": {
+          "description": "The experiments the measurement is pooled from; empty for a prior.",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

@@ -179,18 +179,40 @@ in [ADR 0009](adr/0009-experiments.md).
 The rules, the thresholds and what was rejected are in
 [ADR 0010](adr/0010-diagnosis-and-explain.md).
 
-## What exists today (after phase 4)
+## The learning path (phase 5)
+
+1. **Gather.** `GET /sensitivity`. Core reads the `result` rows of every finished one-factor
+   experiment, per car. Experiments still being driven, aborted ones and champion re-checks
+   are left out.
+2. **Pool.** The engine (`POST /sensitivity/update`) pools repeated experiments on one
+   change by precision, classes the interval against the experiments' band of practical
+   equivalence, and flags a response that is not mirrored or does not double.
+3. **Borrow.** For a car another car can lend to, core asks again with the lender's
+   measured effects on the item that does the same job. The engine returns them shrunk,
+   widened and flagged `is_prior`; the car's own measurement always replaces a prior.
+4. **Keep.** Core replaces the rows of `sensitivity_effect` in one transaction, with the
+   method's `model_version`. The table is a record of the newest derivation, not a source.
+5. **Rank.** `GET /sessions/{id}/proposals` sends the candidates of the session's newest
+   diagnosis and the car's profile to `POST /propose`. The engine orders them by expected
+   gain per lap and lists a change the car measured as negligible or worse as skipped.
+6. **Score.** `GET /scorecard` counts the predictions that came true, in SQL.
+
+Why it is built this way, and what is missing (the 20+ experiment optimizer, tracks and
+conditions), is in [ADR 0011](adr/0011-sensitivity-and-ranking.md).
+
+## What exists today (after phase 5)
 
 | Piece | State |
 | --- | --- |
-| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply; generators and drift check | Working, checked in CI |
-| agent: capture with conditions, setup catalog and setup lines, run-plan window, setup loading with read-back and rollback, block and lap tags, installer (`tools/install_agent.py`) | 96 offline tests pass; **unverified in game** |
-| core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, REST API for sessions, diagnoses and experiments, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
-| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose` | Working, 120 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
-| web: sessions, diagnosis page, propose form (also filled from a candidate), experiment page with its full history, ledger | Working, 59 tests |
-| End to end: the Lua agent on the mocked game, core and the engine through a diagnosis and three experiments (`make test-e2e`) | Passes locally and in CI |
-| Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates and no experiments |
-| Sensitivity, optimizer, ghost | Not started (phases 5 and 6) |
+| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard; generators and drift check | Working, checked in CI |
+| agent: capture with conditions, setup catalog and setup lines, run-plan window, setup loading with read-back and rollback, block and lap tags, installer (`tools/install_agent.py`) | 97 offline tests pass; **unverified in game** |
+| core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
+| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 132 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
+| web: sessions, diagnosis page with what to test next, propose form (also filled from a candidate, with its predicted gain), experiment page with its full history, ledger with the scorecard, garage | Working, 75 tests |
+| End to end: the Lua agent on the mocked game, core and the engine through a diagnosis, three experiments, and the profile, ranking and scorecard they leave (`make test-e2e`) | Passes locally and in CI |
+| Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
+| Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
+| Ghost Driver | Not started (phase 6, gated on the game) |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.

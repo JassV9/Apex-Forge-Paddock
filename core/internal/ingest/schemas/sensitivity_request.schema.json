@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sensitivity_request.schema.json",
+  "title": "SensitivityRequest",
+  "description": "Core asks the engine to rebuild a car's sensitivity profile from its finished experiments (POST /sensitivity/update).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "measurements",
+    "transfers",
+    "ropes",
+    "level"
+  ],
+  "properties": {
+    "measurements": {
+      "description": "Every channel result of the car's finished one-item experiments.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Measurement"
+      }
+    },
+    "transfers": {
+      "description": "Measured effects of other cars, for items this car has not measured.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Transfer"
+      }
+    },
+    "ropes": {
+      "description": "Half-width of the band of practical equivalence per channel; a channel without one is judged against zero.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "level": {
+      "description": "Confidence level of the intervals, as in the experiments.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    }
+  },
+  "definitions": {
+    "Measurement": {
+      "title": "Measurement",
+      "description": "One channel result of one finished experiment on this car.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "parameter",
+        "clicks",
+        "channel",
+        "corner_class",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clicks": {
+          "description": "Signed clicks of the variant against its baseline.",
+          "type": "integer"
+        },
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "description": "Variant minus baseline, in the channel's unit, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Transfer": {
+      "title": "Transfer",
+      "description": "A measured effect of another car's item with the same role and axle, offered as a prior for this car's item.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "source_car",
+        "same_drivetrain",
+        "clicks",
+        "channel",
+        "corner_class",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes"
+      ],
+      "properties": {
+        "parameter": {
+          "description": "This car's item.",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_car": {
+          "description": "Name of the car it was measured on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "same_drivetrain": {
+          "type": "boolean"
+        },
+        "clicks": {
+          "type": "integer"
+        },
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "description": "Variant minus baseline, in the channel's unit, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

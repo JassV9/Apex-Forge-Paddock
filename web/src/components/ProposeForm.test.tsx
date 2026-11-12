@@ -37,7 +37,8 @@ describe("ProposeForm", () => {
     const onProposed = vi.fn();
     render(<ProposeForm api={api} onProposed={onProposed} />);
 
-    fireEvent.change(await screen.findByLabelText("Setup item"), { target: { value: "ARB_REAR" } });
+    await screen.findByRole("option", { name: /Rear ARB/ }); // the items are loaded
+    fireEvent.change(screen.getByLabelText("Setup item"), { target: { value: "ARB_REAR" } });
     fireEvent.change(screen.getByLabelText(/Clicks/), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText("Hypothesis"), {
       target: { value: "  A stiffer rear bar helps rotation. " },

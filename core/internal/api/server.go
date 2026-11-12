@@ -27,6 +27,8 @@ type Deps struct {
 	Version  string
 	Database Pinger
 	Sessions SessionLister
+	// Experiments serves the /experiments routes; nil leaves them out.
+	Experiments Experiments
 	// Metrics serves GET /metrics for Prometheus; nil leaves the route out.
 	Metrics http.Handler
 }
@@ -36,6 +38,9 @@ func NewHandler(deps Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /health", healthHandler(deps.Logger, deps.Version, deps.Database))
 	mux.Handle("GET /sessions", sessionsHandler(deps.Logger, deps.Sessions))
+	if deps.Experiments != nil {
+		registerExperiments(mux, deps.Logger, deps.Experiments)
+	}
 	if deps.Metrics != nil {
 		mux.Handle("GET /metrics", deps.Metrics)
 	}

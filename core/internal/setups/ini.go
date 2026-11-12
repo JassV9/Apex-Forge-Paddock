@@ -15,13 +15,18 @@ var ErrFileExists = errors.New("setup file already exists")
 
 var unsafeFileChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-// FileName is a safe file name for a setup, without directories.
-func FileName(stem string) string {
-	clean := strings.Trim(unsafeFileChars.ReplaceAllString(stem, "_"), "._")
+// SafeName turns any text into a single path element: no separators, no leading dots.
+func SafeName(text string) string {
+	clean := strings.Trim(unsafeFileChars.ReplaceAllString(text, "_"), "._")
 	if clean == "" {
 		clean = "setup"
 	}
-	return clean + ".ini"
+	return clean
+}
+
+// FileName is a safe file name for a setup, without directories.
+func FileName(stem string) string {
+	return SafeName(stem) + ".ini"
 }
 
 // Render is the content of an Assetto Corsa setup file: one [ITEM] section with VALUE per

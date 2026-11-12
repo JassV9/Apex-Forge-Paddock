@@ -15,6 +15,9 @@ import (
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/api"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/config"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/engine"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/features"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/ingest"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/store"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/telemetry"
@@ -27,6 +30,7 @@ const (
 	readHeaderTimeout = 5 * time.Second
 	shutdownTimeout   = 10 * time.Second
 	spoolPollInterval = time.Second
+	jobPollInterval   = time.Second
 	// The agent writes each spool file to a temporary name and renames it, so a visible file
 	// is complete; the settle time only covers file systems where a rename is not atomic.
 	spoolSettleTime = time.Second
@@ -64,11 +68,18 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := startIngest(ctx, cfg, database, logger, metrics); err != nil {
 		return err
 	}
+	analysis := engine.New(cfg.EngineURL)
+	if err := startFeatures(ctx, cfg, database, analysis, logger, metrics); err != nil {
+		return err
+	}
+	outbox := experiments.Outbox{Dir: cfg.OutboxDir}
 	server := &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: api.NewHandler(api.Deps{
 			Logger: logger, Version: version, Database: database,
-			Sessions: store.NewReader(database), Metrics: metrics.Handler,
+			Sessions:    store.NewReader(database),
+			Experiments: experiments.NewService(database, analysis, outbox, logger),
+			Metrics:     metrics.Handler,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
@@ -105,6 +116,25 @@ func startIngest(ctx context.Context, cfg config.Config, database *sql.DB, logge
 	go func() {
 		if err := service.Run(ctx); err != nil {
 			logger.Error("ingest stopped", "error", err)
+		}
+	}()
+	return nil
+}
+
+// startFeatures runs the engine jobs in the background until ctx is cancelled.
+func startFeatures(ctx context.Context, cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) error {
+	if cfg.EngineURL == "" {
+		logger.Info("pass features are off: PADDOCK_ENGINE_URL is not set")
+		return nil
+	}
+	worker, err := features.NewWorker(database, analysis, logger, metrics.Provider.Meter("paddock/jobs"), jobPollInterval)
+	if err != nil {
+		return fmt.Errorf("set up the features worker: %w", err)
+	}
+	logger.Info("features worker is running", "engine_url", cfg.EngineURL)
+	go func() {
+		if err := worker.Run(ctx); err != nil {
+			logger.Error("features worker stopped", "error", err)
 		}
 	}()
 	return nil

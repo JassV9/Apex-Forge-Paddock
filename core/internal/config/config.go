@@ -11,6 +11,8 @@ const (
 	envDatabaseURL = "PADDOCK_DATABASE_URL"
 	envSpoolDir    = "PADDOCK_SPOOL_DIR"
 	envDataDir     = "PADDOCK_DATA_DIR"
+	envEngineURL   = "PADDOCK_ENGINE_URL"
+	envOutboxDir   = "PADDOCK_OUTBOX_DIR"
 
 	defaultHTTPAddr = ":8080"
 	defaultDataDir  = "data"
@@ -30,6 +32,12 @@ type Config struct {
 	SpoolDir string
 	// DataDir is where core keeps files it owns (Parquet files of raw samples).
 	DataDir string
+	// EngineURL is where the analysis engine listens, for example http://engine:8000. Empty
+	// leaves pass features uncomputed and experiments unable to be planned or judged.
+	EngineURL string
+	// OutboxDir is where core writes the run plan and setup files for the in-game agent,
+	// normally Documents/Assetto Corsa/paddock/outbox. Empty writes nothing.
+	OutboxDir string
 }
 
 // FromEnv builds a Config. getenv is os.Getenv in production and a map lookup in tests.
@@ -39,6 +47,8 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		DatabaseURL: getenv(envDatabaseURL),
 		SpoolDir:    getenv(envSpoolDir),
 		DataDir:     getenv(envDataDir),
+		EngineURL:   getenv(envEngineURL),
+		OutboxDir:   getenv(envOutboxDir),
 	}
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = defaultHTTPAddr

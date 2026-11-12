@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Apex Forge Paddock core API
-  version: 0.2.0
+  version: 0.3.0
   description: >
     REST API of the core process, used by the web dashboard. This file is written first; the
     TypeScript client types in web/src/api/schema.d.ts are generated from it (`make gen`).
@@ -35,9 +35,136 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SessionSummary"
+  /experiments:
+    get:
+      operationId: listExperiments
+      summary: The ledger. Every experiment, newest first, whatever its outcome.
+      responses:
+        "200":
+          description: Every experiment with its plan, results, verdict and history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Experiment"
+    post:
+      operationId: createExperiment
+      summary: Propose an experiment. One setup item, moved by some clicks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Experiment"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /experiments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ExperimentId"
+    get:
+      operationId: getExperiment
+      summary: One experiment.
+      responses:
+        "200":
+          $ref: "#/components/responses/Experiment"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /experiments/{id}/{action}:
+    parameters:
+      - $ref: "#/components/parameters/ExperimentId"
+      - name: action
+        in: path
+        required: true
+        description: >
+          plan: ask the engine what an A-B-A-B plan can detect (proposed to planned).
+          start: write the run plan and both setups for the agent (planned to running).
+          evaluate: have the engine judge the driven passes (running to accepted, tradeoff,
+          inconclusive, or rejected and then reverted).
+          extend: two more blocks for an inconclusive experiment, at most twice.
+          revert: go back to the baseline (inconclusive, tradeoff, or the current champion).
+          abort: stop a running experiment.
+          discard: drop an experiment that was not driven.
+        schema:
+          type: string
+          enum: [plan, start, evaluate, extend, revert, abort, discard]
+    post:
+      operationId: actOnExperiment
+      summary: Move an experiment along its state machine.
+      responses:
+        "200":
+          $ref: "#/components/responses/Experiment"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "502":
+          $ref: "#/components/responses/Problem"
+  /experiments/{id}/decision:
+    parameters:
+      - $ref: "#/components/parameters/ExperimentId"
+    post:
+      operationId: decideExperiment
+      summary: The driver's call on a trade-off.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentDecision"
+      responses:
+        "200":
+          $ref: "#/components/responses/Experiment"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
 components:
+  parameters:
+    ExperimentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    Experiment:
+      description: The experiment as it is after the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Experiment"
+    Problem:
+      description: >
+        The request was refused. 404: no such experiment. 409: not possible in the
+        experiment's current state. 422: the request is not valid. 502: the engine did not
+        answer.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
   schemas:
     Health:
       $ref: "../../contracts/health.schema.json"
     SessionSummary:
       $ref: "../../contracts/session_summary.schema.json"
+    Experiment:
+      $ref: "../../contracts/experiment.schema.json"
+    ExperimentCreate:
+      $ref: "../../contracts/experiment_create.schema.json"
+    ExperimentDecision:
+      $ref: "../../contracts/experiment_decision.schema.json"
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          description: What went wrong, in words.
+          type: string

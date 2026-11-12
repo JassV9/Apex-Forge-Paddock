@@ -25,12 +25,16 @@ func TestFromEnv(t *testing.T) {
 				envDatabaseURL: databaseURL,
 				envSpoolDir:    `C:\Users\me\Documents\Assetto Corsa\paddock\spool`,
 				envDataDir:     "/var/lib/paddock",
+				envEngineURL:   "http://engine:8000",
+				envOutboxDir:   "/outbox",
 			},
 			want: Config{
 				HTTPAddr:    "127.0.0.1:9000",
 				DatabaseURL: databaseURL,
 				SpoolDir:    `C:\Users\me\Documents\Assetto Corsa\paddock\spool`,
 				DataDir:     "/var/lib/paddock",
+				EngineURL:   "http://engine:8000",
+				OutboxDir:   "/outbox",
 			},
 		},
 		{

@@ -18,7 +18,9 @@ Phase 6 (Ghost Driver) is optional and gated on the game; it was not started.
   app's secrets, scale to zero.
 - CI: a job that starts the replica and runs the smoke test, and a job that runs
   `terraform fmt -check` and `terraform validate`. A workflow started by hand publishes
-  the four images to GitHub's registry.
+  the four images to GitHub's registry. `.gitleaks.toml` exempts one line, the Terraform
+  attribute `password_secret_name`, which names a secret and holds none; the default rules
+  stay on and the rest of `infra/` is still scanned.
 - docs: the case study `docs/case-study-v0-regressions.md`, ADR 0012, a deploy runbook,
   screenshots and a GIF in the README.
 

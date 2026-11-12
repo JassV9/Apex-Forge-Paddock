@@ -1,0 +1,12 @@
+# Extends gitleaks' default rules; nothing is switched off. Written for the 8.24 syntax the
+# secret-scan job pins.
+[extend]
+useDefault = true
+
+# `password_secret_name` is an attribute the azurerm provider requires: it names a secret held
+# by the container app, it is not a password. Only this exact line is exempt; the rest of
+# infra/ is still scanned.
+[allowlist]
+description = "Terraform attribute that names a secret"
+regexTarget = "line"
+regexes = ['''^\s*password_secret_name\s*=\s*"registry-password"\s*$''']

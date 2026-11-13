@@ -94,8 +94,9 @@ Both are fixed, and both are why that test exists.
 
 ## What this does not show
 
-- **Nothing here has been run inside Assetto Corsa.** The capture code is ported from v0,
-  which did run there; the rebuilt agent is tested against a mocked game only.
+- **Little here has been run inside Assetto Corsa.** The rebuilt agent recorded one real
+  practice session (Formula Hybrid 2026 at COTA, 102 passes) and the engine diagnosed it;
+  everything else, experiments included, is tested against a mocked game only.
 - **No real experiment has been driven.** The verdict statistics are validated on
   simulation and on the scatter of one real session. Whether 28 ms holds on other cars,
   tracks and days is not known.

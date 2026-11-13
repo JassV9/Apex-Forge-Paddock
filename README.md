@@ -12,11 +12,12 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: built and tested offline; not yet run in the game.** Capture, ingest, the
+> **Status: capture verified in Assetto Corsa; experiments not yet driven.** Capture, ingest, the
 > measurement statistics, experiments, diagnosis, the sensitivity profile and a read-only
 > demo work and are tested (phases 0 to 5 and 7; phase 6 is optional research). The
-> [roadmap](#roadmap) below says exactly what exists today. Nothing has been run inside
-> Assetto Corsa yet, no real experiment has been driven, and the demo is not deployed.
+> [roadmap](#roadmap) below says exactly what exists today. The agent has recorded one
+> real practice session in the game (102 corner passes, none rejected); no experiment
+> has been driven there, and the demo is not deployed.
 
 ![The ledger, one experiment and the garage of measured effects](docs/img/experiment-loop.gif)
 
@@ -129,7 +130,7 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | Phase | Scope | State |
 | --- | --- | --- |
 | 0 | Skeleton: layout, contracts + codegen, CI, Compose, ADRs, reused v0 capture code under test | **Done** |
-| 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (offline; unverified in game) |
+| 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (verified in game on one session, one car, one track) |
 | 2 | Measurement: features, noise model, mixed model, minimum detectable effect | **Done** (simulated: false decisions 39% to 0%) |
 | 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (end to end on a simulated car; unverified in game) |
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | **Done** (on the real COTA session; hosted models unverified) |
@@ -143,7 +144,8 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
 **In the repository today:**
 
 - An in-game agent (Lua) that records every corner pass with its conditions: fuel, tyre
-  temperatures, pressures, wear, track grip, and 24 raw channels at 60 Hz. It costs about
+  temperatures, pressures, wear, track grip, and 24 raw channels at up to 60 Hz (45 Hz in the first real
+  session, the game's frame rate). It costs about
   0.002 ms per frame in the mocked benchmark and drops any pass interrupted by a restart,
   teleport, pit visit or replay.
 - A Go service that tails the agent's spool, validates every line against a JSON Schema,
@@ -195,8 +197,8 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   ([ADR 0012](docs/adr/0012-read-only-demo.md), [runbook](docs/runbooks/deploy-demo.md)).
   **It has not been deployed**: no cloud account is used from this repository.
 
-Nothing in this repository has been run inside Assetto Corsa yet, and the docs say so wherever
-it matters ([first-run checklist](docs/runbooks/agent-in-game.md)).
+Capture has run inside Assetto Corsa once; experiments have not, and the docs say so wherever
+it matters ([first-run results and checklist](docs/runbooks/agent-in-game.md)).
 
 ## Run it
 

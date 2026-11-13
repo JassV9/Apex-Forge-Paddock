@@ -2,6 +2,16 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## First in-game run (2026-11-12)
+
+- The agent was installed into Assetto Corsa (CSP 0.3.0-preview581) and recorded six laps
+  of the Formula Hybrid 2026 at COTA by hand: 102 passes, all 17 corners each lap, none
+  rejected by core, and the engine diagnosed the session. Results and what was not
+  checked are in `docs/runbooks/agent-in-game.md`.
+- Docs corrected: capture is verified in game once; run plans, setup loading and
+  experiments are still unverified in game. Samples arrive at the game's frame rate (45 Hz
+  here), not a fixed 60 Hz.
+
 ## Phase 7: read-only demo and case study (2026-11-12)
 
 Phase 6 (Ghost Driver) is optional and gated on the game; it was not started.

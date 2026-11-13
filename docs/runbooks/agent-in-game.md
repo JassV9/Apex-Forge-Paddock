@@ -1,8 +1,30 @@
 # Runbook: the agent in Assetto Corsa
 
-**Status: unverified in game.** Everything the agent does is tested offline against a mock of
-the CSP API. None of it has been run in Assetto Corsa yet. This runbook is the procedure for
-the first real run and the list of things that run has to confirm.
+**Status: capture verified in game once; experiments unverified in game.** Everything the
+agent does is tested offline against a mock of the CSP API. Recording passes has been run in
+Assetto Corsa (results below); loading setups and following a run plan have not. This runbook
+is the procedure and the list of things a run has to confirm.
+
+## First real run: 2026-11-12
+
+Formula Hybrid 2026 (`rss_formula_hybrid_2026`) at COTA F1 2026, practice, CSP
+0.3.0-preview581, started from Content Manager, driven by hand on a wheel for about six
+laps. The game was fullscreen, so the agent's window text was not seen.
+
+| Check | Result |
+| --- | --- |
+| The app loads | CSP's log: "Lua: <App: Paddock Agent> loaded and ready to run". The window itself was not seen |
+| Passes reach the spool | 102 passes in files `000002` to `000103`: six laps of 17 corners, `seq` contiguous, one setup hash |
+| Core accepts them | 0 rejected, no error or warning in core's log |
+| Field names are right | Fuel fell from 49.8 to 48.4 L over the first lap; tyre core 74 to 79 C, pressures about 20 psi, grip 1 |
+| Catalog and setup | 87 parameters and 78 values read from the car in the first file |
+| Diagnosis on the session | The engine returned mid-corner understeer in all speed classes, with the driver-input and conditions alternatives. The template text was used (no model) |
+| Sample rate | Median step 0.0221 s (45 Hz), 5th to 95th percentile 0.0198 to 0.0250 s. The recorder caps at 60 Hz, so this is the frame rate of that session |
+| Slow-script warnings | None for the agent in CSP's log |
+
+Not checked in this run: frame cost with the Lua profiler, restarting mid-corner, the setup
+hash after a change in the pits, the experiment checks below. One session on one car and
+one track says nothing about other cars.
 
 ## Install
 

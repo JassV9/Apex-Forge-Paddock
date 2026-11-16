@@ -105,6 +105,48 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/passes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    /** Every corner pass of the session, with best, median and spread per corner. */
+    get: operations["listPasses"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sessions/{id}/passes/{seq}/samples": {
+    parameters: {
+      query?: {
+        /** @description Most samples per column in the reply (default 1000); more are thinned evenly. */
+        max_points?: number;
+      };
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+        seq: number;
+      };
+      cookie?: never;
+    };
+    /** The raw samples of one pass from the session's Parquet files. */
+    get: operations["getPassSamples"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/sensitivity": {
     parameters: {
       query?: never;
@@ -233,6 +275,8 @@ export interface components {
     SensitivityProfile: components["schemas"]["sensitivity_profile.schema"];
     Proposals: components["schemas"]["proposals.schema"];
     Scorecard: components["schemas"]["scorecard.schema"];
+    SessionPasses: components["schemas"]["session_passes.schema"];
+    PassTrace: components["schemas"]["pass_trace.schema"];
     Problem: {
       /** @description What went wrong, in words. */
       error: string;
@@ -452,6 +496,167 @@ export interface components {
       ranked: components["schemas"]["Proposal"][];
       /** @description Candidates measured on this car as negligible or worse. */
       skipped: components["schemas"]["SkippedCandidate"][];
+    };
+    /**
+     * CornerSummary
+     * @description One corner's zone times over its valid passes. Times are absent when no pass is valid; the spread needs two.
+     */
+    CornerSummary: {
+      /** @description Corner number on the session's corner map. */
+      corner: number;
+      /** @description The corner's name on the map; empty when it has none. */
+      name: string;
+      passes: number;
+      valid_passes: number;
+      /** @description Shortest zone time of a valid pass, seconds. */
+      best_s?: number;
+      /** @description The pass with the shortest zone time. */
+      best_seq?: number;
+      median_s?: number;
+      /** @description Sample standard deviation of the valid zone times, seconds. */
+      spread_s?: number;
+    };
+    /**
+     * PassRecord
+     * @description One stored corner pass.
+     */
+    PassRecord: {
+      /** @description Order of the pass within its session, from 1. */
+      seq: number;
+      corner: number;
+      /** @description Completed laps when the pass ended; absent when the agent did not say. */
+      lap?: number;
+      /** @description When the car entered the zone, RFC 3339 in UTC. */
+      t_start: string;
+      /** @description Zone time: from zone start to zone end, seconds. */
+      duration_s: number;
+      valid: boolean;
+      invalid_reason?: string;
+      /** @description Raw samples stored for the pass. */
+      n_samples: number;
+      /** @description The agent's fingerprint of the setup the car ran. */
+      setup_hash?: string;
+      /**
+       * PassRecordBlock
+       * @description The experiment block the pass was driven in.
+       */
+      block?: {
+        experiment_id: number;
+        order: number;
+        lap: number;
+      };
+      /**
+       * PassRecordConditions
+       * @description State of the car and track when the pass ended; absent when it was not recorded. FL, FR, RL, RR order.
+       */
+      conditions?: {
+        fuel_l: number;
+        tyre_core_c: number[];
+        tyre_surface_c: number[];
+        tyre_press_psi: number[];
+        tyre_wear: number[];
+        grip: number;
+        air_c: number;
+        road_c: number;
+      };
+      /** @description The engine's class of the corner (slow, medium, fast); absent before features are computed. */
+      speed_class?: string;
+      /** @description The engine's notes on the pass, such as flat-out corner. */
+      flags: string[];
+      /** @description The engine's metrics of the pass by name, as stored. Empty before features are computed; a metric that does not apply is absent. */
+      metrics: {
+        [key: string]: number;
+      };
+    };
+    /**
+     * SessionPasses
+     * @description Every corner pass of one session as core stored it, and per corner the best, median and spread of the valid passes' zone times. Read-only; raw samples are in PassTrace.
+     */
+    "session_passes.schema": {
+      session_id: number;
+      /** @description Length of the track, metres. Distance restarts at the start line, so a pass that crosses it jumps back by this much. */
+      track_length_m: number;
+      /** @description Every corner with at least one pass, by number. */
+      corners: components["schemas"]["CornerSummary"][];
+      /** @description Every pass, in the order it was driven. */
+      passes: components["schemas"]["PassRecord"][];
+    };
+    /**
+     * PassTrace
+     * @description The raw samples of one corner pass as column arrays of equal length n, read from the session's Parquet files. When the pass has more samples than were asked for, every step-th sample is kept, and the last one.
+     */
+    "pass_trace.schema": {
+      session_id: number;
+      seq: number;
+      corner: number;
+      /** @description Samples stored for the pass. */
+      n_recorded: number;
+      /** @description Samples in every column of this reply. */
+      n: number;
+      /** @description 1 when every sample is in the reply; k when every k-th one is. */
+      step: number;
+      /**
+       * TraceColumns
+       * @description The 24 spool channels, in the units of SpoolPass.
+       */
+      columns: {
+        /** @description Seconds since the pass started. */
+        t: number[];
+        /** @description Metres from the start line. */
+        d: number[];
+        /** @description Speed, m/s. */
+        v: number[];
+        /** @description Throttle pedal, 0..1. */
+        gas: number[];
+        /** @description Brake pedal, 0..1. */
+        brake: number[];
+        /** @description Steering wheel angle, degrees. */
+        steer: number[];
+        /** @description Lateral acceleration, g. */
+        lat_g: number[];
+        /** @description Longitudinal acceleration, g. */
+        lon_g: number[];
+        /** @description Yaw rate, rad/s. */
+        yaw: number[];
+        /** @description Slip angle FL, degrees. */
+        sa_fl: number[];
+        /** @description Slip angle FR, degrees. */
+        sa_fr: number[];
+        /** @description Slip angle RL, degrees. */
+        sa_rl: number[];
+        /** @description Slip angle RR, degrees. */
+        sa_rr: number[];
+        /** @description Slip ratio FL. */
+        sr_fl: number[];
+        /** @description Slip ratio FR. */
+        sr_fr: number[];
+        /** @description Slip ratio RL. */
+        sr_rl: number[];
+        /** @description Slip ratio RR. */
+        sr_rr: number[];
+        /** @description Tyre load FL, N. */
+        load_fl: number[];
+        /** @description Tyre load FR, N. */
+        load_fr: number[];
+        /** @description Tyre load RL, N. */
+        load_rl: number[];
+        /** @description Tyre load RR, N. */
+        load_rr: number[];
+        /** @description Wheels outside the track, 0..4. */
+        out: number[];
+        /** @description Front ride height, m. */
+        rh_f: number[];
+        /** @description Rear ride height, m. */
+        rh_r: number[];
+      };
+      /**
+       * TraceAxles
+       * @description Slip angle per axle as the engine defines it (engine features/axles.py): the load-weighted mean of the two tyres' absolute slip angles, the plain mean when the axle carries no load. Degrees.
+       */
+      axles: {
+        front_slip_deg: number[];
+        rear_slip_deg: number[];
+      };
     };
     /**
      * SensitivityEffect
@@ -758,7 +963,7 @@ export interface components {
         "application/json": components["schemas"]["diagnosis.schema"];
       };
     };
-    /** @description The request was refused. 404: no such experiment, session or diagnosis. 409: not possible in the experiment's current state, or the session has no pass to diagnose yet. 422: the request is not valid. 502: the engine did not answer. */
+    /** @description The request was refused. 404: no such experiment, session, pass or diagnosis, or the pass has no stored samples. 409: not possible in the experiment's current state, or the session has no pass to diagnose yet. 422: the request is not valid. 502: the engine did not answer. */
     Problem: {
       headers: {
         [name: string]: unknown;
@@ -895,6 +1100,57 @@ export interface operations {
       };
       404: components["responses"]["Problem"];
       502: components["responses"]["Problem"];
+    };
+  };
+  listPasses: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The stored passes in the order driven, and the corners they cover. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["session_passes.schema"];
+        };
+      };
+      404: components["responses"]["Problem"];
+    };
+  };
+  getPassSamples: {
+    parameters: {
+      query?: {
+        /** @description Most samples per column in the reply (default 1000); more are thinned evenly. */
+        max_points?: number;
+      };
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+        seq: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Column arrays of equal length, and the slip angle per axle. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["pass_trace.schema"];
+        };
+      };
+      404: components["responses"]["Problem"];
+      422: components["responses"]["Problem"];
     };
   };
   listSensitivity: {

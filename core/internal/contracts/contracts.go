@@ -340,6 +340,76 @@ func (j *ChannelResult) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// One corner's zone times over its valid passes. Times are absent when no pass is
+// valid; the spread needs two.
+type CornerSummary struct {
+	// Shortest zone time of a valid pass, seconds.
+	BestS *float64 `json:"best_s,omitempty,omitzero"`
+
+	// The pass with the shortest zone time.
+	BestSeq *int `json:"best_seq,omitempty,omitzero"`
+
+	// Corner number on the session's corner map.
+	Corner int `json:"corner"`
+
+	// MedianS corresponds to the JSON schema field "median_s".
+	MedianS *float64 `json:"median_s,omitempty,omitzero"`
+
+	// The corner's name on the map; empty when it has none.
+	Name string `json:"name"`
+
+	// Passes corresponds to the JSON schema field "passes".
+	Passes int `json:"passes"`
+
+	// Sample standard deviation of the valid zone times, seconds.
+	SpreadS *float64 `json:"spread_s,omitempty,omitzero"`
+
+	// ValidPasses corresponds to the JSON schema field "valid_passes".
+	ValidPasses int `json:"valid_passes"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *CornerSummary) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in CornerSummary: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in CornerSummary: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in CornerSummary: required")
+	}
+	if _, ok := raw["valid_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field valid_passes in CornerSummary: required")
+	}
+	type Plain CornerSummary
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.BestSeq != nil && 1 > *plain.BestSeq {
+		return fmt.Errorf("field %s: must be >= %v", "best_seq", 1)
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 0 > plain.Passes {
+		return fmt.Errorf("field %s: must be >= %v", "passes", 0)
+	}
+	if plain.SpreadS != nil && 0 > *plain.SpreadS {
+		return fmt.Errorf("field %s: must be >= %v", "spread_s", 0)
+	}
+	if 0 > plain.ValidPasses {
+		return fmt.Errorf("field %s: must be >= %v", "valid_passes", 0)
+	}
+	*j = CornerSummary(plain)
+	return nil
+}
+
 // One changeable setup item, as the agent read it from the setup menu.
 type DiagnoseItem struct {
 	// F or R when the item belongs to one axle; empty otherwise.
@@ -2912,6 +2982,227 @@ func (j *PassFeatures) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// One stored corner pass.
+type PassRecord struct {
+	// The experiment block the pass was driven in.
+	Block *PassRecordBlock `json:"block,omitempty,omitzero"`
+
+	// State of the car and track when the pass ended; absent when it was not
+	// recorded. FL, FR, RL, RR order.
+	Conditions *PassRecordConditions `json:"conditions,omitempty,omitzero"`
+
+	// Corner corresponds to the JSON schema field "corner".
+	Corner int `json:"corner"`
+
+	// Zone time: from zone start to zone end, seconds.
+	DurationS float64 `json:"duration_s"`
+
+	// The engine's notes on the pass, such as flat-out corner.
+	Flags []string `json:"flags"`
+
+	// InvalidReason corresponds to the JSON schema field "invalid_reason".
+	InvalidReason *string `json:"invalid_reason,omitempty,omitzero"`
+
+	// Completed laps when the pass ended; absent when the agent did not say.
+	Lap *int `json:"lap,omitempty,omitzero"`
+
+	// The engine's metrics of the pass by name, as stored. Empty before features are
+	// computed; a metric that does not apply is absent.
+	Metrics PassRecordMetrics `json:"metrics"`
+
+	// Raw samples stored for the pass.
+	NSamples int `json:"n_samples"`
+
+	// Order of the pass within its session, from 1.
+	Seq int `json:"seq"`
+
+	// The agent's fingerprint of the setup the car ran.
+	SetupHash *string `json:"setup_hash,omitempty,omitzero"`
+
+	// The engine's class of the corner (slow, medium, fast); absent before features
+	// are computed.
+	SpeedClass *string `json:"speed_class,omitempty,omitzero"`
+
+	// When the car entered the zone, RFC 3339 in UTC.
+	TStart string `json:"t_start"`
+
+	// Valid corresponds to the JSON schema field "valid".
+	Valid bool `json:"valid"`
+}
+
+// The experiment block the pass was driven in.
+type PassRecordBlock struct {
+	// ExperimentId corresponds to the JSON schema field "experiment_id".
+	ExperimentId int `json:"experiment_id"`
+
+	// Lap corresponds to the JSON schema field "lap".
+	Lap int `json:"lap"`
+
+	// Order corresponds to the JSON schema field "order".
+	Order int `json:"order"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassRecordBlock) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["experiment_id"]; raw != nil && !ok {
+		return fmt.Errorf("field experiment_id in PassRecordBlock: required")
+	}
+	if _, ok := raw["lap"]; raw != nil && !ok {
+		return fmt.Errorf("field lap in PassRecordBlock: required")
+	}
+	if _, ok := raw["order"]; raw != nil && !ok {
+		return fmt.Errorf("field order in PassRecordBlock: required")
+	}
+	type Plain PassRecordBlock
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.ExperimentId {
+		return fmt.Errorf("field %s: must be >= %v", "experiment_id", 1)
+	}
+	if 0 > plain.Lap {
+		return fmt.Errorf("field %s: must be >= %v", "lap", 0)
+	}
+	if 1 > plain.Order {
+		return fmt.Errorf("field %s: must be >= %v", "order", 1)
+	}
+	*j = PassRecordBlock(plain)
+	return nil
+}
+
+// State of the car and track when the pass ended; absent when it was not recorded.
+// FL, FR, RL, RR order.
+type PassRecordConditions struct {
+	// AirC corresponds to the JSON schema field "air_c".
+	AirC float64 `json:"air_c"`
+
+	// FuelL corresponds to the JSON schema field "fuel_l".
+	FuelL float64 `json:"fuel_l"`
+
+	// Grip corresponds to the JSON schema field "grip".
+	Grip float64 `json:"grip"`
+
+	// RoadC corresponds to the JSON schema field "road_c".
+	RoadC float64 `json:"road_c"`
+
+	// TyreCoreC corresponds to the JSON schema field "tyre_core_c".
+	TyreCoreC []float64 `json:"tyre_core_c"`
+
+	// TyrePressPsi corresponds to the JSON schema field "tyre_press_psi".
+	TyrePressPsi []float64 `json:"tyre_press_psi"`
+
+	// TyreSurfaceC corresponds to the JSON schema field "tyre_surface_c".
+	TyreSurfaceC []float64 `json:"tyre_surface_c"`
+
+	// TyreWear corresponds to the JSON schema field "tyre_wear".
+	TyreWear []float64 `json:"tyre_wear"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassRecordConditions) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["air_c"]; raw != nil && !ok {
+		return fmt.Errorf("field air_c in PassRecordConditions: required")
+	}
+	if _, ok := raw["fuel_l"]; raw != nil && !ok {
+		return fmt.Errorf("field fuel_l in PassRecordConditions: required")
+	}
+	if _, ok := raw["grip"]; raw != nil && !ok {
+		return fmt.Errorf("field grip in PassRecordConditions: required")
+	}
+	if _, ok := raw["road_c"]; raw != nil && !ok {
+		return fmt.Errorf("field road_c in PassRecordConditions: required")
+	}
+	if _, ok := raw["tyre_core_c"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_core_c in PassRecordConditions: required")
+	}
+	if _, ok := raw["tyre_press_psi"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_press_psi in PassRecordConditions: required")
+	}
+	if _, ok := raw["tyre_surface_c"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_surface_c in PassRecordConditions: required")
+	}
+	if _, ok := raw["tyre_wear"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_wear in PassRecordConditions: required")
+	}
+	type Plain PassRecordConditions
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = PassRecordConditions(plain)
+	return nil
+}
+
+// The engine's metrics of the pass by name, as stored. Empty before features are
+// computed; a metric that does not apply is absent.
+type PassRecordMetrics map[string]float64
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassRecord) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in PassRecord: required")
+	}
+	if _, ok := raw["duration_s"]; raw != nil && !ok {
+		return fmt.Errorf("field duration_s in PassRecord: required")
+	}
+	if _, ok := raw["flags"]; raw != nil && !ok {
+		return fmt.Errorf("field flags in PassRecord: required")
+	}
+	if _, ok := raw["metrics"]; raw != nil && !ok {
+		return fmt.Errorf("field metrics in PassRecord: required")
+	}
+	if _, ok := raw["n_samples"]; raw != nil && !ok {
+		return fmt.Errorf("field n_samples in PassRecord: required")
+	}
+	if _, ok := raw["seq"]; raw != nil && !ok {
+		return fmt.Errorf("field seq in PassRecord: required")
+	}
+	if _, ok := raw["t_start"]; raw != nil && !ok {
+		return fmt.Errorf("field t_start in PassRecord: required")
+	}
+	if _, ok := raw["valid"]; raw != nil && !ok {
+		return fmt.Errorf("field valid in PassRecord: required")
+	}
+	type Plain PassRecord
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 0 >= plain.DurationS {
+		return fmt.Errorf("field %s: must be > %v", "duration_s", 0)
+	}
+	if plain.Lap != nil && 0 > *plain.Lap {
+		return fmt.Errorf("field %s: must be >= %v", "lap", 0)
+	}
+	if 0 > plain.NSamples {
+		return fmt.Errorf("field %s: must be >= %v", "n_samples", 0)
+	}
+	if 1 > plain.Seq {
+		return fmt.Errorf("field %s: must be >= %v", "seq", 1)
+	}
+	if utf8.RuneCountInString(string(plain.TStart)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "t_start", 1)
+	}
+	*j = PassRecord(plain)
+	return nil
+}
+
 // Raw channels at up to 60 Hz as column arrays of equal length n.
 type PassSamples struct {
 	// Columns corresponds to the JSON schema field "columns".
@@ -2942,6 +3233,94 @@ func (j *PassSamples) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "n", 2)
 	}
 	*j = PassSamples(plain)
+	return nil
+}
+
+// The raw samples of one corner pass as column arrays of equal length n, read from
+// the session's Parquet files. When the pass has more samples than were asked for,
+// every step-th sample is kept, and the last one.
+type PassTrace struct {
+	// Slip angle per axle as the engine defines it (engine features/axles.py): the
+	// load-weighted mean of the two tyres' absolute slip angles, the plain mean when
+	// the axle carries no load. Degrees.
+	Axles TraceAxles `json:"axles"`
+
+	// The 24 spool channels, in the units of SpoolPass.
+	Columns TraceColumns `json:"columns"`
+
+	// Corner corresponds to the JSON schema field "corner".
+	Corner int `json:"corner"`
+
+	// Samples in every column of this reply.
+	N int `json:"n"`
+
+	// Samples stored for the pass.
+	NRecorded int `json:"n_recorded"`
+
+	// Seq corresponds to the JSON schema field "seq".
+	Seq int `json:"seq"`
+
+	// SessionId corresponds to the JSON schema field "session_id".
+	SessionId int `json:"session_id"`
+
+	// 1 when every sample is in the reply; k when every k-th one is.
+	Step int `json:"step"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassTrace) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["axles"]; raw != nil && !ok {
+		return fmt.Errorf("field axles in PassTrace: required")
+	}
+	if _, ok := raw["columns"]; raw != nil && !ok {
+		return fmt.Errorf("field columns in PassTrace: required")
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in PassTrace: required")
+	}
+	if _, ok := raw["n"]; raw != nil && !ok {
+		return fmt.Errorf("field n in PassTrace: required")
+	}
+	if _, ok := raw["n_recorded"]; raw != nil && !ok {
+		return fmt.Errorf("field n_recorded in PassTrace: required")
+	}
+	if _, ok := raw["seq"]; raw != nil && !ok {
+		return fmt.Errorf("field seq in PassTrace: required")
+	}
+	if _, ok := raw["session_id"]; raw != nil && !ok {
+		return fmt.Errorf("field session_id in PassTrace: required")
+	}
+	if _, ok := raw["step"]; raw != nil && !ok {
+		return fmt.Errorf("field step in PassTrace: required")
+	}
+	type Plain PassTrace
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 1 > plain.N {
+		return fmt.Errorf("field %s: must be >= %v", "n", 1)
+	}
+	if 1 > plain.NRecorded {
+		return fmt.Errorf("field %s: must be >= %v", "n_recorded", 1)
+	}
+	if 1 > plain.Seq {
+		return fmt.Errorf("field %s: must be >= %v", "seq", 1)
+	}
+	if 1 > plain.SessionId {
+		return fmt.Errorf("field %s: must be >= %v", "session_id", 1)
+	}
+	if 1 > plain.Step {
+		return fmt.Errorf("field %s: must be >= %v", "step", 1)
+	}
+	*j = PassTrace(plain)
 	return nil
 }
 
@@ -4523,6 +4902,57 @@ func (j *SensitivityResponse) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// Every corner pass of one session as core stored it, and per corner the best,
+// median and spread of the valid passes' zone times. Read-only; raw samples are in
+// PassTrace.
+type SessionPasses struct {
+	// Every corner with at least one pass, by number.
+	Corners []CornerSummary `json:"corners"`
+
+	// Every pass, in the order it was driven.
+	Passes []PassRecord `json:"passes"`
+
+	// SessionId corresponds to the JSON schema field "session_id".
+	SessionId int `json:"session_id"`
+
+	// Length of the track, metres. Distance restarts at the start line, so a pass
+	// that crosses it jumps back by this much.
+	TrackLengthM float64 `json:"track_length_m"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SessionPasses) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in SessionPasses: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in SessionPasses: required")
+	}
+	if _, ok := raw["session_id"]; raw != nil && !ok {
+		return fmt.Errorf("field session_id in SessionPasses: required")
+	}
+	if _, ok := raw["track_length_m"]; raw != nil && !ok {
+		return fmt.Errorf("field track_length_m in SessionPasses: required")
+	}
+	type Plain SessionPasses
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.SessionId {
+		return fmt.Errorf("field %s: must be >= %v", "session_id", 1)
+	}
+	if 0 >= plain.TrackLengthM {
+		return fmt.Errorf("field %s: must be > %v", "track_length_m", 0)
+	}
+	*j = SessionPasses(plain)
+	return nil
+}
+
 // One recorded session as core lists it for the dashboard.
 type SessionSummary struct {
 	// CarName corresponds to the JSON schema field "car_name".
@@ -5791,6 +6221,200 @@ func (j *SuccessTest) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "rope", 0)
 	}
 	*j = SuccessTest(plain)
+	return nil
+}
+
+// Slip angle per axle as the engine defines it (engine features/axles.py): the
+// load-weighted mean of the two tyres' absolute slip angles, the plain mean when
+// the axle carries no load. Degrees.
+type TraceAxles struct {
+	// FrontSlipDeg corresponds to the JSON schema field "front_slip_deg".
+	FrontSlipDeg []float64 `json:"front_slip_deg"`
+
+	// RearSlipDeg corresponds to the JSON schema field "rear_slip_deg".
+	RearSlipDeg []float64 `json:"rear_slip_deg"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *TraceAxles) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["front_slip_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field front_slip_deg in TraceAxles: required")
+	}
+	if _, ok := raw["rear_slip_deg"]; raw != nil && !ok {
+		return fmt.Errorf("field rear_slip_deg in TraceAxles: required")
+	}
+	type Plain TraceAxles
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = TraceAxles(plain)
+	return nil
+}
+
+// The 24 spool channels, in the units of SpoolPass.
+type TraceColumns struct {
+	// Brake pedal, 0..1.
+	Brake []float64 `json:"brake"`
+
+	// Metres from the start line.
+	D []float64 `json:"d"`
+
+	// Throttle pedal, 0..1.
+	Gas []float64 `json:"gas"`
+
+	// Lateral acceleration, g.
+	LatG []float64 `json:"lat_g"`
+
+	// Tyre load FL, N.
+	LoadFl []float64 `json:"load_fl"`
+
+	// Tyre load FR, N.
+	LoadFr []float64 `json:"load_fr"`
+
+	// Tyre load RL, N.
+	LoadRl []float64 `json:"load_rl"`
+
+	// Tyre load RR, N.
+	LoadRr []float64 `json:"load_rr"`
+
+	// Longitudinal acceleration, g.
+	LonG []float64 `json:"lon_g"`
+
+	// Wheels outside the track, 0..4.
+	Out []float64 `json:"out"`
+
+	// Front ride height, m.
+	RhF []float64 `json:"rh_f"`
+
+	// Rear ride height, m.
+	RhR []float64 `json:"rh_r"`
+
+	// Slip angle FL, degrees.
+	SaFl []float64 `json:"sa_fl"`
+
+	// Slip angle FR, degrees.
+	SaFr []float64 `json:"sa_fr"`
+
+	// Slip angle RL, degrees.
+	SaRl []float64 `json:"sa_rl"`
+
+	// Slip angle RR, degrees.
+	SaRr []float64 `json:"sa_rr"`
+
+	// Slip ratio FL.
+	SrFl []float64 `json:"sr_fl"`
+
+	// Slip ratio FR.
+	SrFr []float64 `json:"sr_fr"`
+
+	// Slip ratio RL.
+	SrRl []float64 `json:"sr_rl"`
+
+	// Slip ratio RR.
+	SrRr []float64 `json:"sr_rr"`
+
+	// Steering wheel angle, degrees.
+	Steer []float64 `json:"steer"`
+
+	// Seconds since the pass started.
+	T []float64 `json:"t"`
+
+	// Speed, m/s.
+	V []float64 `json:"v"`
+
+	// Yaw rate, rad/s.
+	Yaw []float64 `json:"yaw"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *TraceColumns) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["brake"]; raw != nil && !ok {
+		return fmt.Errorf("field brake in TraceColumns: required")
+	}
+	if _, ok := raw["d"]; raw != nil && !ok {
+		return fmt.Errorf("field d in TraceColumns: required")
+	}
+	if _, ok := raw["gas"]; raw != nil && !ok {
+		return fmt.Errorf("field gas in TraceColumns: required")
+	}
+	if _, ok := raw["lat_g"]; raw != nil && !ok {
+		return fmt.Errorf("field lat_g in TraceColumns: required")
+	}
+	if _, ok := raw["load_fl"]; raw != nil && !ok {
+		return fmt.Errorf("field load_fl in TraceColumns: required")
+	}
+	if _, ok := raw["load_fr"]; raw != nil && !ok {
+		return fmt.Errorf("field load_fr in TraceColumns: required")
+	}
+	if _, ok := raw["load_rl"]; raw != nil && !ok {
+		return fmt.Errorf("field load_rl in TraceColumns: required")
+	}
+	if _, ok := raw["load_rr"]; raw != nil && !ok {
+		return fmt.Errorf("field load_rr in TraceColumns: required")
+	}
+	if _, ok := raw["lon_g"]; raw != nil && !ok {
+		return fmt.Errorf("field lon_g in TraceColumns: required")
+	}
+	if _, ok := raw["out"]; raw != nil && !ok {
+		return fmt.Errorf("field out in TraceColumns: required")
+	}
+	if _, ok := raw["rh_f"]; raw != nil && !ok {
+		return fmt.Errorf("field rh_f in TraceColumns: required")
+	}
+	if _, ok := raw["rh_r"]; raw != nil && !ok {
+		return fmt.Errorf("field rh_r in TraceColumns: required")
+	}
+	if _, ok := raw["sa_fl"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_fl in TraceColumns: required")
+	}
+	if _, ok := raw["sa_fr"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_fr in TraceColumns: required")
+	}
+	if _, ok := raw["sa_rl"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_rl in TraceColumns: required")
+	}
+	if _, ok := raw["sa_rr"]; raw != nil && !ok {
+		return fmt.Errorf("field sa_rr in TraceColumns: required")
+	}
+	if _, ok := raw["sr_fl"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_fl in TraceColumns: required")
+	}
+	if _, ok := raw["sr_fr"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_fr in TraceColumns: required")
+	}
+	if _, ok := raw["sr_rl"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_rl in TraceColumns: required")
+	}
+	if _, ok := raw["sr_rr"]; raw != nil && !ok {
+		return fmt.Errorf("field sr_rr in TraceColumns: required")
+	}
+	if _, ok := raw["steer"]; raw != nil && !ok {
+		return fmt.Errorf("field steer in TraceColumns: required")
+	}
+	if _, ok := raw["t"]; raw != nil && !ok {
+		return fmt.Errorf("field t in TraceColumns: required")
+	}
+	if _, ok := raw["v"]; raw != nil && !ok {
+		return fmt.Errorf("field v in TraceColumns: required")
+	}
+	if _, ok := raw["yaw"]; raw != nil && !ok {
+		return fmt.Errorf("field yaw in TraceColumns: required")
+	}
+	type Plain TraceColumns
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = TraceColumns(plain)
 	return nil
 }
 

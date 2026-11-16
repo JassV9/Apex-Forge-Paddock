@@ -1,0 +1,273 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "pass_trace.schema.json",
+  "title": "PassTrace",
+  "description": "The raw samples of one corner pass as column arrays of equal length n, read from the session's Parquet files. When the pass has more samples than were asked for, every step-th sample is kept, and the last one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "seq",
+    "corner",
+    "n_recorded",
+    "n",
+    "step",
+    "columns",
+    "axles"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "corner": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "n_recorded": {
+      "description": "Samples stored for the pass.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "n": {
+      "description": "Samples in every column of this reply.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "step": {
+      "description": "1 when every sample is in the reply; k when every k-th one is.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "columns": {
+      "title": "TraceColumns",
+      "description": "The 24 spool channels, in the units of SpoolPass.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t",
+        "d",
+        "v",
+        "gas",
+        "brake",
+        "steer",
+        "lat_g",
+        "lon_g",
+        "yaw",
+        "sa_fl",
+        "sa_fr",
+        "sa_rl",
+        "sa_rr",
+        "sr_fl",
+        "sr_fr",
+        "sr_rl",
+        "sr_rr",
+        "load_fl",
+        "load_fr",
+        "load_rl",
+        "load_rr",
+        "out",
+        "rh_f",
+        "rh_r"
+      ],
+      "properties": {
+        "t": {
+          "description": "Seconds since the pass started.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "d": {
+          "description": "Metres from the start line.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "v": {
+          "description": "Speed, m/s.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "gas": {
+          "description": "Throttle pedal, 0..1.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "brake": {
+          "description": "Brake pedal, 0..1.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "steer": {
+          "description": "Steering wheel angle, degrees.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "lat_g": {
+          "description": "Lateral acceleration, g.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "lon_g": {
+          "description": "Longitudinal acceleration, g.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "yaw": {
+          "description": "Yaw rate, rad/s.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sa_fl": {
+          "description": "Slip angle FL, degrees.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sa_fr": {
+          "description": "Slip angle FR, degrees.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sa_rl": {
+          "description": "Slip angle RL, degrees.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sa_rr": {
+          "description": "Slip angle RR, degrees.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sr_fl": {
+          "description": "Slip ratio FL.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sr_fr": {
+          "description": "Slip ratio FR.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sr_rl": {
+          "description": "Slip ratio RL.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "sr_rr": {
+          "description": "Slip ratio RR.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "load_fl": {
+          "description": "Tyre load FL, N.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "load_fr": {
+          "description": "Tyre load FR, N.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "load_rl": {
+          "description": "Tyre load RL, N.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "load_rr": {
+          "description": "Tyre load RR, N.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "out": {
+          "description": "Wheels outside the track, 0..4.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "rh_f": {
+          "description": "Front ride height, m.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "rh_r": {
+          "description": "Rear ride height, m.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "axles": {
+      "title": "TraceAxles",
+      "description": "Slip angle per axle as the engine defines it (engine features/axles.py): the load-weighted mean of the two tyres' absolute slip angles, the plain mean when the axle carries no load. Degrees.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "front_slip_deg",
+        "rear_slip_deg"
+      ],
+      "properties": {
+        "front_slip_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "rear_slip_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

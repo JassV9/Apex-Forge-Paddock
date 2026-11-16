@@ -74,7 +74,9 @@ function rowOf(text: RegExp): HTMLElement {
 
 describe("Garage", () => {
   it("shows a measured effect with its interval and what it rests on", async () => {
-    render(<Garage loadProfiles={() => Promise.resolve([mazda, untested])} />);
+    render(
+      <Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([mazda, untested])} />,
+    );
 
     const car = await screen.findByRole("region", { name: "Mazda MX-5 Cup" });
 
@@ -88,7 +90,7 @@ describe("Garage", () => {
   });
 
   it("words a borrowed effect as a prior, never as a measurement", async () => {
-    render(<Garage loadProfiles={() => Promise.resolve([mazda])} />);
+    render(<Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([mazda])} />);
 
     await screen.findByRole("region", { name: "Mazda MX-5 Cup" });
     const row = rowOf(/Rear ARB \+1 click/);
@@ -103,7 +105,7 @@ describe("Garage", () => {
   });
 
   it("flags a response that is not a straight line, and falls back to the item id", async () => {
-    render(<Garage loadProfiles={() => Promise.resolve([mazda])} />);
+    render(<Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([mazda])} />);
 
     await screen.findByRole("region", { name: "Mazda MX-5 Cup" });
     const row = rowOf(/WING_REAR \+1 click/);
@@ -113,7 +115,7 @@ describe("Garage", () => {
   });
 
   it("says so when a car has nothing measured", async () => {
-    render(<Garage loadProfiles={() => Promise.resolve([untested])} />);
+    render(<Garage carName="Ferrari F2026" loadProfiles={() => Promise.resolve([untested])} />);
 
     const car = await screen.findByRole("region", { name: "Ferrari F2026" });
 
@@ -121,12 +123,17 @@ describe("Garage", () => {
     expect(within(car).queryByRole("table")).toBeNull();
   });
 
-  it("says what to do without cars, and reports a failed load", async () => {
-    const { unmount } = render(<Garage loadProfiles={() => Promise.resolve([])} />);
-    expect(await screen.findByText(/No cars yet/)).toBeVisible();
+  it("shows only the session car, says when it has no profile, and reports a failed load", async () => {
+    const { unmount } = render(
+      <Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([untested])} />,
+    );
+    expect(await screen.findByText(/no profile of this car/)).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Ferrari F2026" })).toBeNull();
     unmount();
 
-    render(<Garage loadProfiles={() => Promise.reject(new Error("502"))} />);
+    render(
+      <Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.reject(new Error("502"))} />,
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent("The garage could not be loaded.");
   });
 });

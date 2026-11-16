@@ -1,0 +1,151 @@
+/* Tokens, type and the plain elements. The chart colours in components/charts/chartTheme.ts
+   repeat --best, --picked and the axis colour, because a canvas cannot read variables. */
+:root {
+  color-scheme: dark;
+  --bg: #0a0d12;
+  --surface: #10151c;
+  --surface-2: #161d27;
+  --line: #1e2732;
+  --line-strong: #2c3846;
+  --text: #e3e8ee;
+  --muted: #8a96a5;
+  --faint: #5c6776;
+  --accent: #ff7a1a;
+  --best: #c77dff;
+  --picked: #3ad0ff;
+  --good: #4cc38a;
+  --bad: #f2555a;
+  --warn: #e5b93c;
+  --radius: 10px;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.5 ui-sans-serif,
+    system-ui,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+h4 {
+  margin: 1rem 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+p {
+  margin: 0.4rem 0;
+}
+
+a {
+  color: var(--picked);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--picked);
+  outline-offset: 2px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  color: #c9d3de;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+caption {
+  padding-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+blockquote {
+  margin: 0.8rem 0;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
+  border-radius: 0 6px 6px 0;
+}
+
+details summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+[role="alert"] {
+  color: var(--bad);
+}
+
+.note {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.empty {
+  padding: 2rem 0;
+  color: var(--muted);
+}
+
+.num {
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.bad {
+  color: var(--bad);
+}

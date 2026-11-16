@@ -16,6 +16,10 @@ export type Scorecard = components["schemas"]["Scorecard"];
 export type Experiment = components["schemas"]["Experiment"];
 export type ExperimentCreate = components["schemas"]["ExperimentCreate"];
 export type ExperimentResult = components["schemas"]["ExperimentResult"];
+export type SessionPasses = components["schemas"]["SessionPasses"];
+export type PassRecord = SessionPasses["passes"][number];
+export type CornerSummary = SessionPasses["corners"][number];
+export type PassTrace = components["schemas"]["PassTrace"];
 export type ExperimentAction =
   paths["/experiments/{id}/{action}"]["post"]["parameters"]["path"]["action"];
 
@@ -67,6 +71,27 @@ export async function fetchProposals(sessionId: number): Promise<Proposals | nul
   });
   if (reply.response.status === 404) return null;
   return unwrap(reply, "GET /sessions/{id}/proposals");
+}
+
+/** Every corner pass of a session, with the zone times per corner. */
+export async function fetchPasses(sessionId: number): Promise<SessionPasses> {
+  const reply = await coreApi.GET("/sessions/{id}/passes", { params: { path: { id: sessionId } } });
+  return unwrap(reply, "GET /sessions/{id}/passes");
+}
+
+/** The raw samples of one pass, at most maxPoints per channel. */
+export async function fetchTrace(
+  sessionId: number,
+  seq: number,
+  maxPoints?: number,
+): Promise<PassTrace> {
+  const reply = await coreApi.GET("/sessions/{id}/passes/{seq}/samples", {
+    params: {
+      path: { id: sessionId, seq },
+      query: maxPoints === undefined ? {} : { max_points: maxPoints },
+    },
+  });
+  return unwrap(reply, "GET /sessions/{id}/passes/{seq}/samples");
 }
 
 /** Every car's sensitivity profile, rebuilt from the finished experiments. */

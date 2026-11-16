@@ -5,9 +5,17 @@ import { running, tradeoff } from "../test-data";
 import { Ledger } from "./Ledger";
 
 describe("Ledger", () => {
-  it("lists every experiment with its state and why it is there", async () => {
+  it("lists the car's experiments with their state and why they are there", async () => {
     const judged = { ...tradeoff, id: 5 };
-    render(<Ledger loadExperiments={() => Promise.resolve([judged, running])} />);
+    const otherCar = { ...running, id: 6, car_name: "Ferrari F2026" };
+    render(
+      <Ledger
+        sessionId={3}
+        carName="Mazda MX-5 Cup"
+        selected={5}
+        loadExperiments={() => Promise.resolve([judged, running, otherCar])}
+      />,
+    );
 
     const rows = await screen.findAllByRole("row");
 
@@ -15,8 +23,9 @@ describe("Ledger", () => {
     const [, first, second] = rows as [HTMLElement, HTMLElement, HTMLElement];
     expect(within(first).getByRole("link", { name: "#5" })).toHaveAttribute(
       "href",
-      "#/experiments/5",
+      "#/sessions/3/experiments/5",
     );
+    expect(within(first).getByRole("link", { name: "#5" })).toHaveAttribute("aria-current", "true");
     expect(within(first).getByText("Trade-off")).toBeInTheDocument();
     expect(within(first).getByText(/rear_slip_peak_deg got worse/)).toBeInTheDocument();
     expect(within(first).getByText("1 of 1")).toBeInTheDocument();
@@ -25,14 +34,26 @@ describe("Ledger", () => {
     expect(within(second).getByText("Run plan and setups written for the agent.")).toBeVisible();
   });
 
-  it("says what to do when nothing was proposed yet", async () => {
-    render(<Ledger loadExperiments={() => Promise.resolve([])} />);
+  it("says so when the car has no experiment", async () => {
+    render(
+      <Ledger
+        sessionId={3}
+        carName="Mazda MX-5 Cup"
+        loadExperiments={() => Promise.resolve([{ ...running, car_name: "Other" }])}
+      />,
+    );
 
-    expect(await screen.findByText(/No experiments yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/No experiments on this car yet/)).toBeInTheDocument();
   });
 
   it("reports a failed load", async () => {
-    render(<Ledger loadExperiments={() => Promise.reject(new Error("502"))} />);
+    render(
+      <Ledger
+        sessionId={3}
+        carName="Mazda MX-5 Cup"
+        loadExperiments={() => Promise.reject(new Error("502"))}
+      />,
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The ledger could not be loaded.");
   });

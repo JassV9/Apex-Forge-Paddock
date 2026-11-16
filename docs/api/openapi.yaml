@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Apex Forge Paddock core API
-  version: 0.3.0
+  version: 0.4.0
   description: >
     REST API of the core process, used by the web dashboard. This file is written first; the
     TypeScript client types in web/src/api/schema.d.ts are generated from it (`make gen`).
@@ -108,6 +108,51 @@ paths:
         "404":
           $ref: "#/components/responses/Problem"
         "502":
+          $ref: "#/components/responses/Problem"
+  /sessions/{id}/passes:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: listPasses
+      summary: Every corner pass of the session, with best, median and spread per corner.
+      responses:
+        "200":
+          description: The stored passes in the order driven, and the corners they cover.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionPasses"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /sessions/{id}/passes/{seq}/samples:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - name: seq
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: max_points
+        in: query
+        description: Most samples per column in the reply (default 1000); more are thinned evenly.
+        schema:
+          type: integer
+          minimum: 50
+          maximum: 5000
+    get:
+      operationId: getPassSamples
+      summary: The raw samples of one pass from the session's Parquet files.
+      responses:
+        "200":
+          description: Column arrays of equal length, and the slip angle per axle.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PassTrace"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
           $ref: "#/components/responses/Problem"
   /sensitivity:
     get:
@@ -259,7 +304,8 @@ components:
             $ref: "#/components/schemas/Diagnosis"
     Problem:
       description: >
-        The request was refused. 404: no such experiment, session or diagnosis. 409: not
+        The request was refused. 404: no such experiment, session, pass or diagnosis, or the
+        pass has no stored samples. 409: not
         possible in the experiment's current state, or the session has no pass to
         diagnose yet. 422: the request is not valid. 502: the engine did not
         answer.
@@ -288,6 +334,10 @@ components:
       $ref: "../../contracts/proposals.schema.json"
     Scorecard:
       $ref: "../../contracts/scorecard.schema.json"
+    SessionPasses:
+      $ref: "../../contracts/session_passes.schema.json"
+    PassTrace:
+      $ref: "../../contracts/pass_trace.schema.json"
     Problem:
       type: object
       additionalProperties: false

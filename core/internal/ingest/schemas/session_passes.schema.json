@@ -1,0 +1,243 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "session_passes.schema.json",
+  "title": "SessionPasses",
+  "description": "Every corner pass of one session as core stored it, and per corner the best, median and spread of the valid passes' zone times. Read-only; raw samples are in PassTrace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "track_length_m",
+    "corners",
+    "passes"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "track_length_m": {
+      "description": "Length of the track, metres. Distance restarts at the start line, so a pass that crosses it jumps back by this much.",
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "corners": {
+      "description": "Every corner with at least one pass, by number.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CornerSummary"
+      }
+    },
+    "passes": {
+      "description": "Every pass, in the order it was driven.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PassRecord"
+      }
+    }
+  },
+  "definitions": {
+    "CornerSummary": {
+      "title": "CornerSummary",
+      "description": "One corner's zone times over its valid passes. Times are absent when no pass is valid; the spread needs two.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corner",
+        "name",
+        "passes",
+        "valid_passes"
+      ],
+      "properties": {
+        "corner": {
+          "description": "Corner number on the session's corner map.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "description": "The corner's name on the map; empty when it has none.",
+          "type": "string"
+        },
+        "passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_s": {
+          "description": "Shortest zone time of a valid pass, seconds.",
+          "type": "number"
+        },
+        "best_seq": {
+          "description": "The pass with the shortest zone time.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "median_s": {
+          "type": "number"
+        },
+        "spread_s": {
+          "description": "Sample standard deviation of the valid zone times, seconds.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "PassRecord": {
+      "title": "PassRecord",
+      "description": "One stored corner pass.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "corner",
+        "t_start",
+        "duration_s",
+        "valid",
+        "n_samples",
+        "flags",
+        "metrics"
+      ],
+      "properties": {
+        "seq": {
+          "description": "Order of the pass within its session, from 1.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "corner": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lap": {
+          "description": "Completed laps when the pass ended; absent when the agent did not say.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "t_start": {
+          "description": "When the car entered the zone, RFC 3339 in UTC.",
+          "type": "string",
+          "minLength": 1
+        },
+        "duration_s": {
+          "description": "Zone time: from zone start to zone end, seconds.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "invalid_reason": {
+          "type": "string"
+        },
+        "n_samples": {
+          "description": "Raw samples stored for the pass.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "setup_hash": {
+          "description": "The agent's fingerprint of the setup the car ran.",
+          "type": "string"
+        },
+        "block": {
+          "title": "PassRecordBlock",
+          "description": "The experiment block the pass was driven in.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "experiment_id",
+            "order",
+            "lap"
+          ],
+          "properties": {
+            "experiment_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "order": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lap": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "conditions": {
+          "title": "PassRecordConditions",
+          "description": "State of the car and track when the pass ended; absent when it was not recorded. FL, FR, RL, RR order.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fuel_l",
+            "tyre_core_c",
+            "tyre_surface_c",
+            "tyre_press_psi",
+            "tyre_wear",
+            "grip",
+            "air_c",
+            "road_c"
+          ],
+          "properties": {
+            "fuel_l": {
+              "type": "number"
+            },
+            "tyre_core_c": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "tyre_surface_c": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "tyre_press_psi": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "tyre_wear": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "grip": {
+              "type": "number"
+            },
+            "air_c": {
+              "type": "number"
+            },
+            "road_c": {
+              "type": "number"
+            }
+          }
+        },
+        "speed_class": {
+          "description": "The engine's class of the corner (slow, medium, fast); absent before features are computed.",
+          "type": "string"
+        },
+        "flags": {
+          "description": "The engine's notes on the pass, such as flat-out corner.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "description": "The engine's metrics of the pass by name, as stored. Empty before features are computed; a metric that does not apply is absent.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

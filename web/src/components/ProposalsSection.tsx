@@ -10,6 +10,8 @@ interface ProposalsSectionProps {
   diagnosis: Diagnosis;
   /** The ranking of the session's candidates; null when core has none. */
   load: (sessionId: number) => Promise<Proposals | null>;
+  /** The read-only demo: no link to the propose panel. */
+  readOnly?: boolean;
 }
 
 const STAGE: Record<Proposals["stage"], string> = {
@@ -52,19 +54,40 @@ function nameOf(candidate: { label: string; parameter: string; clicks: number })
   return `${name} ${clicksText(candidate.clicks)}`;
 }
 
-function RankedItem({ proposal, href }: { proposal: Proposal; href: string }) {
+function RankedItem({ proposal, href }: { proposal: Proposal; href: string | undefined }) {
   return (
     <li>
       <strong>{nameOf(proposal)}</strong>: expected gain {proposal.expected_gain.toFixed(3)} s per
       corner pass (between {signed(proposal.gain_low)} and {signed(proposal.gain_high)}), about{" "}
       {proposal.laps_needed} laps to decide. Basis: {basisText(proposal)}.{" "}
-      <a href={href}>Propose this</a>
+      {href !== undefined && (
+        <a className="action-link" href={href}>
+          Propose this
+        </a>
+      )}
     </li>
   );
 }
 
+function SkippedList({ skipped }: { skipped: Proposals["skipped"] }) {
+  if (skipped.length === 0) return null;
+  return (
+    <details>
+      <summary>Already answered on this car ({skipped.length})</summary>
+      <ul>
+        {skipped.map((candidate) => (
+          <li key={`${candidate.parameter} ${String(candidate.clicks)}`}>
+            {nameOf(candidate)}: {candidate.reason}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /** Which of the diagnosis's experiments to run first, and which the car already answered. */
-export function ProposalsSection({ sessionId, diagnosis, load }: ProposalsSectionProps) {
+export function ProposalsSection(props: ProposalsSectionProps) {
+  const { sessionId, diagnosis, load, readOnly = false } = props;
   const loadThis = useCallback(() => load(sessionId), [load, sessionId]);
   const state = useLoaded(loadThis);
 
@@ -84,22 +107,15 @@ export function ProposalsSection({ sessionId, diagnosis, load }: ProposalsSectio
           <RankedItem
             key={`${proposal.parameter} ${String(proposal.clicks)}`}
             proposal={proposal}
-            href={proposeHref(prefillOf(proposal, sessionId, diagnosis))}
+            href={
+              readOnly
+                ? undefined
+                : proposeHref(sessionId, prefillOf(proposal, sessionId, diagnosis))
+            }
           />
         ))}
       </ol>
-      {proposals.skipped.length > 0 && (
-        <details>
-          <summary>Already answered on this car ({proposals.skipped.length})</summary>
-          <ul>
-            {proposals.skipped.map((skipped) => (
-              <li key={`${skipped.parameter} ${String(skipped.clicks)}`}>
-                {nameOf(skipped)}: {skipped.reason}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <SkippedList skipped={proposals.skipped} />
     </section>
   );
 }

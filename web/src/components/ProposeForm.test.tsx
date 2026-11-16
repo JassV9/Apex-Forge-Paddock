@@ -1,21 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SessionSummary, SetupItem } from "../api/client";
+import type { SetupItem } from "../api/client";
 import { running } from "../test-data";
 import { type ProposeApi, ProposeForm, toRequest } from "./ProposeForm";
-
-const session: SessionSummary = {
-  id: 3,
-  spool_id: "20261112T100000-ks_mazda_mx5_cup",
-  car_name: "Mazda MX-5 Cup",
-  track_name: "Test Ring",
-  layout: "",
-  started_at: "2026-11-12T10:00:00Z",
-  source: "human",
-  passes: 28,
-  corners: 7,
-};
 
 const items: SetupItem[] = [
   { name: "ARB_FRONT", label: "Front ARB", min: 0, max: 4, step: 1, value: 3 },
@@ -24,7 +12,6 @@ const items: SetupItem[] = [
 
 function apiWith(change: Partial<ProposeApi> = {}): ProposeApi {
   return {
-    sessions: () => Promise.resolve([session]),
     items: vi.fn(() => Promise.resolve(items)),
     create: vi.fn(() => Promise.resolve(running)),
     ...change,
@@ -35,7 +22,7 @@ describe("ProposeForm", () => {
   it("proposes a one-item change against the session, with the prediction", async () => {
     const api = apiWith();
     const onProposed = vi.fn();
-    render(<ProposeForm api={api} onProposed={onProposed} />);
+    render(<ProposeForm sessionId={3} api={api} onProposed={onProposed} />);
 
     await screen.findByRole("option", { name: /Rear ARB/ }); // the items are loaded
     fireEvent.change(screen.getByLabelText("Setup item"), { target: { value: "ARB_REAR" } });
@@ -62,7 +49,7 @@ describe("ProposeForm", () => {
   });
 
   it("offers the item's current value and range, and starts on the first item", async () => {
-    render(<ProposeForm api={apiWith()} onProposed={vi.fn()} />);
+    render(<ProposeForm sessionId={3} api={apiWith()} onProposed={vi.fn()} />);
 
     const option = await screen.findByRole("option", {
       name: "Front ARB [ARB_FRONT]: now 3, 0 to 4",
@@ -75,7 +62,7 @@ describe("ProposeForm", () => {
   it("says what core refused", async () => {
     const refusal = new Error("ARB_FRONT = 5 is above its maximum 4");
     const api = apiWith({ create: () => Promise.reject(refusal) });
-    render(<ProposeForm api={api} onProposed={vi.fn()} />);
+    render(<ProposeForm sessionId={3} api={api} onProposed={vi.fn()} />);
 
     await screen.findByRole("option", { name: /Front ARB/ });
     fireEvent.change(screen.getByLabelText("Hypothesis"), { target: { value: "More bar." } });
@@ -93,7 +80,7 @@ describe("ProposeForm", () => {
       statement: "Understeer in slow corners. Test: a stiffer rear bar.",
       hypothesisKey: "mid_understeer.slow",
     };
-    render(<ProposeForm api={api} prefill={prefill} onProposed={vi.fn()} />);
+    render(<ProposeForm sessionId={3} api={api} prefill={prefill} onProposed={vi.fn()} />);
 
     await screen.findByRole("option", { name: /Rear ARB/ });
     expect(screen.getByLabelText("Setup item")).toHaveValue("ARB_REAR");
@@ -124,7 +111,7 @@ describe("ProposeForm", () => {
       hypothesisKey: "mid_understeer.slow",
       gain: { low: 0.016, high: 0.026 },
     };
-    render(<ProposeForm api={api} prefill={prefill} onProposed={vi.fn()} />);
+    render(<ProposeForm sessionId={3} api={api} prefill={prefill} onProposed={vi.fn()} />);
 
     await screen.findByRole("option", { name: /Front ARB/ });
     expect(screen.getByLabelText(/Predicted gain per corner pass/)).toHaveValue(0.016);
@@ -140,14 +127,6 @@ describe("ProposeForm", () => {
         }),
       );
     });
-  });
-
-  it("asks for a session when none was recorded", async () => {
-    render(
-      <ProposeForm api={apiWith({ sessions: () => Promise.resolve([]) })} onProposed={vi.fn()} />,
-    );
-
-    expect(await screen.findByText(/Record a session first/)).toBeInTheDocument();
   });
 });
 

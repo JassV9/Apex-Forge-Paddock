@@ -82,8 +82,7 @@ export function DiagnosisPage({ sessionId, api = coreApi, readOnly = false }: Di
 
   if (state.kind === "loading") return <p>Loading the diagnosis…</p>;
   return (
-    <article>
-      <h2>Session #{sessionId}: diagnosis</h2>
+    <article className="panel-diagnosis">
       {state.kind === "none" && <p>This session has not been diagnosed yet.</p>}
       {!readOnly && (
         <section className="steps">
@@ -101,8 +100,13 @@ export function DiagnosisPage({ sessionId, api = coreApi, readOnly = false }: Di
             sessionId={sessionId}
             diagnosis={state.diagnosis}
             load={api.proposals}
+            readOnly={readOnly}
           />
-          <HypothesesSection diagnosis={state.diagnosis} sessionId={sessionId} />
+          <HypothesesSection
+            diagnosis={state.diagnosis}
+            sessionId={sessionId}
+            readOnly={readOnly}
+          />
         </>
       )}
     </article>

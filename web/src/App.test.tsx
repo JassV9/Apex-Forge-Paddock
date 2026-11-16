@@ -1,39 +1,122 @@
-import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SessionSummary } from "./api/client";
 import { App } from "./App";
+import type { Route } from "./hooks/useRoute";
+import { Workspace } from "./components/workspace/Workspace";
+import { cotaPasses, cotaSession, traceOf } from "./test-passes";
+
+vi.mock("./components/charts/UPlotChart", () => ({
+  UPlotChart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
+}));
+
+const older: SessionSummary = {
+  ...cotaSession,
+  id: 1,
+  car_name: "Mazda MX-5 Cup",
+  started_at: "2026-11-12T10:00:00Z",
+  passes: 0,
+  corners: 0,
+};
+
+const sessionApi = {
+  passes: () => Promise.resolve(cotaPasses),
+  trace: (_: number, seq: number) => Promise.resolve(traceOf(seq)),
+};
+
+function open(route: Route, readOnly = false) {
+  render(
+    <Workspace
+      route={route}
+      readOnly={readOnly}
+      loadSessions={() => Promise.resolve([cotaSession, older])}
+      sessionApi={sessionApi}
+    />,
+  );
+}
 
 function pending(): Promise<Response> {
   return new Promise(() => undefined);
 }
 
-describe("App", () => {
+describe("Workspace", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn(pending)); // core status, diagnosis, ledger
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     window.location.hash = "";
   });
 
-  it("offers every page when experiments can be run", () => {
+  it("lists the sessions and opens the newest one on its overview", async () => {
+    open({ tab: "overview" });
+
+    const rail = await screen.findByRole("navigation", { name: "Sessions" });
+    const current = within(rail).getByRole("link", { current: "page" });
+    expect(current).toHaveTextContent("Formula Hybrid 2026");
+    expect(current).toHaveTextContent("5 passes");
+    expect(within(rail).getByRole("link", { name: /Mazda MX-5 Cup/ })).toHaveAttribute(
+      "href",
+      "#/sessions/1",
+    );
+    expect(screen.getByRole("heading", { level: 1, name: "Formula Hybrid 2026" })).toBeVisible();
+    expect(await screen.findByRole("region", { name: "Zone times by lap" })).toBeVisible();
+  });
+
+  it("keeps the view when switching sessions, and marks the view on screen", async () => {
+    open({ sessionId: 2, tab: "telemetry" });
+
+    const rail = await screen.findByRole("navigation", { name: "Sessions" });
+    expect(within(rail).getByRole("link", { name: /Mazda/ })).toHaveAttribute(
+      "href",
+      "#/sessions/1/telemetry",
+    );
+    const views = screen.getByRole("navigation", { name: "Views" });
+    expect(within(views).getByRole("link", { current: "page" })).toHaveTextContent("Telemetry");
+    expect(within(views).getAllByRole("link")).toHaveLength(5);
+    expect(await screen.findByRole("navigation", { name: "Corners" })).toBeVisible();
+  });
+
+  it("says so when the session in the link does not exist", async () => {
+    open({ sessionId: 9, tab: "overview" });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Session #9 does not exist.");
+  });
+
+  it("offers proposing an experiment, inside the experiments view", async () => {
+    open({ sessionId: 2, tab: "experiments", propose: "blank" });
+
+    expect(await screen.findByRole("region", { name: "Propose an experiment" })).toBeVisible();
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("says it is a read-only demo and offers nothing a visitor cannot do", async () => {
+    open({ sessionId: 2, tab: "experiments", propose: "blank" }, true);
+
+    expect(await screen.findByRole("note")).toHaveTextContent(
+      "Read-only demo on recorded sessions",
+    );
+    expect(screen.queryByRole("region", { name: "Propose an experiment" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Propose an experiment" })).toBeNull();
+    expect(screen.getByText(/cannot be proposed in the read-only demo/)).toBeVisible();
+  });
+});
+
+describe("App", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is the workspace, waiting for core's sessions", () => {
     vi.stubGlobal("fetch", vi.fn(pending));
 
     render(<App readOnly={false} />);
 
-    const pages = screen.getByRole("navigation", { name: "Pages" });
-    expect(pages).toHaveTextContent("SessionsLedgerGaragePropose");
-    expect(screen.queryByRole("note")).toBeNull();
-  });
-
-  it("says it is a read-only demo and offers nothing a visitor cannot do", () => {
-    vi.stubGlobal("fetch", vi.fn(pending));
-    window.location.hash = "#/propose";
-
-    render(<App readOnly />);
-
-    expect(screen.getByRole("note")).toHaveTextContent("Read-only demo on a recorded session");
-    expect(screen.getByRole("navigation", { name: "Pages" })).toHaveTextContent(
-      "SessionsLedgerGarage",
+    expect(screen.getByText("Loading sessions…")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sessions" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
     );
-    expect(screen.queryByRole("link", { name: "Propose" })).toBeNull();
-    expect(screen.getByText(/cannot be proposed in the read-only demo/)).toBeVisible();
   });
 });

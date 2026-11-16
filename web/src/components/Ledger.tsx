@@ -4,6 +4,12 @@ import { useLoaded } from "../hooks/useLoaded";
 import { experimentHref } from "../hooks/useRoute";
 
 interface LedgerProps {
+  /** The session on screen: links open an experiment next to it. */
+  sessionId: number;
+  /** Only this car's experiments are listed. */
+  carName: string;
+  /** The experiment open beside the ledger. */
+  selected?: number;
   /** Injected in tests; the real client by default. */
   loadExperiments?: () => Promise<Experiment[]>;
 }
@@ -24,16 +30,25 @@ export function StateBadge({ state }: { state: Experiment["state"] }) {
   return <span className={`state state-${state}`}>{STATE_LABEL[state]}</span>;
 }
 
-function LedgerRow({ experiment }: { experiment: Experiment }) {
+interface LedgerRowProps {
+  experiment: Experiment;
+  sessionId: number;
+  selected: boolean;
+}
+
+function LedgerRow({ experiment, sessionId, selected }: LedgerRowProps) {
   return (
-    <tr>
+    <tr className={selected ? "is-picked" : undefined}>
       <td>
-        <a href={experimentHref(experiment.id)}>#{experiment.id}</a>
+        <a
+          href={experimentHref(sessionId, experiment.id)}
+          aria-current={selected ? "true" : undefined}
+        >
+          #{experiment.id}
+        </a>
       </td>
       <td>{formatTime(experiment.created_at)}</td>
-      <td>
-        {experiment.car_name}, {experiment.track_name}
-      </td>
+      <td>{experiment.track_name}</td>
       <td>{changeText(experiment)}</td>
       <td>
         <StateBadge state={experiment.state} />
@@ -44,22 +59,24 @@ function LedgerRow({ experiment }: { experiment: Experiment }) {
   );
 }
 
-/** Every experiment, newest first, whatever its outcome: failed ones are kept. */
-export function Ledger({ loadExperiments = fetchExperiments }: LedgerProps) {
+/** Every experiment on the car, newest first, whatever its outcome: failed ones are kept. */
+export function Ledger(props: LedgerProps) {
+  const { sessionId, carName, selected, loadExperiments = fetchExperiments } = props;
   const state = useLoaded(loadExperiments);
 
   if (state.kind === "loading") return <p>Loading the ledger…</p>;
   if (state.kind === "failed") return <p role="alert">The ledger could not be loaded.</p>;
-  if (state.value.length === 0) {
-    return <p>No experiments yet. Propose one from a recorded session.</p>;
+  const mine = state.value.filter((experiment) => experiment.car_name === carName);
+  if (mine.length === 0) {
+    return <p className="empty">No experiments on this car yet.</p>;
   }
   return (
-    <table>
+    <table className="ledger">
       <thead>
         <tr>
           <th scope="col">Experiment</th>
           <th scope="col">Proposed</th>
-          <th scope="col">Car and track</th>
+          <th scope="col">Track</th>
           <th scope="col">Change</th>
           <th scope="col">State</th>
           <th scope="col">Why</th>
@@ -67,8 +84,13 @@ export function Ledger({ loadExperiments = fetchExperiments }: LedgerProps) {
         </tr>
       </thead>
       <tbody>
-        {state.value.map((experiment) => (
-          <LedgerRow key={experiment.id} experiment={experiment} />
+        {mine.map((experiment) => (
+          <LedgerRow
+            key={experiment.id}
+            experiment={experiment}
+            sessionId={sessionId}
+            selected={experiment.id === selected}
+          />
         ))}
       </tbody>
     </table>

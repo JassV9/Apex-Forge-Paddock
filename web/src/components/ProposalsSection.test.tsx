@@ -87,8 +87,9 @@ describe("ProposalsSection", () => {
     const [first, second] = await screen.findAllByRole("link", { name: "Propose this" });
 
     expect(parseRoute(first?.getAttribute("href") ?? "")).toEqual({
-      page: "propose",
-      prefill: {
+      sessionId: 3,
+      tab: "experiments",
+      propose: {
         sessionId: 3,
         parameter: "ARB_FRONT",
         clicks: -1,
@@ -98,7 +99,8 @@ describe("ProposalsSection", () => {
       },
     });
     const prior = parseRoute(second?.getAttribute("href") ?? "");
-    expect(prior.page === "propose" && prior.prefill?.gain).toBeUndefined();
+    expect(prior.propose !== undefined && prior.propose !== "blank").toBe(true);
+    expect(prior.propose !== "blank" && prior.propose?.gain).toBeUndefined();
   });
 
   it("says why a change the car already answered is left out", async () => {

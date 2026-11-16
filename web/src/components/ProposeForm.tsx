@@ -4,29 +4,26 @@ import {
   createExperiment,
   type Experiment,
   type ExperimentCreate,
-  fetchSessions,
   fetchSetupItems,
-  type SessionSummary,
   type SetupItem,
 } from "../api/client";
-import { useLoaded } from "../hooks/useLoaded";
 import type { Prefill } from "../hooks/useRoute";
 
 /** The calls the form makes; injected in tests, the real client by default. */
 export interface ProposeApi {
-  sessions: () => Promise<SessionSummary[]>;
   items: (sessionId: number) => Promise<SetupItem[]>;
   create: (body: ExperimentCreate) => Promise<Experiment>;
 }
 
 const coreApi: ProposeApi = {
-  sessions: fetchSessions,
   items: fetchSetupItems,
   create: createExperiment,
 };
 
 interface ProposeFormProps {
   api?: ProposeApi;
+  /** The session the experiment starts from: its car, track and setup. */
+  sessionId: number;
   /** A candidate experiment of a diagnosis to start the form from. */
   prefill?: Prefill;
   /** Called with the stored experiment. */
@@ -83,11 +80,10 @@ function itemLabel(item: SetupItem): string {
   return `${name}: now ${String(item.value)}, ${String(item.min)} to ${String(item.max)}`;
 }
 
-function useSetupItems(api: ProposeApi, sessionId: number | null): SetupItem[] {
+function useSetupItems(api: ProposeApi, sessionId: number): SetupItem[] {
   const [items, setItems] = useState<SetupItem[]>([]);
   useEffect(() => {
     let cancelled = false;
-    if (sessionId === null) return;
     api.items(sessionId).then(
       (loaded) => {
         if (!cancelled) setItems(loaded);
@@ -184,53 +180,20 @@ function HypothesisFields({ draft, set }: Omit<FieldsProps, "items">) {
   );
 }
 
-interface SessionFieldProps {
-  sessions: SessionSummary[];
-  value: number;
-  choose: (sessionId: number) => void;
-}
-
-function SessionField({ sessions, value, choose }: SessionFieldProps) {
-  return (
-    <label>
-      Session
-      <select
-        value={value}
-        onChange={(e) => {
-          choose(Number(e.target.value));
-        }}
-      >
-        {sessions.map((session) => (
-          <option key={session.id} value={session.id}>
-            {session.car_name}, {session.track_name} ({session.passes} passes)
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-/** Proposes a one-item experiment against a recorded session. Nothing is driven yet. */
-export function ProposeForm({ api = coreApi, prefill, onProposed }: ProposeFormProps) {
-  const sessions = useLoaded(api.sessions);
-  const [chosen, setChosen] = useState<number | null>(prefill?.sessionId ?? null);
+/** Proposes a one-item experiment against the session on screen. Nothing is driven yet. */
+export function ProposeForm({ api = coreApi, sessionId, prefill, onProposed }: ProposeFormProps) {
   const [edited, setEdited] = useState(() => draftFrom(prefill));
   const [problem, setProblem] = useState("");
-  const list = sessions.kind === "ready" ? sessions.value : [];
-  const sessionId = chosen ?? list[0]?.id ?? null;
   const items = useSetupItems(api, sessionId);
   // Until the driver picks an item, the first one of the list is selected.
   const draft = { ...edited, parameter: edited.parameter || (items[0]?.name ?? "") };
-
-  if (sessions.kind === "loading") return <p>Loading sessions…</p>;
-  if (sessions.kind === "failed") return <p role="alert">Sessions could not be loaded.</p>;
-  if (sessionId === null) return <p>Record a session first: an experiment starts from one.</p>;
 
   const set = (change: Partial<Draft>) => {
     setEdited({ ...edited, ...change });
   };
   return (
     <form
+      className="propose-form"
       onSubmit={(event) => {
         event.preventDefault();
         api.create(toRequest(sessionId, draft)).then(onProposed, (error: unknown) => {
@@ -244,7 +207,6 @@ export function ProposeForm({ api = coreApi, prefill, onProposed }: ProposeFormP
           evidence and alternatives are stored with the experiment.
         </p>
       )}
-      <SessionField sessions={list} value={sessionId} choose={setChosen} />
       <ChangeFields draft={draft} items={items} set={set} />
       <HypothesisFields draft={draft} set={set} />
       <button type="submit" disabled={draft.parameter === "" || draft.clicks === 0}>

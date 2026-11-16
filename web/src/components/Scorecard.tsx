@@ -26,7 +26,8 @@ export function Scorecard({ loadScorecard = fetchScorecard }: ScorecardProps) {
   const card = state.value;
   if (card.experiments === 0) return null;
   return (
-    <section aria-label="Scorecard">
+    <section aria-label="Scorecard" className="card">
+      <h3>Scorecard · every car</h3>
       <p>
         Predictions that came true:{" "}
         <strong>{hitText(card.predictions_hit, card.predictions_total)}</strong>, over {card.judged}{" "}

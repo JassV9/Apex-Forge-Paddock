@@ -67,7 +67,14 @@ function Alternatives({
   );
 }
 
-function Candidates({ hypothesis, sessionId }: { hypothesis: Hypothesis; sessionId: number }) {
+interface CandidatesProps {
+  hypothesis: Hypothesis;
+  sessionId: number;
+  /** The read-only demo: no link to the propose panel. */
+  readOnly: boolean;
+}
+
+function Candidates({ hypothesis, sessionId, readOnly }: CandidatesProps) {
   return (
     <>
       <h4>Experiments that would test it</h4>
@@ -77,17 +84,20 @@ function Candidates({ hypothesis, sessionId }: { hypothesis: Hypothesis; session
           <li key={candidate.parameter}>
             {candidate.label === "" ? candidate.parameter : candidate.label}{" "}
             {clicksText(candidate.clicks)}: {candidate.why} (a rule of thumb, not a measurement).{" "}
-            <a
-              href={proposeHref({
-                sessionId,
-                parameter: candidate.parameter,
-                clicks: candidate.clicks,
-                hypothesisKey: hypothesis.key,
-                statement: `${hypothesis.statement} Test: ${candidate.why}.`,
-              })}
-            >
-              Test this
-            </a>
+            {!readOnly && (
+              <a
+                className="action-link"
+                href={proposeHref(sessionId, {
+                  sessionId,
+                  parameter: candidate.parameter,
+                  clicks: candidate.clicks,
+                  hypothesisKey: hypothesis.key,
+                  statement: `${hypothesis.statement} Test: ${candidate.why}.`,
+                })}
+              >
+                Test this
+              </a>
+            )}
           </li>
         ))}
       </ul>
@@ -109,15 +119,16 @@ interface HypothesisCardProps {
   hypothesis: Hypothesis;
   pack: Map<string, Evidence>;
   sessionId: number;
+  readOnly: boolean;
 }
 
-function HypothesisCard({ hypothesis, pack, sessionId }: HypothesisCardProps) {
+function HypothesisCard({ hypothesis, pack, sessionId, readOnly }: HypothesisCardProps) {
   return (
     <li aria-label={hypothesis.key}>
       <h3>{hypothesis.statement}</h3>
       <EvidenceList ids={hypothesis.evidence} pack={pack} />
       <Alternatives hypothesis={hypothesis} pack={pack} />
-      <Candidates hypothesis={hypothesis} sessionId={sessionId} />
+      <Candidates hypothesis={hypothesis} sessionId={sessionId} readOnly={readOnly} />
     </li>
   );
 }
@@ -126,9 +137,11 @@ function HypothesisCard({ hypothesis, pack, sessionId }: HypothesisCardProps) {
 export function HypothesesSection({
   diagnosis,
   sessionId,
+  readOnly = false,
 }: {
   diagnosis: Diagnosis;
   sessionId: number;
+  readOnly?: boolean;
 }) {
   const pack = new Map(diagnosis.evidence.map((reading) => [reading.id, reading]));
   if (diagnosis.hypotheses.length === 0) return null;
@@ -142,6 +155,7 @@ export function HypothesesSection({
             hypothesis={hypothesis}
             pack={pack}
             sessionId={sessionId}
+            readOnly={readOnly}
           />
         ))}
       </ol>

@@ -3,6 +3,8 @@ import { clicksText, signed } from "../experimentText";
 import { useLoaded } from "../hooks/useLoaded";
 
 interface GarageProps {
+  /** The car of the session on screen; only its profile is shown. */
+  carName: string;
   /** Injected in tests; the real client by default. */
   loadProfiles?: () => Promise<SensitivityProfile[]>;
 }
@@ -121,21 +123,20 @@ function CarProfile({ profile }: { profile: SensitivityProfile }) {
 }
 
 /** What each setup item does on each car, with how sure the ledger is about it. */
-export function Garage({ loadProfiles = fetchSensitivity }: GarageProps) {
+export function Garage({ carName, loadProfiles = fetchSensitivity }: GarageProps) {
   const state = useLoaded(loadProfiles);
 
   if (state.kind === "loading") return <p>Loading the garage…</p>;
   if (state.kind === "failed") return <p role="alert">The garage could not be loaded.</p>;
-  if (state.value.length === 0) return <p>No cars yet. Record a session first.</p>;
+  const profile = state.value.find((candidate) => candidate.car_name === carName);
+  if (profile === undefined) return <p className="empty">Core has no profile of this car yet.</p>;
   return (
     <>
-      <p>
+      <p className="note">
         Effects are the variant minus the baseline, with a 90 % interval. An effect borrowed from
         another car is a prior: a reason to test, never a result.
       </p>
-      {state.value.map((profile) => (
-        <CarProfile key={profile.car_id} profile={profile} />
-      ))}
+      <CarProfile profile={profile} />
     </>
   );
 }

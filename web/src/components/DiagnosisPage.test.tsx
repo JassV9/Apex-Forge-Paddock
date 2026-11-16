@@ -40,8 +40,9 @@ describe("DiagnosisPage", () => {
     expect(screen.getByText(/a rule of thumb, not a measurement/)).toBeVisible();
     expect(screen.getByText(/Front ARB −1 click:/)).toBeVisible();
     expect(parseRoute(link.getAttribute("href") ?? "")).toEqual({
-      page: "propose",
-      prefill: {
+      sessionId: 3,
+      tab: "experiments",
+      propose: {
         sessionId: 3,
         parameter: "ARB_FRONT",
         clicks: -1,
@@ -102,6 +103,7 @@ describe("DiagnosisPage", () => {
 
     expect(await screen.findByRole("listitem", { name: "mid_understeer.slow" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /Diagnose/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Test this" })).toBeNull();
   });
 
   it("says what core refused", async () => {

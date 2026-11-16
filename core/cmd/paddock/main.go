@@ -20,6 +20,7 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/features"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/ingest"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/passes"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/sensitivity"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/store"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/telemetry"
@@ -94,6 +95,7 @@ func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logg
 		Sessions:    store.NewReader(database),
 		Experiments: ledger,
 		Diagnoses:   diagnoses,
+		Passes:      passes.NewService(database, cfg.DataDir),
 		Garage:      sensitivity.NewService(database, analysis, diagnoses, logger),
 		Metrics:     metrics.Handler,
 	}

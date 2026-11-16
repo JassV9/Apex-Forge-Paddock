@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 import statsmodels.formula.api as smf
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from simulation import BASELINE, SIGMA_S, VARIANT, simulate_abab
 
@@ -150,6 +150,7 @@ def test_mde_matches_the_design_document(passes: int, corners: int, expected_ms:
 
 
 @given(sigma=st.floats(1, 200), effect=st.floats(1, 100), corners=st.integers(1, 30))
+@example(sigma=30.0, effect=5.6, corners=1)  # 450 passes reach it exactly; ceil said 451
 def test_passes_needed_is_the_smallest_budget_that_reaches_the_effect(
     sigma: float, effect: float, corners: int
 ) -> None:

@@ -25,4 +25,8 @@ def passes_needed(sigma: float, effect: float, corners: int) -> int:
     """Passes per arm in each corner needed to detect `effect` (same unit as sigma)."""
     if effect <= 0 or corners < 1 or sigma < 0:
         raise ValueError("effect must be > 0, corners >= 1 and sigma >= 0")
-    return max(1, math.ceil(2.0 * (POWER_FACTOR * sigma / effect) ** 2 / corners))
+    needed = max(1, math.ceil(2.0 * (POWER_FACTOR * sigma / effect) ** 2 / corners))
+    # rounding can put the exact budget a hair above a whole number: one pass fewer may do
+    if needed > 1 and minimum_detectable_effect(sigma, needed - 1, corners) <= effect:
+        needed -= 1
+    return needed

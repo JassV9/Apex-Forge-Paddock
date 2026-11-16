@@ -227,3 +227,20 @@ def test_the_position_of_an_older_agent_is_picked_up(agent: Agent) -> None:
     agent.drive.idle(130)
 
     assert "block 2 of 2" in agent.rt.eval('require("game.plan").status()')
+
+
+def test_a_stopped_experiment_skips_to_putting_the_baseline_back(agent: Agent) -> None:
+    base, soft = setups(agent)
+    blocks = [("Setup K", base, LAPS), ("Setup R", soft, LAPS)]
+    write_plan(agent, [*blocks, ("Setup K", base, LAPS), ("Setup R", soft, LAPS)])
+    pit_and_load(agent, "Setup K")
+    stint(agent, 1 + LAPS)
+    plans = agent.spool_root.parent / "outbox" / "runplans" / "ks_mazda_mx5_cup.json"
+    stopped = json.loads(plans.read_text(encoding="utf-8"))
+    stopped |= {"revision": 2, "from_order": 5}
+    stopped["blocks"].append({"order": 5, "label": "Setup K", "laps_target": 0, "values": base})
+    plans.write_text(json.dumps(stopped), encoding="utf-8")
+    agent.drive.pit(True)
+    agent.drive.idle(130)
+
+    assert "block 5 of 5: pit and load Setup K" in agent.rt.eval('require("game.plan").status()')

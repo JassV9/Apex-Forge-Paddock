@@ -4297,6 +4297,11 @@ type RunPlan struct {
 	// Core's id of the experiment.
 	ExperimentId int `json:"experiment_id"`
 
+	// Set once the experiment was stopped (aborted, rejected or reverted): the blocks
+	// before this one are abandoned and the agent goes straight to it, a block that
+	// puts the baseline back.
+	FromOrder *int `json:"from_order,omitempty,omitzero"`
+
 	// Increases whenever core rewrites the plan of this experiment.
 	Revision int `json:"revision"`
 
@@ -4445,6 +4450,9 @@ func (j *RunPlan) UnmarshalJSON(value []byte) error {
 	}
 	if 1 > plain.ExperimentId {
 		return fmt.Errorf("field %s: must be >= %v", "experiment_id", 1)
+	}
+	if plain.FromOrder != nil && 1 > *plain.FromOrder {
+		return fmt.Errorf("field %s: must be >= %v", "from_order", 1)
 	}
 	if 1 > plain.Revision {
 		return fmt.Errorf("field %s: must be >= %v", "revision", 1)

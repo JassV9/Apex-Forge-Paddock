@@ -94,6 +94,16 @@ func readRunPlan(ctx context.Context, q querier, id int64) (contracts.RunPlan, [
 		return plan, nil, fmt.Errorf("read run plan of experiment %d: %w", id, err)
 	}
 	plan.Blocks = blocks
+	var restore sql.NullInt64
+	err = q.QueryRowContext(ctx,
+		`SELECT max("order") FROM run_block WHERE experiment_id = $1 AND state = 'restore'`, id).Scan(&restore)
+	if err != nil {
+		return plan, nil, fmt.Errorf("read restore block of experiment %d: %w", id, err)
+	}
+	if restore.Valid {
+		from := int(restore.Int64)
+		plan.FromOrder = &from
+	}
 	seen := map[string]bool{}
 	var arms []armSetup
 	for _, block := range blocks {

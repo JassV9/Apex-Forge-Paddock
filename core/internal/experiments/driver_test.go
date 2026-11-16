@@ -53,3 +53,39 @@ func TestTheDriverOfAnExperimentReachesTheRunPlan(t *testing.T) {
 		})
 	}
 }
+
+// An experiment stopped half way tells the agent to skip what was not driven and put the
+// baseline back: the run plan's from_order is the restore block.
+func TestAnAbortedPlanSendsTheAgentStraightToTheRestoreBlock(t *testing.T) {
+	f := newFixture(t, "exp_from_order")
+	exp := f.propose(t, -1)
+	if _, err := f.service.Plan(t.Context(), int64(exp.Id)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Start(t.Context(), int64(exp.Id)); err != nil {
+		t.Fatal(err)
+	}
+	read := func() contracts.RunPlan {
+		content, err := os.ReadFile(RunPlanPath(f.outbox, "ks_mazda_mx5_cup"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plan contracts.RunPlan
+		if err := json.Unmarshal(content, &plan); err != nil {
+			t.Fatal(err)
+		}
+		return plan
+	}
+	if plan := read(); plan.FromOrder != nil {
+		t.Fatalf("a running plan has from_order %d", *plan.FromOrder)
+	}
+
+	if _, err := f.service.Abort(t.Context(), int64(exp.Id)); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := read()
+	if plan.FromOrder == nil || *plan.FromOrder != 5 || len(plan.Blocks) != 5 || plan.Blocks[4].LapsTarget != 0 {
+		t.Errorf("after abort: from_order %v, %d blocks", plan.FromOrder, len(plan.Blocks))
+	}
+}

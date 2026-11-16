@@ -56,4 +56,9 @@ class RunPlan(BaseModel):
         "human",
         description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
     )
+    from_order: int | None = Field(
+        None,
+        description="Set once the experiment was stopped (aborted, rejected or reverted): the blocks before this one are abandoned and the agent goes straight to it, a block that puts the baseline back.",
+        ge=1,
+    )
     blocks: list[RunPlanBlock] = Field(..., min_length=1)

@@ -30,8 +30,9 @@ function runplan.read(decoded)
   end
   table.sort(blocks, function(a, b) return a.order < b.order end)
   local driver = decoded.driver == "ai" and "ai" or "human"
+  local fromOrder = type(decoded.from_order) == "number" and decoded.from_order or nil
   return { experimentId = decoded.experiment_id, revision = decoded.revision, blocks = blocks,
-    driver = driver }
+    driver = driver, fromOrder = fromOrder }
 end
 
 function runplan.new()
@@ -66,12 +67,15 @@ end
 function runplan.load(state, plan, saved)
   local same = state.plan and state.plan.experimentId == plan.experimentId
   state.plan = plan
-  if same then return end
-  if saved and saved.experiment_id == plan.experimentId and type(saved.order) == "number" then
-    startBlock(state, saved.order, saved.push_done)
-  else
-    startBlock(state, plan.blocks[1].order)
+  if not same then
+    if saved and saved.experiment_id == plan.experimentId and type(saved.order) == "number" then
+      startBlock(state, saved.order, saved.push_done)
+    else
+      startBlock(state, plan.blocks[1].order)
+    end
   end
+  -- a stopped experiment: what was not driven yet is abandoned, the baseline goes back on
+  if plan.fromOrder and state.order < plan.fromOrder then startBlock(state, plan.fromOrder) end
 end
 
 ---What to write down so the position survives closing the game.

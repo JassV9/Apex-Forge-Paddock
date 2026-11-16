@@ -38,6 +38,15 @@
         "$ref": "#/definitions/PredictionSpec"
       }
     },
+    "driver": {
+      "description": "Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
+      "type": "string",
+      "enum": [
+        "human",
+        "ai"
+      ],
+      "default": "human"
+    },
     "hypothesis_key": {
       "description": "Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",
       "type": "string",

@@ -85,6 +85,9 @@ func run(ctx context.Context, logger *slog.Logger) error {
 // services wires everything the API serves to the database and the engine.
 func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) api.Deps {
 	ledger := experiments.NewService(database, analysis, experiments.Outbox{Dir: cfg.OutboxDir}, logger)
+	if err := ledger.PublishRunning(context.Background()); err != nil {
+		logger.Error("run plans not written again", "error", err)
+	}
 	diagnoses := diagnosis.NewService(database, analysis, ledger, logger)
 	return api.Deps{
 		Logger: logger, Version: version, Database: database,

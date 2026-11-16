@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 
@@ -21,7 +20,7 @@ const (
 func readPlan(t *testing.T, f *fixture) contracts.RunPlan {
 	t.Helper()
 	var plan contracts.RunPlan
-	content, err := os.ReadFile(filepath.Join(f.outbox, RunPlanFile))
+	content, err := os.ReadFile(RunPlanPath(f.outbox, "ks_mazda_mx5_cup"))
 	if err != nil {
 		t.Fatal(err)
 	}

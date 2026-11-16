@@ -36,6 +36,15 @@ class Source(StrEnum):
     human = "human"
 
 
+class Driver(StrEnum):
+    """
+    Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).
+    """
+
+    human = "human"
+    ai = "ai"
+
+
 class Better(StrEnum):
     """
     Which direction is an improvement.
@@ -257,6 +266,10 @@ class Experiment(BaseModel):
         description="Where the hypothesis came from: the diagnosis rules, a language model, or the human.",
     )
     car_name: str
+    driver: Driver = Field(
+        ...,
+        description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
+    )
     track_name: str
     parameter: str = Field(..., description="Setup item that is changed.")
     parameter_label: str = Field(..., description="What the setup menu calls it.")

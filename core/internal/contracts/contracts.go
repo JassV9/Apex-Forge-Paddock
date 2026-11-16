@@ -1036,6 +1036,10 @@ type Experiment struct {
 	// RFC 3339, UTC.
 	CreatedAt string `json:"created_at"`
 
+	// Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver,
+	// docs/adr/0014-ghost-driver.md).
+	Driver ExperimentDriver `json:"driver"`
+
 	// Events corresponds to the JSON schema field "events".
 	Events []ExperimentEvent `json:"events"`
 
@@ -1197,6 +1201,10 @@ type ExperimentCreate struct {
 	// Clicks to move it; negative is down. Never 0.
 	Clicks int `json:"clicks"`
 
+	// Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver,
+	// docs/adr/0014-ghost-driver.md).
+	Driver ExperimentCreateDriver `json:"driver,omitempty,omitzero"`
+
 	// Key of the hypothesis in the session's latest diagnosis that this experiment
 	// tests. The hypothesis is then stored with its evidence and alternatives and
 	// marked as coming from the rules; without it the hypothesis is the human's own.
@@ -1213,6 +1221,36 @@ type ExperimentCreate struct {
 
 	// The hypothesis in words.
 	Statement string `json:"statement"`
+}
+
+type ExperimentCreateDriver string
+
+const ExperimentCreateDriverAi ExperimentCreateDriver = "ai"
+const ExperimentCreateDriverHuman ExperimentCreateDriver = "human"
+
+var enumValues_ExperimentCreateDriver = []interface{}{
+	"human",
+	"ai",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ExperimentCreateDriver) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ExperimentCreateDriver {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ExperimentCreateDriver, v)
+	}
+	*j = ExperimentCreateDriver(v)
+	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -1240,6 +1278,9 @@ func (j *ExperimentCreate) UnmarshalJSON(value []byte) error {
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
+	}
+	if v, ok := raw["driver"]; !ok || v == nil {
+		plain.Driver = "human"
 	}
 	if plain.HypothesisKey != nil && utf8.RuneCountInString(string(*plain.HypothesisKey)) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "hypothesis_key", 1)
@@ -1278,6 +1319,36 @@ func (j *ExperimentDecision) UnmarshalJSON(value []byte) error {
 		return err
 	}
 	*j = ExperimentDecision(plain)
+	return nil
+}
+
+type ExperimentDriver string
+
+const ExperimentDriverAi ExperimentDriver = "ai"
+const ExperimentDriverHuman ExperimentDriver = "human"
+
+var enumValues_ExperimentDriver = []interface{}{
+	"human",
+	"ai",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ExperimentDriver) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ExperimentDriver {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ExperimentDriver, v)
+	}
+	*j = ExperimentDriver(v)
 	return nil
 }
 
@@ -1626,6 +1697,9 @@ func (j *Experiment) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["created_at"]; raw != nil && !ok {
 		return fmt.Errorf("field created_at in Experiment: required")
+	}
+	if _, ok := raw["driver"]; raw != nil && !ok {
+		return fmt.Errorf("field driver in Experiment: required")
 	}
 	if _, ok := raw["events"]; raw != nil && !ok {
 		return fmt.Errorf("field events in Experiment: required")
@@ -3837,6 +3911,10 @@ type RunPlan struct {
 	// Blocks corresponds to the JSON schema field "blocks".
 	Blocks []RunPlanBlock `json:"blocks"`
 
+	// Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver,
+	// docs/adr/0014-ghost-driver.md).
+	Driver RunPlanDriver `json:"driver,omitempty,omitzero"`
+
 	// Core's id of the experiment.
 	ExperimentId int `json:"experiment_id"`
 
@@ -3901,6 +3979,36 @@ func (j *RunPlanBlock) UnmarshalJSON(value []byte) error {
 // Setup item name to raw value, as the setup menu's spinners hold it.
 type RunPlanBlocksElemValues map[string]float64
 
+type RunPlanDriver string
+
+const RunPlanDriverAi RunPlanDriver = "ai"
+const RunPlanDriverHuman RunPlanDriver = "human"
+
+var enumValues_RunPlanDriver = []interface{}{
+	"human",
+	"ai",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RunPlanDriver) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_RunPlanDriver {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_RunPlanDriver, v)
+	}
+	*j = RunPlanDriver(v)
+	return nil
+}
+
 type RunPlanV int
 
 var enumValues_RunPlanV = []interface{}{
@@ -3952,6 +4060,9 @@ func (j *RunPlan) UnmarshalJSON(value []byte) error {
 	}
 	if plain.Blocks != nil && len(plain.Blocks) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "blocks", 1)
+	}
+	if v, ok := raw["driver"]; !ok || v == nil {
+		plain.Driver = "human"
 	}
 	if 1 > plain.ExperimentId {
 		return fmt.Errorf("field %s: must be >= %v", "experiment_id", 1)

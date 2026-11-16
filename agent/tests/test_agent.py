@@ -55,7 +55,7 @@ def test_pass_records_carry_conditions_and_raw_samples(agent: Agent) -> None:
     assert max(columns["load_rl"]) == 3400  # per-wheel values, not axle averages
 
 
-def test_spool_is_written_at_most_five_times_per_second_and_only_in_its_folder(
+def test_files_are_written_at_most_five_times_per_second_and_only_in_its_folder(
     agent: Agent,
 ) -> None:
     drive_laps(agent, 2)
@@ -65,7 +65,10 @@ def test_spool_is_written_at_most_five_times_per_second_and_only_in_its_folder(
     assert len(writes) >= CORNERS
     assert min(gaps) >= MIN_WRITE_GAP_S
     assert all(write["async"] for write in writes)
-    assert all("/paddock/spool/" in write["path"] for write in writes)
+    assert all("/paddock/" in write["path"] for write in writes)
+    assert any("/paddock/spool/" in write["path"] for write in writes)
+    status = [write for write in writes if write["path"].endswith("/agent_status.json")]
+    assert status, "the agent's status is written for tools outside the game"
 
 
 def test_restart_teleport_pits_and_replay_never_leave_a_partial_pass(agent: Agent) -> None:

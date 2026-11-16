@@ -70,6 +70,7 @@ export function toRequest(sessionId: number, draft: Draft): ExperimentCreate {
     session_id: sessionId,
     parameter: draft.parameter,
     clicks: draft.clicks,
+    driver: "human",
     statement: draft.statement.trim(),
     predictions: predicted ? [{ channel: "corner_time_s", direction: "decrease", low, high }] : [],
     ...(draft.hypothesisKey === "" ? {} : { hypothesis_key: draft.hypothesisKey }),

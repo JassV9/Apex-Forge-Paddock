@@ -692,6 +692,11 @@ export interface components {
        */
       source: "rules" | "llm" | "human";
       car_name: string;
+      /**
+       * @description Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).
+       * @enum {string}
+       */
+      driver: "human" | "ai";
       track_name: string;
       /** @description Setup item that is changed. */
       parameter: string;
@@ -727,6 +732,12 @@ export interface components {
       /** @description The hypothesis in words. */
       statement: string;
       predictions: components["schemas"]["PredictionSpec"][];
+      /**
+       * @description Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).
+       * @default human
+       * @enum {string}
+       */
+      driver: "human" | "ai";
       /** @description Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own. */
       hypothesis_key?: string;
     };

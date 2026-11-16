@@ -28,6 +28,15 @@
       "type": "integer",
       "minimum": 1
     },
+    "driver": {
+      "description": "Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
+      "type": "string",
+      "enum": [
+        "human",
+        "ai"
+      ],
+      "default": "human"
+    },
     "blocks": {
       "type": "array",
       "minItems": 1,

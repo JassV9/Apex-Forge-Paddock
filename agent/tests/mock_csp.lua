@@ -40,7 +40,7 @@ M.car = {
   acceleration = vec3(), localAngularVelocity = vec3(), wheels = { [0] = wheel(), wheel(), wheel(), wheel() },
   wheelsOutside = 0, rideHeight = { [0] = 0.02, 0.04 }, isInPitlane = false, isInPit = false,
   isAIControlled = false, resetCounter = 0, tractionType = 0, compoundIndex = 0,
-  fuel = 42.5, lapCount = 0,
+  fuel = 42.5, lapCount = 0, damage = { [0] = 0, 0, 0, 0, 0 },
 }
 M.sim = {
   trackLengthM = M.L, isPaused = false, isReplayActive = false, raceSessionType = 2,
@@ -232,8 +232,12 @@ function ui.pushStyleColor() M.pushes.color = M.pushes.color + 1 end
 function ui.popStyleColor() M.pushes.color = M.pushes.color - 1 assert(M.pushes.color >= 0, "popStyleColor underflow") end
 function ui.pushDisabled() M.disabledDepth = M.disabledDepth + 1 end
 function ui.popDisabled() M.disabledDepth = M.disabledDepth - 1 assert(M.disabledDepth >= 0, "popDisabled underflow") end
-function ui.tabBar(id, fn) fn() end
-function ui.tabItem(label, fn) fn() end
+function ui.tabBar(id, a, b) (b or a)() end
+function ui.tabItem(label, a, b) (b or a)() end
+function ui.header(s) assert(type(s) == "string") M.texts = M.texts + 1 end
+function ui.progressBar(f, size, overlay) assert(f >= 0 and f <= 1.0001, "progress out of range") end
+function ui.pushFont() end
+function ui.popFont() end
 function ui.childWindow(id, size, border, flags, fn) fn() end
 function ui.treeNode(label, flags, fn) fn() end
 function ui.getClipboardText() return M.clipboard end
@@ -252,6 +256,24 @@ function web.get(url, headers, cb)
   local status, resp = M.web_post(url, headers, nil)
   cb(nil, { status = status, body = resp, headers = {} })
 end
+
+-- physics: only on tracks that give apps access (MOCK.physicsAllowed); calls are recorded
+ac.SpawnSet = { Pits = "PIT", HotlapStart = "HOTLAP_START" }
+M.physicsCalls = {}
+local function record(name, ...) M.physicsCalls[#M.physicsCalls + 1] = { name = name, args = { ... } } end
+physics = {}
+function physics.allowed() return M.physicsAllowed == true end
+function physics.setCarAutopilot(on) record("autopilot", on) M.car.isAIControlled = on ~= false end
+function physics.teleportCarTo(i, spawn)
+  record("teleport", spawn)
+  M.car.isInPitlane, M.car.isInPit = true, true
+  M.car.speedMs, M.car.speedKmh = 0, 0
+end
+function physics.setCarFuel(i, liters) record("fuel", liters) M.car.fuel = liters end
+function physics.resetCarState(i) record("repair") for z = 0, 4 do M.car.damage[z] = 0 end end
+function ac.tryToStart() record("start") return true end
+function physics.setAILapsToComplete(i, laps) record("laps_to_complete", laps) end
+function physics.setAIPitStopRequest(i, on) record("pit_request", on) end
 
 script = {}
 function setInterval(fn, s) end

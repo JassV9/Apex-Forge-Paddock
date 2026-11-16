@@ -77,7 +77,8 @@ verdict records that the driver made it.
 - A lost outbox file costs nothing: core rewrites it on the next state change, and the agent
   keeps its position in `paddock/agent_state.json`.
 - One experiment at a time per installation can be on the car. A second one cannot start
-  until the first is settled.
+  until the first is settled. (Amended by [ADR 0014](0014-ghost-driver.md): one per car,
+  with a run plan file per car and the position kept per experiment.)
 - Starting a fresh line of development from a different setup on the same car and track is
   not possible yet: there is no way to replace the champion except through experiments.
 - The engine can be replaced or run elsewhere without touching the ledger; it holds no state.

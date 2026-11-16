@@ -53,6 +53,15 @@ type draft struct {
 	statement       string
 	origin          origin // where the hypothesis came from
 	predictions     []contracts.PredictionSpec
+	driver          contracts.ExperimentCreateDriver // empty: the human
+}
+
+// driverOf is who drives the laps; an experiment without one is driven by the human.
+func driverOf(driver contracts.ExperimentCreateDriver) string {
+	if driver == "" {
+		return string(contracts.ExperimentCreateDriverHuman)
+	}
+	return string(driver)
 }
 
 // baseline is the setup an experiment is measured against.
@@ -138,10 +147,10 @@ func insertDraft(ctx context.Context, tx *sql.Tx, d draft, baselineLabel, varian
 	}
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO experiment (hypothesis_id, kind, baseline_version_id, parameter_id, clicks,
-		                         state, success_test, guardrails)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		                         state, success_test, guardrails, driver)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
 		hypothesisID, string(d.kind), d.baselineVersion, d.parameterID, d.clicks,
-		string(Proposed), test, guardrails).Scan(&id)
+		string(Proposed), test, guardrails, driverOf(d.driver)).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("save experiment: %w", err)
 	}

@@ -1,4 +1,5 @@
--- The run plan in the game: reads runplan.json from the outbox core writes, loads a block's
+-- The run plan in the game: reads this car's plan (outbox/runplans/<car>.json, written by
+-- core, one file per car so an experiment waiting on another car is left alone), loads a block's
 -- setup when the driver asks for it, follows the car through the blocks and says how each
 -- pass is tagged. The rules live in core/runplan.lua; this file is the CSP side of them.
 
@@ -15,6 +16,15 @@ local lastText, lastSaved, nextPoll = nil, nil, 0
 
 local function folder() return ac.getFolder(ac.FolderID.ACDocuments) .. "\\paddock" end
 
+-- the car's id as core names its files (setups.SafeName)
+local function carFile()
+  local name = tostring(ac.getCarID(0) or ""):gsub("[^%w%._%-]+", "_"):gsub("^[%._]+", ""):gsub("[%._]+$", "")
+  return name ~= "" and name or "setup"
+end
+
+-- where the position in an experiment is kept; agent_state.json is the older, single file
+local function statePath(id) return folder() .. "\\state\\e" .. tostring(id) .. ".json" end
+
 local function decode(text)
   local ok, decoded = pcall(JSON.parse, text)
   return ok and decoded or nil
@@ -27,7 +37,8 @@ local function remember()
   local text = JSON.stringify(snapshot)
   if text == lastSaved then return end
   lastSaved = text
-  io.saveAsync(folder() .. "\\agent_state.json", text, nil, true)
+  io.createDir(folder() .. "\\state")
+  io.saveAsync(statePath(snapshot.experiment_id), text, nil, true)
 end
 
 ---Look for a new run plan. Reading is cheap but not free, so it happens every POLL_S seconds
@@ -35,7 +46,7 @@ end
 function plan.poll(now)
   if now < nextPoll then return end
   nextPoll = now + plan.POLL_S
-  local text = io.load(folder() .. "\\outbox\\runplan.json", nil)
+  local text = io.load(folder() .. "\\outbox\\runplans\\" .. carFile() .. ".json", nil)
   if not text or text == lastText then return end
   lastText = text
   local loaded, problem = runplan.read(decode(text))
@@ -43,7 +54,8 @@ function plan.poll(now)
     plan.message = "Run plan ignored: " .. problem
     return
   end
-  local saved = decode(io.load(folder() .. "\\agent_state.json", "") or "")
+  local saved = decode(io.load(statePath(loaded.experimentId), "") or "")
+    or decode(io.load(folder() .. "\\agent_state.json", "") or "")
   runplan.load(plan.state, loaded, saved)
   plan.message = string.format("Run plan of experiment %d loaded.", loaded.experimentId)
   remember()
@@ -101,5 +113,23 @@ function plan.label()
 end
 
 function plan.status() return runplan.status(plan.state) end
+
+---Who the plan says drives its laps: "human" or "ai" (nil without a plan).
+function plan.driver() return plan.state.plan and plan.state.plan.driver or nil end
+
+function plan.experimentId() return plan.state.plan and plan.state.plan.experimentId or nil end
+
+---Push laps done and to do in the block being driven (nil without a block).
+function plan.progress()
+  local block = runplan.block(plan.state)
+  if not block then return nil, nil end
+  return plan.state.pushDone, block.lapsTarget
+end
+
+---The order of the block being driven, or nil when there is none left.
+function plan.blockOrder()
+  local block = runplan.block(plan.state)
+  return block and block.order or nil
+end
 
 return plan

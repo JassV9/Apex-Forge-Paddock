@@ -29,7 +29,9 @@ function runplan.read(decoded)
     blocks[i] = { order = b.order, label = b.label, lapsTarget = b.laps_target, values = b.values }
   end
   table.sort(blocks, function(a, b) return a.order < b.order end)
-  return { experimentId = decoded.experiment_id, revision = decoded.revision, blocks = blocks }
+  local driver = decoded.driver == "ai" and "ai" or "human"
+  return { experimentId = decoded.experiment_id, revision = decoded.revision, blocks = blocks,
+    driver = driver }
 end
 
 function runplan.new()

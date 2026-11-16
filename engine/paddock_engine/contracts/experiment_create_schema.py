@@ -6,6 +6,15 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class Driver(StrEnum):
+    """
+    Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).
+    """
+
+    human = "human"
+    ai = "ai"
+
+
 class Direction(StrEnum):
     decrease = "decrease"
     increase = "increase"
@@ -40,6 +49,10 @@ class ExperimentCreate(BaseModel):
     clicks: int = Field(..., description="Clicks to move it; negative is down. Never 0.")
     statement: str = Field(..., description="The hypothesis in words.", min_length=1)
     predictions: list[PredictionSpec]
+    driver: Driver | None = Field(
+        "human",
+        description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
+    )
     hypothesis_key: str | None = Field(
         None,
         description="Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",

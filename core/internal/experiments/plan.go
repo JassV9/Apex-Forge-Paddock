@@ -117,7 +117,8 @@ func extend(ctx context.Context, tx *sql.Tx, exp record) error {
 	return bumpRevision(ctx, tx, exp.id)
 }
 
-// otherOccupying is the id of another experiment that has its setups on the car, or 0.
+// otherOccupying is the id of another experiment that has its setups on the same car, or 0.
+// Experiments on different cars never meet: the game drives one car at a time.
 func otherOccupying(ctx context.Context, q querier, id int64) (int64, error) {
 	states := make([]string, len(occupying))
 	for i, state := range occupying {
@@ -125,7 +126,10 @@ func otherOccupying(ctx context.Context, q querier, id int64) (int64, error) {
 	}
 	var other sql.NullInt64
 	err := q.QueryRowContext(ctx,
-		`SELECT min(id) FROM experiment WHERE id <> $1 AND state = ANY($2)`, id, states).Scan(&other)
+		`SELECT min(e.id) FROM experiment e JOIN hypothesis h ON h.id = e.hypothesis_id
+		 WHERE e.id <> $1 AND e.state = ANY($2) AND h.car_id = (
+		   SELECT h2.car_id FROM experiment e2 JOIN hypothesis h2 ON h2.id = e2.hypothesis_id
+		   WHERE e2.id = $1)`, id, states).Scan(&other)
 	if err != nil {
 		return 0, fmt.Errorf("look for a running experiment: %w", err)
 	}

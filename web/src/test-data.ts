@@ -12,6 +12,7 @@ export const running: Experiment = {
   parameter: "ARB_FRONT",
   parameter_label: "Front ARB",
   clicks: -1,
+  driver: "human",
   success_test: { channel: "corner_time_s", rope: 0.005, level: 0.9, better: "lower" },
   guardrails: [{ channel: "rear_slip_peak_deg", tolerance: 0.5, worse: "higher" }],
   predictions: [{ channel: "corner_time_s", direction: "decrease", low: 0.01, high: 0.3 }],

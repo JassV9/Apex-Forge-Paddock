@@ -4,6 +4,7 @@
 
 local carlink = require("game.carlink")
 local corners = require("core.corners")
+local ghost = require("game.ghost")
 local lines = require("core.spool_lines")
 local plan = require("game.plan")
 local recorder = require("core.recorder")
@@ -15,6 +16,7 @@ local agent = {
   MAP_VERSION = 1,  -- bump when corners.lua changes what it detects
   ready = false,
   status = "starting",
+  source = "human",  -- who drives the current spool session
   passes = 0,       -- passes recorded this session
   writes = 0,       -- chunk files written
 }
@@ -55,7 +57,7 @@ end
 
 local function sessionMeta()
   return {
-    sessionId = agent.sessionId, startedAtMs = nowMs(), source = "human",
+    sessionId = agent.sessionId, startedAtMs = nowMs(), source = agent.source,
     agentVersion = agent.VERSION, carId = ac.getCarID(0), carName = ac.getCarName(0),
     trackId = ac.getTrackID(), layout = ac.getTrackLayout() or "", trackName = ac.getTrackName(),
     mapVersion = agent.MAP_VERSION,
@@ -70,20 +72,16 @@ function agent.init()
     agent.status = "no corner map: this track has no usable AI line"
     return
   end
-  agent.sessionId = os.date("%Y%m%dT%H%M%S") .. "-" .. safeName(ac.getCarID(0))
-  agent.dir = ac.getFolder(ac.FolderID.ACDocuments) .. "\\paddock\\spool\\" .. agent.sessionId
-  io.createDir(agent.dir)
   agent.rec = recorder.new(agent.map)
-  agent.out = spool.new()
-  agent.out:add(lines.session(sessionMeta(), agent.map))
   agent.t = 0
   agent.lastReset = ac.getCar(0).resetCounter
   agent.wasInPit = ac.getCar(0).isInPitlane
-  refreshSetupHash()
+  agent.startSession("human")
   if ac.onSessionStart then
     ac.onSessionStart(function()
       agent.rec:reset("session restart")
       plan.pit()
+      ghost.reset()
     end)
   end
   plan.poll(agent.t)
@@ -91,9 +89,31 @@ function agent.init()
   agent.status = string.format("recording %d corners", #agent.map.list)
 end
 
+---Begin a spool session. A human's laps and the AI's laps never share a session, so the
+---driver of every pass is known (source "human" or "ai").
+function agent.startSession(source)
+  if agent.out then agent.shutdown() end
+  agent.source = source
+  local suffix = source == "human" and "" or ("-" .. source)
+  agent.sessionId = os.date("%Y%m%dT%H%M%S") .. "-" .. safeName(ac.getCarID(0)) .. suffix
+  agent.dir = ac.getFolder(ac.FolderID.ACDocuments) .. "\\paddock\\spool\\" .. agent.sessionId
+  io.createDir(agent.dir)
+  agent.rec:reset("new session")
+  agent.out = spool.new()
+  agent.out:add(lines.session(sessionMeta(), agent.map))
+  agent.catalogSent, agent.setupHash = false, nil
+  refreshSetupHash()
+end
+
+-- Every file the agent writes shares one budget: at most one write per WRITE_GAP_S.
+local WRITE_GAP_S, lastWriteAt = 0.2, -math.huge
+local function mayWrite() return os.preciseClock() - lastWriteAt >= WRITE_GAP_S end
+
 local function write(force)
+  if not force and not mayWrite() then return end
   local name, text = agent.out:take(os.preciseClock(), force)
   if not name then return end
+  lastWriteAt = os.preciseClock()
   agent.writes = agent.writes + 1
   local path = agent.dir .. "\\" .. name
   if force then
@@ -101,6 +121,22 @@ local function write(force)
   else
     io.saveAsync(path, text, nil, true)
   end
+end
+
+-- What the agent is doing, for tools outside the game (and for checking a run without
+-- seeing the screen). Written when it changes, at most once a second.
+local lastStatus, nextStatus = nil, 0
+local function writeStatus()
+  if agent.t < nextStatus or not mayWrite() then return end
+  nextStatus = agent.t + 1
+  local text = JSON.stringify({
+    session_id = agent.sessionId, source = agent.source, passes = agent.passes,
+    plan = plan.status(), plan_message = plan.message, ghost = ghost.phase(),
+    ghost_message = ghost.message(), ghost_allowed = ghost.allowed(),
+  })
+  if text == lastStatus then return end
+  lastStatus, lastWriteAt = text, os.preciseClock()
+  io.saveAsync(ac.getFolder(ac.FolderID.ACDocuments) .. "\\paddock\\agent_status.json", text, nil, true)
 end
 
 -- One column per frame; if a second pass finishes first, the pending one is completed at once
@@ -142,25 +178,31 @@ function agent.update(dt)
     agent.rec:reset("car reset")
   end
   local inPit = car.isInPitlane
+  -- a human only picks up a plan in the pits; the AI never stops, so it reads it on track
+  if inPit or ghost.phase() ~= "off" then plan.poll(agent.t) end
   if inPit then
     plan.pit()
-    plan.poll(agent.t)
   elseif agent.wasInPit then
     refreshSetupHash()
     plan.leftPit()
   end
   agent.wasInPit = inPit
 
-  local driving = (not inPit) and (not car.isAIControlled)
+  ghost.pollCommands(agent.t)
+  ghost.update(dt, car)
+  local source = ghost.active() and "ai" or "human"
+  if source ~= agent.source then agent.startSession(source) end
+  local driving = (not inPit) and (not car.isAIControlled or ghost.active())
   if driving then plan.position(car.splinePosition) end
   local raw = agent.rec:feed(carlink.read(car, agent.trackLength, agent.t), driving)
   if raw then encode(raw, car) end
   stepEncoding()
   write(false)
+  writeStatus()
 end
 
 function agent.shutdown()
-  if not agent.ready then return end
+  if not agent.out then return end
   if agent.job then
     agent.out:add(lines.finish(agent.job))
     agent.job = nil

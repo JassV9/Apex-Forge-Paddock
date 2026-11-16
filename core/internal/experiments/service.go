@@ -89,13 +89,13 @@ func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate
 		carID: base.carID, trackID: base.trackID, kind: contracts.ExperimentKindOfat,
 		baselineVersion: base.versionID, variantValues: variant, parameterID: &parameterID,
 		clicks: request.Clicks, statement: strings.TrimSpace(request.Statement), origin: cameFrom,
-		predictions: request.Predictions,
+		predictions: request.Predictions, driver: request.Driver,
 	})
 	if err != nil {
 		return contracts.Experiment{}, err
 	}
 	s.logger.InfoContext(ctx, "experiment proposed", "experiment_id", id,
-		"parameter", request.Parameter, "clicks", request.Clicks)
+		"parameter", request.Parameter, "clicks", request.Clicks, "driver", driverOf(request.Driver))
 	return s.Get(ctx, id)
 }
 
@@ -159,6 +159,30 @@ func (s *Service) publish(ctx context.Context, id int64) error {
 	}
 	if err := s.outbox.Write(plan, exp.carACID, arms); err != nil {
 		return fmt.Errorf("experiment %d: %w", id, err)
+	}
+	return nil
+}
+
+// PublishRunning writes the run plan of every experiment that is on its car again. Core calls
+// it at startup, so an outbox that was emptied or moved, or plans in an older layout, are
+// put back where the agent reads them.
+func (s *Service) PublishRunning(ctx context.Context) error {
+	states := make([]string, len(occupying))
+	for i, state := range occupying {
+		states[i] = string(state)
+	}
+	ids, err := queryAll(ctx, s.database, `SELECT id FROM experiment WHERE state = ANY($1) ORDER BY id`,
+		func(rows *sql.Rows) (int64, error) {
+			var id int64
+			return id, rows.Scan(&id)
+		}, states)
+	if err != nil {
+		return fmt.Errorf("list running experiments: %w", err)
+	}
+	for _, id := range ids {
+		if err := s.publish(ctx, id); err != nil {
+			return err
+		}
 	}
 	return nil
 }

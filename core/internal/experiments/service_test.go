@@ -141,7 +141,7 @@ func TestStartWritesTheRunPlanAndBothSetupsForTheAgent(t *testing.T) {
 		t.Fatalf("Start: state %s, err %v", running.State, err)
 	}
 	var plan contracts.RunPlan
-	content, err := os.ReadFile(filepath.Join(f.outbox, RunPlanFile))
+	content, err := os.ReadFile(RunPlanPath(f.outbox, "ks_mazda_mx5_cup"))
 	if err != nil {
 		t.Fatal(err)
 	}

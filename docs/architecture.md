@@ -35,7 +35,7 @@ flowchart LR
   SP --> ING
   ING --> PQ
   ING --> PG
-  SET -- "setup .ini + runplan.json" --> AG
+  SET -- "setup .ini + runplans/<car>.json" --> AG
   EXP <--> PG
   EXP -- "HTTP/JSON + jobs table" --> ENG
   ENG --> PQ
@@ -45,7 +45,8 @@ flowchart LR
 | Boundary | Transport | Contract |
 | --- | --- | --- |
 | agent to core | Files: the agent writes numbered chunk files of JSON lines to `Documents/Assetto Corsa/paddock/spool/<session-id>/`; core tails the directory and never writes to it ([ADR 0003](adr/0003-spool-transport.md)) | `contracts/spool_session.schema.json`, `contracts/spool_pass.schema.json` |
-| core to agent | Files: `runplan.json` and setup `.ini` files in `Documents/Assetto Corsa/paddock/outbox/`, read by the agent every two seconds, in the pits only ([ADR 0009](adr/0009-experiments.md)) | `contracts/runplan.schema.json` |
+| core to agent | Files: one run plan per car (`runplans/<car>.json`) and setup `.ini` files in `Documents/Assetto Corsa/paddock/outbox/`, read by the agent every two seconds, in the pits or while the AI drives ([ADR 0009](adr/0009-experiments.md), [ADR 0014](adr/0014-ghost-driver.md)) | `contracts/runplan.schema.json` |
+| agent window to core | HTTP to core's REST API, only while the window is drawn, at most every 10 s, and on a click ([ADR 0015](adr/0015-in-game-setup-desk.md)) | `docs/api/openapi.yaml` |
 | core to engine | HTTP/JSON on localhost; long work goes through the `jobs` table, claimed with `SELECT ... FOR UPDATE SKIP LOCKED` ([ADR 0006](adr/0006-no-kafka-no-kubernetes.md)) | `contracts/*.schema.json` |
 | web to core | REST | `docs/api/openapi.yaml` |
 
@@ -138,8 +139,9 @@ the session's Parquet parts.
    guardrails. Nothing changes them later.
 2. **Plan.** Core asks the engine (`POST /plan`) what four interleaved blocks can detect and
    stores the blocks. The two setups get random code names.
-3. **Start.** Core writes `runplan.json` and one setup file per arm into the outbox. Only one
-   experiment can be on the car, and it must start from the champion.
+3. **Start.** Core writes the car's run plan (`runplans/<car>.json`) and one setup file per
+   arm into the outbox. Only one experiment per car can be on it, and it must start from
+   the champion. The plan says who drives: the human, or AC's AI (phase 6).
 4. **Drive.** In the pits the agent shows the block to load; "Load Setup X" sets the values
    through the setup spinners with read-back and rollback. Passes are tagged with block and
    lap only while that setup is on the car; lap 0 is the out-lap.

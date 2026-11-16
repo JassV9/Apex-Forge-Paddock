@@ -2,12 +2,21 @@
 #   filename:  runplan.schema.json
 
 from __future__ import annotations
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class V(IntEnum):
     integer_1 = 1
+
+
+class Driver(StrEnum):
+    """
+    Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).
+    """
+
+    human = "human"
+    ai = "ai"
 
 
 class RunPlanBlock(BaseModel):
@@ -42,5 +51,9 @@ class RunPlan(BaseModel):
     experiment_id: int = Field(..., description="Core's id of the experiment.", ge=1)
     revision: int = Field(
         ..., description="Increases whenever core rewrites the plan of this experiment.", ge=1
+    )
+    driver: Driver | None = Field(
+        "human",
+        description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
     )
     blocks: list[RunPlanBlock] = Field(..., min_length=1)

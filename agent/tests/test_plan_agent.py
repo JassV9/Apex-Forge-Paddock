@@ -19,9 +19,12 @@ LAPS = 2  # push laps per block
 
 
 def write_plan(
-    agent: Agent, blocks: list[tuple[str, dict[str, float], int]], revision: int = 1
+    agent: Agent,
+    blocks: list[tuple[str, dict[str, float], int]],
+    revision: int = 1,
+    driver: str | None = None,
 ) -> None:
-    """Put a runplan.json into the outbox, the way core does."""
+    """Put the car's run plan into the outbox, the way core does."""
     plan = {
         "v": 1,
         "experiment_id": 12,
@@ -31,10 +34,12 @@ def write_plan(
             for order, (label, values, laps) in enumerate(blocks, start=1)
         ],
     }
+    if driver:
+        plan["driver"] = driver
     jsonschema.Draft7Validator(schema("runplan")).validate(plan)
-    outbox = agent.spool_root.parent / "outbox"
-    outbox.mkdir(parents=True, exist_ok=True)
-    (outbox / "runplan.json").write_text(json.dumps(plan), encoding="utf-8")
+    plans = agent.spool_root.parent / "outbox" / "runplans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / "ks_mazda_mx5_cup.json").write_text(json.dumps(plan), encoding="utf-8")
 
 
 def setups(agent: Agent) -> tuple[dict[str, float], dict[str, float]]:
@@ -174,17 +179,18 @@ def test_position_is_written_down_only_when_it_changes(agent: Agent) -> None:
 
     stint(agent, 2)
 
-    state_writes = [w for w in agent.writes() if w["path"].endswith("agent_state.json")]
-    state = json.loads((agent.spool_root.parent / "agent_state.json").read_text(encoding="utf-8"))
+    state_writes = [w for w in agent.writes() if w["path"].endswith("/state/e12.json")]
+    state_file = agent.spool_root.parent / "state" / "e12.json"
+    state = json.loads(state_file.read_text(encoding="utf-8"))
     assert state == {"experiment_id": 12, "order": 1, "push_done": 1}
     assert 1 <= len(state_writes) <= 4, "a few writes for one stint, not one per frame"
     assert all(w["async"] for w in state_writes)
 
 
 def test_a_broken_run_plan_is_ignored_and_recording_goes_on(agent: Agent) -> Any:
-    outbox = agent.spool_root.parent / "outbox"
-    outbox.mkdir(parents=True)
-    (outbox / "runplan.json").write_text('{"v": 1, "blocks": "none"', encoding="utf-8")
+    plans = agent.spool_root.parent / "outbox" / "runplans"
+    plans.mkdir(parents=True)
+    (plans / "ks_mazda_mx5_cup.json").write_text('{"v": 1, "blocks": "none"', encoding="utf-8")
     agent.drive.pit(True)
     agent.drive.idle(130)
     agent.drive.pit(False)
@@ -193,3 +199,31 @@ def test_a_broken_run_plan_is_ignored_and_recording_goes_on(agent: Agent) -> Any
 
     assert "Run plan ignored" in agent.rt.eval('require("game.plan").message')
     assert tags(agent) == {None: CORNERS}
+
+
+def test_another_cars_plan_is_left_alone(agent: Agent) -> None:
+    _base, soft = setups(agent)
+    plans = agent.spool_root.parent / "outbox" / "runplans"
+    plans.mkdir(parents=True)
+    plan = {
+        "v": 1,
+        "experiment_id": 3,
+        "revision": 1,
+        "blocks": [{"order": 1, "label": "Setup Q", "laps_target": 2, "values": soft}],
+    }
+    (plans / "ks_ferrari_488_gt3.json").write_text(json.dumps(plan), encoding="utf-8")
+    agent.drive.pit(True)
+    agent.drive.idle(130)
+
+    assert agent.rt.eval('require("game.plan").status()') == "No run plan."
+
+
+def test_the_position_of_an_older_agent_is_picked_up(agent: Agent) -> None:
+    base, soft = setups(agent)
+    older = {"experiment_id": 12, "order": 2, "push_done": 0}
+    (agent.spool_root.parent / "agent_state.json").write_text(json.dumps(older), encoding="utf-8")
+    write_plan(agent, [("Setup K", base, LAPS), ("Setup R", soft, LAPS)])
+    agent.drive.pit(True)
+    agent.drive.idle(130)
+
+    assert "block 2 of 2" in agent.rt.eval('require("game.plan").status()')

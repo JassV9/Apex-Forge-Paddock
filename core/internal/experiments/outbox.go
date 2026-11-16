@@ -13,11 +13,14 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/setups"
 )
 
-// RunPlanFile is the file the in-game agent reads its run plan from.
-const RunPlanFile = "runplan.json"
+// RunPlanPath is where the in-game agent reads the run plan of a car: one file per car, so an
+// experiment waiting on one car does not stop another car's (docs/adr/0014-ghost-driver.md).
+func RunPlanPath(dir, carACID string) string {
+	return filepath.Join(dir, "runplans", setups.SafeName(carACID)+".json")
+}
 
-// Outbox is the directory core writes for the game: runplan.json, which the agent reads, and
-// a setup file per arm under setups/<car>/. It is core's own directory. Core never writes
+// Outbox is the directory core writes for the game: runplans/<car>.json, which the agent
+// reads, and a setup file per arm under setups/<car>/. It is core's own directory. Core never writes
 // into Assetto Corsa's setups folder, so it cannot overwrite a setup the driver saved.
 type Outbox struct {
 	// Dir is the directory; empty turns writing off (the API and the ledger still work).
@@ -49,14 +52,15 @@ func (o Outbox) Write(plan contracts.RunPlan, carACID string, arms []armSetup) e
 	if err != nil {
 		return fmt.Errorf("encode run plan: %w", err)
 	}
-	if err := os.MkdirAll(o.Dir, 0o750); err != nil {
+	path := RunPlanPath(o.Dir, carACID)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("create outbox: %w", err)
 	}
-	temporary := filepath.Join(o.Dir, RunPlanFile+".tmp")
+	temporary := path + ".tmp"
 	if err := os.WriteFile(temporary, encoded, 0o640); err != nil { //nolint:gosec // the agent, another user's process, must read it
 		return fmt.Errorf("write run plan: %w", err)
 	}
-	if err := os.Rename(temporary, filepath.Join(o.Dir, RunPlanFile)); err != nil {
+	if err := os.Rename(temporary, path); err != nil {
 		return fmt.Errorf("publish run plan: %w", err)
 	}
 	return nil
@@ -73,7 +77,8 @@ WHERE b.experiment_id = $1 ORDER BY b."order"`
 // arm. Blocks carry code names only: the plan does not say which setup is the baseline.
 func readRunPlan(ctx context.Context, q querier, id int64) (contracts.RunPlan, []armSetup, error) {
 	plan := contracts.RunPlan{V: 1, ExperimentId: int(id)}
-	err := q.QueryRowContext(ctx, `SELECT plan_revision FROM experiment WHERE id = $1`, id).Scan(&plan.Revision)
+	err := q.QueryRowContext(ctx, `SELECT plan_revision, driver FROM experiment WHERE id = $1`, id).
+		Scan(&plan.Revision, &plan.Driver)
 	if err != nil {
 		return plan, nil, fmt.Errorf("read plan revision of experiment %d: %w", id, err)
 	}

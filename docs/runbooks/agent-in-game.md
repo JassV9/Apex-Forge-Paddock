@@ -39,9 +39,11 @@ This copies `PaddockAgent.lua`, `manifest.ini` and `src/` to
 else. Use `--ac-root` if the game is not in the default Steam folder. Then start a practice
 session and enable **Paddock Agent** in the apps bar on the right edge of the screen.
 
-The agent writes only under `Documents/Assetto Corsa/paddock/` (the spool and
-`agent_state.json`). It never writes a setup file; during an experiment it changes setup
-values on the car through the setup screen's spinners, and only when you click "Load". It is
+The agent writes only under `Documents/Assetto Corsa/paddock/` (the spool, its position in
+each experiment under `state/`, and `agent_status.json`). It never writes a setup file;
+during an experiment it changes setup values on the car through the setup screen's
+spinners, only when you click "Load" or when the AI driver loads a block
+([ghost-driver.md](ghost-driver.md)). It is
 separate from Apex Forge, VRC Energy Mapper and MusicBlender.
 
 ## Point core at the spool and the outbox
@@ -66,7 +68,9 @@ list and its pass count grows as you drive.
 1. Drive a few laps so a session with its setup exists, then open **Propose** in the
    dashboard: pick the session, one setup item, a number of clicks, and write the hypothesis.
 2. On the experiment's page: **Plan** (shows what four blocks can detect), then **Start**.
-   Core writes `outbox/runplan.json` and one setup file per arm under `outbox/setups/<car>/`.
+   Core writes `outbox/runplans/<car>.json` and one setup file per arm under
+   `outbox/setups/<car>/`. The same can be done from the game: the **Setups** tab of the
+   Paddock window lists what to test next with **I drive it** and **AI drives it**.
 3. In the game, drive into the pits. Within two seconds the agent's window names the block:
    "Experiment 4, block 1 of 4: pit and load Setup K".
 4. Open the setup screen and click **Load Setup K** in the agent's window. The agent sets

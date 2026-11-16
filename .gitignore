@@ -39,3 +39,6 @@ data/
 
 # Unpublished working notes (kept on this machine only)
 docs/private/
+
+# Claude Code local state (worktrees of parallel agents)
+.claude/

@@ -48,6 +48,18 @@ def test_an_out_lap_caps_only_the_sections_it_drove(rt):
     assert caps(rt, state) == {14: round(74 * a.CAP_FACTOR, 1)}
 
 
+def test_the_sections_crawled_through_after_going_off_are_not_capped(rt):
+    a = tune(rt)
+    state = a.new()
+    for i in range(a.SECTIONS):
+        pos = (i + 0.5) / a.SECTIONS
+        speed = 20 if 101 <= i <= 104 else 150  # off at 100, then crawling back
+        a.observe(state, pos, speed, 100 <= i <= 104)
+
+    assert a.endLap(state, True) == 5
+    assert sorted(caps(rt, state)) == list(range(100 - a.LOOKBACK, 101))
+
+
 def test_a_repeated_incident_lowers_the_cap_again_and_never_raises_it(rt):
     a = tune(rt)
     state = a.new()

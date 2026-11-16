@@ -51,7 +51,10 @@ function aitune.endLap(state, learning)
   local count = 0
   for s in pairs(state.incidents) do
     count = count + 1
-    if learning then
+    -- only where it went wrong: the sections after, crawled through or spun in, are the result
+    -- and their speed is no cap
+    local continues = state.incidents[(s - 1) % aitune.SECTIONS]
+    if learning and not continues then
       for back = 0, aitune.LOOKBACK do
         local t = (s - back) % aitune.SECTIONS
         lower(state, t, state.entry[t])

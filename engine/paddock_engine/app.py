@@ -6,6 +6,8 @@ Run with: uvicorn paddock_engine.app:create_app --factory
 from fastapi import FastAPI
 
 from paddock_engine import __version__
+from paddock_engine.contracts.base_setup_request_schema import BaseSetupRequest
+from paddock_engine.contracts.base_setup_schema import BaseSetup
 from paddock_engine.contracts.diagnose_request_schema import DiagnoseRequest
 from paddock_engine.contracts.diagnosis_schema import Diagnosis
 from paddock_engine.contracts.evaluate_request_schema import EvaluateRequest
@@ -24,6 +26,7 @@ from paddock_engine.experiments.evaluate import evaluate
 from paddock_engine.experiments.plan import plan
 from paddock_engine.explain.config import Choice, from_env
 from paddock_engine.features.session import session_features
+from paddock_engine.optimize.base_setup import base_setup
 from paddock_engine.optimize.rank import propose
 from paddock_engine.sensitivity.profile import update
 
@@ -60,5 +63,9 @@ def create_app(llm: Choice | None = None) -> FastAPI:
     @app.post("/propose")
     def next_experiments(request: ProposeRequest) -> Proposals:
         return propose(request)
+
+    @app.post("/base-setup", response_model_exclude_none=True)
+    def build_base_setup(request: BaseSetupRequest) -> BaseSetup:
+        return base_setup(request)
 
     return app

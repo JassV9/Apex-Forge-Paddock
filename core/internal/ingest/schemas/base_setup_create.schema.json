@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "base_setup_create.schema.json",
+  "title": "BaseSetupCreate",
+  "description": "Build a base setup for a session from what its car measured (POST /sessions/{id}/base-setup).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "driver"
+  ],
+  "properties": {
+    "driver": {
+      "description": "Who drives the experiment that judges the base setup: the human, or AC's AI on the player's car.",
+      "type": "string",
+      "enum": [
+        "human",
+        "ai"
+      ]
+    }
+  }
+}

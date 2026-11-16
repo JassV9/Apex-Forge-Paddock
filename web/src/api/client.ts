@@ -25,10 +25,10 @@ export type ExperimentAction =
   paths["/experiments/{id}/{action}"]["post"]["parameters"]["path"]["action"];
 
 /** Typed client for core's REST API; every path and body comes from docs/api/openapi.yaml. */
-const coreApi = createClient<paths>({ baseUrl: "/api" });
+export const coreApi = createClient<paths>({ baseUrl: "/api" });
 
 /** The body of a reply, or an error that says what core refused (its Problem body). */
-function unwrap<T>(reply: { data?: T; error?: unknown }, request: string): T {
+export function unwrap<T>(reply: { data?: T; error?: unknown }, request: string): T {
   if (reply.data !== undefined) return reply.data;
   const problem = reply.error as { error?: unknown } | undefined;
   const said = typeof problem?.error === "string" ? problem.error : "";

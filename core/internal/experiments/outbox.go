@@ -33,16 +33,25 @@ type armSetup struct {
 	values setups.Values
 }
 
+// armFile is the stem and description of an arm's setup file. A base setup's files say they
+// belong to one (both arms alike, so the name does not tell which arm is the base).
+func armFile(experimentID int, kind contracts.ExperimentKind, label string) (stem, description string) {
+	if kind == contracts.ExperimentKindBase {
+		return fmt.Sprintf("paddock-e%d-base-%s", experimentID, label),
+			fmt.Sprintf("Experiment %d (base setup), %s", experimentID, label)
+	}
+	return fmt.Sprintf("paddock-e%d-%s", experimentID, label), fmt.Sprintf("Experiment %d, %s", experimentID, label)
+}
+
 // Write puts the run plan and its setup files into the outbox. The plan is written to a
 // temporary file and renamed, so the agent never reads half a plan.
-func (o Outbox) Write(plan contracts.RunPlan, carACID string, arms []armSetup) error {
+func (o Outbox) Write(plan contracts.RunPlan, carACID string, kind contracts.ExperimentKind, arms []armSetup) error {
 	if o.Dir == "" {
 		return nil
 	}
 	setupDir := filepath.Join(o.Dir, "setups", setups.SafeName(carACID))
 	for _, arm := range arms {
-		stem := fmt.Sprintf("paddock-e%d-%s", plan.ExperimentId, arm.label)
-		description := fmt.Sprintf("Experiment %d, %s", plan.ExperimentId, arm.label)
+		stem, description := armFile(plan.ExperimentId, kind, arm.label)
 		_, err := setups.WriteIni(setupDir, stem, carACID, arm.values, description)
 		if err != nil && !errors.Is(err, setups.ErrFileExists) {
 			return fmt.Errorf("write setup of %s: %w", arm.label, err)

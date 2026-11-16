@@ -195,11 +195,19 @@ func insertVersion(ctx context.Context, tx *sql.Tx, d draft, experimentID int64)
 		 ON CONFLICT (car_id, content_hash) DO UPDATE SET content_hash = EXCLUDED.content_hash
 		 RETURNING id`,
 		d.carID, setups.Hash(d.variantValues), d.baselineVersion, string(encoded),
-		fmt.Sprintf("experiment %d", experimentID)).Scan(&id)
+		createdBy(d.kind, experimentID)).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("save variant setup: %w", err)
 	}
 	return id, nil
+}
+
+// createdBy is the version's origin as the ledger shows it; a base setup says it is one.
+func createdBy(kind contracts.ExperimentKind, experimentID int64) string {
+	if kind == contracts.ExperimentKindBase {
+		return fmt.Sprintf("base setup, experiment %d", experimentID)
+	}
+	return fmt.Sprintf("experiment %d", experimentID)
 }
 
 func insertArms(ctx context.Context, tx *sql.Tx, id, baselineVersion, variantVersion int64, baselineLabel, variantLabel string) error {

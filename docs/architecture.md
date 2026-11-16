@@ -202,6 +202,14 @@ The rules, the thresholds and what was rejected are in
 Why it is built this way, and what is missing (the 20+ experiment optimizer, tracks and
 conditions), is in [ADR 0011](adr/0011-sensitivity-and-ranking.md).
 
+7. **Base setup.** `POST /sessions/{id}/base-setup` sends the car's profile and the
+   baseline's items (each marked when it is one of a pair) to `POST /base-setup`. The engine
+   takes each change measured on corner time over all corners with its interval wholly
+   below zero, one per item, and predicts the sum with summed variances. Core proposes an
+   experiment of kind `base` (baseline against the base setup) with that prediction, or
+   answers 409 with what the car measured. Accepted, the base is the champion
+   ([ADR 0018](adr/0018-base-setup.md)).
+
 ## The public demo (phase 7)
 
 The demo mode can be shown to strangers without giving them the API. Nothing in core or
@@ -248,7 +256,7 @@ Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
 
 | Piece | State |
 | --- | --- |
-| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard; generators and drift check | Working, checked in CI |
+| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard, base setup request, response and reply; generators and drift check | Working, checked in CI |
 | agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 151 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
 | engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 132 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
@@ -257,6 +265,7 @@ Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
 | Read-only demo: nginx door, replica layout in Compose, smoke test (`make demo-replica`, `make demo-replica-check`) | Working locally and in CI |
 | Azure deployment of the demo (`infra/azure`, `.github/workflows/publish-demo.yml`) | Terraform validated; **never applied, nothing published** |
+| Base setup from the car's own measurements: `contracts/base_setup*.schema.json`, engine `POST /base-setup`, core `POST /sessions/{id}/base-setup`, experiment kind `base` (migration 00007), web "Base setup" panel in the experiments tab | Working, tested (pytest with hypothesis, Go against PostgreSQL, Vitest); **unverified in game** ([ADR 0018](adr/0018-base-setup.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
 

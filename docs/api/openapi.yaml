@@ -109,6 +109,46 @@ paths:
           $ref: "#/components/responses/Problem"
         "502":
           $ref: "#/components/responses/Problem"
+  /sessions/{id}/base-setup:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      operationId: buildBaseSetup
+      summary: Build a base setup from what the car measured, and propose the experiment that judges it.
+      description: >
+        The baseline is the setup an experiment on this session would start from. A change
+        goes in when the car's own pooled measurement on corner time over all corners lies
+        wholly on the faster side of zero; never a prior, a row flagged non-linear, a change
+        measured worse on a guardrail, or a paired item; one change per item, within its
+        range. The prediction is the sum of the estimates with the summed variances;
+        interactions were not measured, so the combination is judged as its own experiment
+        (kind base) against the baseline. When nothing qualifies the answer is 409 with what
+        the car measured.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BaseSetupCreate"
+      responses:
+        "201":
+          description: The base setup, and the id of the proposed experiment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BaseSetupReply"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: No measured change qualifies. The body says what the car measured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BaseSetupReply"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "502":
+          $ref: "#/components/responses/Problem"
   /sessions/{id}/passes:
     parameters:
       - $ref: "#/components/parameters/SessionId"
@@ -402,6 +442,10 @@ components:
       $ref: "../../contracts/proposals.schema.json"
     Scorecard:
       $ref: "../../contracts/scorecard.schema.json"
+    BaseSetupCreate:
+      $ref: "../../contracts/base_setup_create.schema.json"
+    BaseSetupReply:
+      $ref: "../../contracts/base_setup_reply.schema.json"
     SessionPasses:
       $ref: "../../contracts/session_passes.schema.json"
     PassTrace:

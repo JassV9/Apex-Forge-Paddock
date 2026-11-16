@@ -39,7 +39,8 @@ export function SetupsSection({ experiment }: { experiment: Experiment }) {
         {experiment.arms.map((arm) => (
           <li key={arm.label}>
             {arm.label}
-            {!blind && `: ${arm.is_baseline ? "baseline" : "variant"}, value ${String(arm.value)}`}
+            {!blind && `: ${arm.is_baseline ? "baseline" : "variant"}`}
+            {!blind && experiment.parameter !== "" && `, value ${String(arm.value)}`}
           </li>
         ))}
       </ul>

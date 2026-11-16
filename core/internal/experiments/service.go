@@ -157,7 +157,7 @@ func (s *Service) publish(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if err := s.outbox.Write(plan, exp.carACID, arms); err != nil {
+	if err := s.outbox.Write(plan, exp.carACID, exp.kind, arms); err != nil {
 		return fmt.Errorf("experiment %d: %w", id, err)
 	}
 	return nil

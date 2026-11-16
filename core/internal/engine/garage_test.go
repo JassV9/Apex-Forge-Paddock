@@ -84,3 +84,33 @@ func TestProposePostsTheCandidatesAndDecodesTheRanking(t *testing.T) {
 		t.Errorf("reply = %+v", reply)
 	}
 }
+
+func TestBaseSetupPostsTheProfileAndDecodesTheChoice(t *testing.T) {
+	var got contracts.BaseSetupRequest
+	server := engineStub(t, "/base-setup", `{"channel":"corner_time_s","left_out":[],"measured":[],
+		"changes":[{"parameter":"ARB_FRONT","label":"ARB Front","clicks":-1,"from_value":3,"to_value":2,
+		"estimate":-0.0042,"ci_low":-0.0068,"ci_high":-0.0016,"n_passes":84,
+		"effect_class":"inconclusive","experiment_ids":[12]}],
+		"prediction":{"channel":"corner_time_s","estimate":-0.0042,"ci_low":-0.0068,"ci_high":-0.0016,
+		"level":0.9,"note":"Sum of 1 effects."}}`, &got)
+	request := contracts.BaseSetupRequest{
+		Effects: []contracts.SensitivityEffect{},
+		Items: []contracts.BaseSetupItem{{
+			Name: "ARB_FRONT", Label: "ARB Front", Min: 0, Max: 4, Step: 1, Value: 3,
+		}},
+		Channel: "corner_time_s", Better: contracts.BaseSetupRequestBetterLower, Rope: 0.005,
+		Level: 0.9, Guardrails: []contracts.GuardrailSpec{},
+	}
+
+	reply, err := New(server.URL).BaseSetup(t.Context(), request)
+
+	if err != nil {
+		t.Fatalf("BaseSetup: %v", err)
+	}
+	if len(got.Items) != 1 || got.Items[0].Value != 3 || got.Level != 0.9 {
+		t.Errorf("engine received %+v", got)
+	}
+	if len(reply.Changes) != 1 || reply.Changes[0].ToValue != 2 || reply.Prediction == nil {
+		t.Errorf("reply = %+v", reply)
+	}
+}

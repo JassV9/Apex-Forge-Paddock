@@ -38,6 +38,8 @@ type Deps struct {
 	Garage Garage
 	// Training serves /sessions/{id}/training and /training; nil leaves them out.
 	Training Training
+	// BaseSetups serves POST /sessions/{id}/base-setup; nil leaves it out.
+	BaseSetups BaseSetups
 	// Metrics serves GET /metrics for Prometheus; nil leaves the route out.
 	Metrics http.Handler
 }
@@ -61,6 +63,9 @@ func NewHandler(deps Deps) http.Handler {
 	}
 	if deps.Training != nil {
 		registerTraining(mux, deps.Logger, deps.Training)
+	}
+	if deps.BaseSetups != nil {
+		registerBaseSetups(mux, deps.Logger, deps.BaseSetups)
 	}
 	if deps.Metrics != nil {
 		mux.Handle("GET /metrics", deps.Metrics)

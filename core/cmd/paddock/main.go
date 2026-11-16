@@ -110,6 +110,7 @@ func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logg
 		Passes:      passes.NewService(database, cfg.DataDir),
 		Garage:      garage,
 		Training:    trainer,
+		BaseSetups:  sensitivity.NewBaseSetups(garage, ledger, analysis, logger),
 		Metrics:     metrics.Handler,
 	}, trainer
 }

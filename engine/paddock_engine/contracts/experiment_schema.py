@@ -10,6 +10,7 @@ class Kind(StrEnum):
     ofat = "ofat"
     factorial = "factorial"
     recheck = "recheck"
+    base = "base"
 
 
 class State(StrEnum):

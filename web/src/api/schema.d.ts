@@ -105,6 +105,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/base-setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Build a base setup from what the car measured, and propose the experiment that judges it.
+     * @description The baseline is the setup an experiment on this session would start from. A change goes in when the car's own pooled measurement on corner time over all corners lies wholly on the faster side of zero; never a prior, a row flagged non-linear, a change measured worse on a guardrail, or a paired item; one change per item, within its range. The prediction is the sum of the estimates with the summed variances; interactions were not measured, so the combination is judged as its own experiment (kind base) against the baseline. When nothing qualifies the answer is 409 with what the car measured.
+     */
+    post: operations["buildBaseSetup"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/sessions/{id}/passes": {
     parameters: {
       query?: never;
@@ -275,6 +297,8 @@ export interface components {
     SensitivityProfile: components["schemas"]["sensitivity_profile.schema"];
     Proposals: components["schemas"]["proposals.schema"];
     Scorecard: components["schemas"]["scorecard.schema"];
+    BaseSetupCreate: components["schemas"]["base_setup_create.schema"];
+    BaseSetupReply: components["schemas"]["base_setup_reply.schema"];
     SessionPasses: components["schemas"]["session_passes.schema"];
     PassTrace: components["schemas"]["pass_trace.schema"];
     Problem: {
@@ -496,6 +520,110 @@ export interface components {
       ranked: components["schemas"]["Proposal"][];
       /** @description Candidates measured on this car as negligible or worse. */
       skipped: components["schemas"]["SkippedCandidate"][];
+    };
+    /**
+     * BaseSetupCreate
+     * @description Build a base setup for a session from what its car measured (POST /sessions/{id}/base-setup).
+     */
+    "base_setup_create.schema": {
+      /**
+       * @description Who drives the experiment that judges the base setup: the human, or AC's AI on the player's car.
+       * @enum {string}
+       */
+      driver: "human" | "ai";
+    };
+    /**
+     * BaseSetupChange
+     * @description One change that goes into the base setup, with the measurement it rests on.
+     */
+    BaseSetupChange: {
+      /** @description Item id in the game's setup. */
+      parameter: string;
+      label: string;
+      /** @description Clicks moved; negative lowers the raw value. Never 0. */
+      clicks: number;
+      /** @description Raw value on the baseline. */
+      from_value: number;
+      /** @description Raw value on the base setup. */
+      to_value: number;
+      /** @description Measured effect on the judged channel, per corner pass. */
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+      n_passes: number;
+      /** @enum {string} */
+      effect_class: "positive" | "negative" | "negligible" | "inconclusive";
+      /** @description The experiments the measurement is pooled from. */
+      experiment_ids: number[];
+    };
+    /**
+     * BaseSetupLeftOut
+     * @description A row of the profile that did not go into the base setup, and why.
+     */
+    BaseSetupLeftOut: {
+      parameter: string;
+      label: string;
+      /** @description Clicks moved; negative lowers the raw value. Never 0. */
+      clicks: number;
+      reason: string;
+    };
+    /**
+     * BaseSetupMeasured
+     * @description What this car measured on the judged channel over all corners: one row per item and clicks.
+     */
+    BaseSetupMeasured: {
+      parameter: string;
+      label: string;
+      /** @description Clicks moved; negative lowers the raw value. Never 0. */
+      clicks: number;
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+      n_passes: number;
+      /** @enum {string} */
+      effect_class: "positive" | "negative" | "negligible" | "inconclusive";
+    };
+    /**
+     * BaseSetupPrediction
+     * @description What the changes together are expected to do, written down before a lap is driven.
+     */
+    BaseSetupPrediction: {
+      channel: string;
+      /** @description Sum of the changes' estimates, per corner pass. */
+      estimate: number;
+      /** @description Interval from the summed variances. */
+      ci_low: number;
+      ci_high: number;
+      level: number;
+      /** @description What the prediction assumes. */
+      note: string;
+    };
+    /**
+     * BaseSetup
+     * @description A base setup built only from what this car measured.
+     */
+    BaseSetup: {
+      /** @description The channel the changes were chosen on. */
+      channel: string;
+      /** @description The changes, one per item, by item id. */
+      changes: components["schemas"]["BaseSetupChange"][];
+      /** @description Rows of the profile that were not taken, with the reason. */
+      left_out: components["schemas"]["BaseSetupLeftOut"][];
+      /** @description Everything this car measured on the channel, with its class. */
+      measured: components["schemas"]["BaseSetupMeasured"][];
+      prediction?: components["schemas"]["BaseSetupPrediction"];
+    };
+    /**
+     * BaseSetupReply
+     * @description Core's answer to POST /sessions/{id}/base-setup: the base setup and the experiment that judges it, or, when nothing qualifies, what the car measured and why.
+     */
+    "base_setup_reply.schema": {
+      car_name: string;
+      base_setup: components["schemas"]["BaseSetup"];
+      /** @description The proposed experiment comparing the baseline with the base setup; absent when none was created. */
+      experiment_id?: number;
+      /** @description Why no experiment was created; absent when one was. */
+      error?: string;
     };
     /**
      * CornerSummary
@@ -875,7 +1003,7 @@ export interface components {
     "experiment.schema": {
       id: number;
       /** @enum {string} */
-      kind: "ofat" | "factorial" | "recheck";
+      kind: "ofat" | "factorial" | "recheck" | "base";
       /** @enum {string} */
       state:
         | "proposed"
@@ -1110,6 +1238,44 @@ export interface operations {
         };
       };
       404: components["responses"]["Problem"];
+      502: components["responses"]["Problem"];
+    };
+  };
+  buildBaseSetup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["base_setup_create.schema"];
+      };
+    };
+    responses: {
+      /** @description The base setup, and the id of the proposed experiment. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["base_setup_reply.schema"];
+        };
+      };
+      404: components["responses"]["Problem"];
+      /** @description No measured change qualifies. The body says what the car measured. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["base_setup_reply.schema"];
+        };
+      };
+      422: components["responses"]["Problem"];
       502: components["responses"]["Problem"];
     };
   };

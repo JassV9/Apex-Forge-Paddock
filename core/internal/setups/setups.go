@@ -75,8 +75,8 @@ func Validate(catalog Catalog, values, anchor Values) error {
 }
 
 // Step returns base with one item moved by a number of clicks, validated. This is the only
-// way an experiment makes a variant, so a variant always differs from its baseline in exactly
-// one item.
+// way an experiment makes a variant: a one-factor variant differs from its baseline in exactly
+// one item, a base setup (docs/adr/0018-base-setup.md) is one Step per measured change.
 func Step(catalog Catalog, base Values, name string, clicks int) (Values, error) {
 	if clicks == 0 {
 		return nil, fmt.Errorf("%s: a change of 0 clicks is not a change", name)

@@ -1,0 +1,235 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "base_setup.schema.json",
+  "title": "BaseSetup",
+  "description": "A base setup built only from what this car measured.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "channel",
+    "changes",
+    "left_out",
+    "measured"
+  ],
+  "properties": {
+    "channel": {
+      "description": "The channel the changes were chosen on.",
+      "type": "string"
+    },
+    "changes": {
+      "description": "The changes, one per item, by item id.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BaseSetupChange"
+      }
+    },
+    "left_out": {
+      "description": "Rows of the profile that were not taken, with the reason.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BaseSetupLeftOut"
+      }
+    },
+    "measured": {
+      "description": "Everything this car measured on the channel, with its class.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BaseSetupMeasured"
+      }
+    },
+    "prediction": {
+      "$ref": "#/definitions/BaseSetupPrediction"
+    }
+  },
+  "definitions": {
+    "BaseSetupChange": {
+      "title": "BaseSetupChange",
+      "description": "One change that goes into the base setup, with the measurement it rests on.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "from_value",
+        "to_value",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes",
+        "effect_class",
+        "experiment_ids"
+      ],
+      "properties": {
+        "parameter": {
+          "description": "Item id in the game's setup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "description": "Clicks moved; negative lowers the raw value. Never 0.",
+          "type": "integer"
+        },
+        "from_value": {
+          "description": "Raw value on the baseline.",
+          "type": "number"
+        },
+        "to_value": {
+          "description": "Raw value on the base setup.",
+          "type": "number"
+        },
+        "estimate": {
+          "description": "Measured effect on the judged channel, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_class": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "negligible",
+            "inconclusive"
+          ]
+        },
+        "experiment_ids": {
+          "description": "The experiments the measurement is pooled from.",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "BaseSetupLeftOut": {
+      "title": "BaseSetupLeftOut",
+      "description": "A row of the profile that did not go into the base setup, and why.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "reason"
+      ],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "description": "Clicks moved; negative lowers the raw value. Never 0.",
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "BaseSetupMeasured": {
+      "title": "BaseSetupMeasured",
+      "description": "What this car measured on the judged channel over all corners: one row per item and clicks.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "label",
+        "clicks",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes",
+        "effect_class"
+      ],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "clicks": {
+          "description": "Clicks moved; negative lowers the raw value. Never 0.",
+          "type": "integer"
+        },
+        "estimate": {
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_class": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "negligible",
+            "inconclusive"
+          ]
+        }
+      }
+    },
+    "BaseSetupPrediction": {
+      "title": "BaseSetupPrediction",
+      "description": "What the changes together are expected to do, written down before a lap is driven.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "level",
+        "note"
+      ],
+      "properties": {
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimate": {
+          "description": "Sum of the changes' estimates, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "description": "Interval from the summed variances.",
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "level": {
+          "type": "number"
+        },
+        "note": {
+          "description": "What the prediction assumes.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

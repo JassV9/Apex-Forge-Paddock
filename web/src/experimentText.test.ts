@@ -47,6 +47,8 @@ describe("experiment text", () => {
     expect(changeText(running)).toBe("Front ARB −1 click");
     expect(changeText({ ...running, clicks: 2, parameter_label: "" })).toBe("ARB_FRONT +2 clicks");
     expect(changeText({ ...running, kind: "recheck" })).toMatch(/^Re-check/);
+    const base = { ...running, kind: "base" as const, statement: "Base setup: 2 measured changes" };
+    expect(changeText(base)).toBe("Base setup: 2 measured changes");
   });
 
   it("writes an effect with its interval and signs", () => {

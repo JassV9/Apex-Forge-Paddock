@@ -73,6 +73,11 @@ func (c *Client) Propose(ctx context.Context, request contracts.ProposeRequest) 
 	return post[contracts.Proposals](ctx, c, "/propose", request)
 }
 
+// BaseSetup chooses which of a car's measured changes make a base setup.
+func (c *Client) BaseSetup(ctx context.Context, request contracts.BaseSetupRequest) (contracts.BaseSetup, error) {
+	return post[contracts.BaseSetup](ctx, c, "/base-setup", request)
+}
+
 func post[T any](ctx context.Context, c *Client, path string, body any) (T, error) {
 	var reply T
 	if c.baseURL == "" {

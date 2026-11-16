@@ -1,5 +1,6 @@
 import type { SessionSummary } from "../../api/client";
 import { experimentHref, type Prefill, proposeHref, sessionHref } from "../../hooks/useRoute";
+import { BaseSetupPanel } from "../BaseSetupPanel";
 import { ExperimentPage } from "../ExperimentPage";
 import { Ledger } from "../Ledger";
 import { ProposeForm } from "../ProposeForm";
@@ -62,6 +63,7 @@ export function ExperimentsPanel({
           {...(experimentId === undefined ? {} : { selected: experimentId })}
         />
       </section>
+      <BaseSetupPanel session={session} readOnly={readOnly} />
       {propose !== undefined && readOnly && (
         <p className="empty">Experiments cannot be proposed in the read-only demo.</p>
       )}

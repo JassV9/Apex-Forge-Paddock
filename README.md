@@ -182,6 +182,12 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   always shown as a prior. The next experiment is ranked by expected gain per lap, and
   a change the car already showed to do nothing is left out with the reason
   ([ADR 0011](docs/adr/0011-sensitivity-and-ranking.md), [demo script](docs/demos/phase-5.md)).
+- A base setup built only from what the car measured: every change whose interval on corner
+  time lies wholly on the faster side of zero, one per item, never a prior or a non-linear
+  item, with the sum of the effects as the prediction. The combination is then judged as its
+  own experiment against the current setup, and becomes the champion only if it wins; with
+  nothing measured, it says to train the AI on the car first
+  ([ADR 0018](docs/adr/0018-base-setup.md)). Unverified in game.
 - A language model behind a gate. It gets the computed evidence and may only put it
   into words: a reply that cites a metric the session never measured, or states a
   number that is not in the evidence, is thrown away and template text is shown.

@@ -90,13 +90,15 @@ func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logg
 		logger.Error("run plans not written again", "error", err)
 	}
 	diagnoses := diagnosis.NewService(database, analysis, ledger, logger)
+	garage := sensitivity.NewService(database, analysis, diagnoses, logger)
 	return api.Deps{
 		Logger: logger, Version: version, Database: database,
 		Sessions:    store.NewReader(database),
 		Experiments: ledger,
 		Diagnoses:   diagnoses,
 		Passes:      passes.NewService(database, cfg.DataDir),
-		Garage:      sensitivity.NewService(database, analysis, diagnoses, logger),
+		Garage:      garage,
+		BaseSetups:  sensitivity.NewBaseSetups(garage, ledger, analysis, logger),
 		Metrics:     metrics.Handler,
 	}
 }

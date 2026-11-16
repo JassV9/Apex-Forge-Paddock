@@ -1,0 +1,236 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "base_setup_request.schema.json",
+  "title": "BaseSetupRequest",
+  "description": "Core asks the engine which measured changes make a base setup (POST /base-setup).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effects",
+    "items",
+    "channel",
+    "better",
+    "rope",
+    "level",
+    "guardrails"
+  ],
+  "properties": {
+    "effects": {
+      "description": "The car's sensitivity profile.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SensitivityEffect"
+      }
+    },
+    "items": {
+      "description": "The changeable items of the baseline setup, with their values.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BaseSetupItem"
+      }
+    },
+    "channel": {
+      "description": "The channel experiments are judged on.",
+      "type": "string",
+      "minLength": 1
+    },
+    "better": {
+      "type": "string",
+      "enum": [
+        "lower",
+        "higher"
+      ]
+    },
+    "rope": {
+      "description": "Band of practical equivalence of that channel.",
+      "type": "number",
+      "minimum": 0
+    },
+    "level": {
+      "description": "Level of the profile's intervals.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "guardrails": {
+      "description": "Channels that must not get worse; a change measured worse on one is left out.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/GuardrailSpec"
+      }
+    }
+  },
+  "definitions": {
+    "SensitivityEffect": {
+      "title": "SensitivityEffect",
+      "description": "What moving one setup item by some clicks does to one channel on this car: a pooled measurement, or a prior transferred from another car and flagged as one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "clicks",
+        "channel",
+        "corner_class",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "n_passes",
+        "effect_class",
+        "nonlinear",
+        "note",
+        "is_prior",
+        "prior_source",
+        "experiment_ids"
+      ],
+      "properties": {
+        "parameter": {
+          "description": "Item id in the game's setup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "clicks": {
+          "description": "Clicks moved; negative lowers the raw value. Never 0.",
+          "type": "integer"
+        },
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "description": "Variant minus baseline, in the channel's unit, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_class": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "negligible",
+            "inconclusive"
+          ]
+        },
+        "nonlinear": {
+          "description": "True when the item's other measured clicks show the response is not a straight line.",
+          "type": "boolean"
+        },
+        "note": {
+          "description": "Why it is flagged non-linear, or how a prior was derived; empty otherwise.",
+          "type": "string"
+        },
+        "is_prior": {
+          "description": "True when this was not measured on this car.",
+          "type": "boolean"
+        },
+        "prior_source": {
+          "description": "Name of the car a prior was transferred from; empty for a measurement.",
+          "type": "string"
+        },
+        "experiment_ids": {
+          "description": "The experiments the measurement is pooled from; empty for a prior.",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "BaseSetupItem": {
+      "title": "BaseSetupItem",
+      "description": "One changeable item of the baseline setup.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "min",
+        "max",
+        "step",
+        "value",
+        "paired"
+      ],
+      "properties": {
+        "name": {
+          "description": "Item id in the game's setup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "description": "Name shown in the game's setup screen.",
+          "type": "string"
+        },
+        "min": {
+          "description": "Lowest raw value.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Highest raw value.",
+          "type": "number"
+        },
+        "step": {
+          "description": "Raw value of one click.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "value": {
+          "description": "Raw value on the baseline setup.",
+          "type": "number"
+        },
+        "paired": {
+          "description": "True when another item of the car does the same job (one per wheel or side): such an item is never changed alone.",
+          "type": "boolean"
+        }
+      }
+    },
+    "GuardrailSpec": {
+      "title": "GuardrailSpec",
+      "description": "A channel that must not get worse by more than a tolerance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "tolerance",
+        "worse"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tolerance": {
+          "description": "Allowed change in the bad direction, in the channel's unit.",
+          "type": "number",
+          "minimum": 0
+        },
+        "worse": {
+          "description": "Which direction is bad.",
+          "type": "string",
+          "enum": [
+            "higher",
+            "lower"
+          ]
+        }
+      }
+    }
+  }
+}

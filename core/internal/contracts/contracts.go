@@ -84,6 +84,656 @@ func (j *Alternative) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// A base setup built only from what this car measured.
+type BaseSetup struct {
+	// The changes, one per item, by item id.
+	Changes []BaseSetupChange `json:"changes"`
+
+	// The channel the changes were chosen on.
+	Channel string `json:"channel"`
+
+	// Rows of the profile that were not taken, with the reason.
+	LeftOut []BaseSetupLeftOut `json:"left_out"`
+
+	// Everything this car measured on the channel, with its class.
+	Measured []BaseSetupMeasured `json:"measured"`
+
+	// Prediction corresponds to the JSON schema field "prediction".
+	Prediction *BaseSetupPrediction `json:"prediction,omitempty,omitzero"`
+}
+
+// One change that goes into the base setup, with the measurement it rests on.
+type BaseSetupChange struct {
+	// CiHigh corresponds to the JSON schema field "ci_high".
+	CiHigh float64 `json:"ci_high"`
+
+	// CiLow corresponds to the JSON schema field "ci_low".
+	CiLow float64 `json:"ci_low"`
+
+	// Clicks moved; negative lowers the raw value. Never 0.
+	Clicks int `json:"clicks"`
+
+	// EffectClass corresponds to the JSON schema field "effect_class".
+	EffectClass BaseSetupChangeEffectClass `json:"effect_class"`
+
+	// Measured effect on the judged channel, per corner pass.
+	Estimate float64 `json:"estimate"`
+
+	// The experiments the measurement is pooled from.
+	ExperimentIds []int `json:"experiment_ids"`
+
+	// Raw value on the baseline.
+	FromValue float64 `json:"from_value"`
+
+	// Label corresponds to the JSON schema field "label".
+	Label string `json:"label"`
+
+	// NPasses corresponds to the JSON schema field "n_passes".
+	NPasses int `json:"n_passes"`
+
+	// Item id in the game's setup.
+	Parameter string `json:"parameter"`
+
+	// Raw value on the base setup.
+	ToValue float64 `json:"to_value"`
+}
+
+type BaseSetupChangeEffectClass string
+
+const BaseSetupChangeEffectClassInconclusive BaseSetupChangeEffectClass = "inconclusive"
+const BaseSetupChangeEffectClassNegative BaseSetupChangeEffectClass = "negative"
+const BaseSetupChangeEffectClassNegligible BaseSetupChangeEffectClass = "negligible"
+const BaseSetupChangeEffectClassPositive BaseSetupChangeEffectClass = "positive"
+
+var enumValues_BaseSetupChangeEffectClass = []interface{}{
+	"positive",
+	"negative",
+	"negligible",
+	"inconclusive",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupChangeEffectClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_BaseSetupChangeEffectClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_BaseSetupChangeEffectClass, v)
+	}
+	*j = BaseSetupChangeEffectClass(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupChange) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ci_high"]; raw != nil && !ok {
+		return fmt.Errorf("field ci_high in BaseSetupChange: required")
+	}
+	if _, ok := raw["ci_low"]; raw != nil && !ok {
+		return fmt.Errorf("field ci_low in BaseSetupChange: required")
+	}
+	if _, ok := raw["clicks"]; raw != nil && !ok {
+		return fmt.Errorf("field clicks in BaseSetupChange: required")
+	}
+	if _, ok := raw["effect_class"]; raw != nil && !ok {
+		return fmt.Errorf("field effect_class in BaseSetupChange: required")
+	}
+	if _, ok := raw["estimate"]; raw != nil && !ok {
+		return fmt.Errorf("field estimate in BaseSetupChange: required")
+	}
+	if _, ok := raw["experiment_ids"]; raw != nil && !ok {
+		return fmt.Errorf("field experiment_ids in BaseSetupChange: required")
+	}
+	if _, ok := raw["from_value"]; raw != nil && !ok {
+		return fmt.Errorf("field from_value in BaseSetupChange: required")
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in BaseSetupChange: required")
+	}
+	if _, ok := raw["n_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field n_passes in BaseSetupChange: required")
+	}
+	if _, ok := raw["parameter"]; raw != nil && !ok {
+		return fmt.Errorf("field parameter in BaseSetupChange: required")
+	}
+	if _, ok := raw["to_value"]; raw != nil && !ok {
+		return fmt.Errorf("field to_value in BaseSetupChange: required")
+	}
+	type Plain BaseSetupChange
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.NPasses {
+		return fmt.Errorf("field %s: must be >= %v", "n_passes", 0)
+	}
+	if utf8.RuneCountInString(string(plain.Parameter)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)
+	}
+	*j = BaseSetupChange(plain)
+	return nil
+}
+
+// Build a base setup for a session from what its car measured (POST
+// /sessions/{id}/base-setup).
+type BaseSetupCreate struct {
+	// Who drives the experiment that judges the base setup: the human, or AC's AI on
+	// the player's car.
+	Driver BaseSetupCreateDriver `json:"driver"`
+}
+
+type BaseSetupCreateDriver string
+
+const BaseSetupCreateDriverAi BaseSetupCreateDriver = "ai"
+const BaseSetupCreateDriverHuman BaseSetupCreateDriver = "human"
+
+var enumValues_BaseSetupCreateDriver = []interface{}{
+	"human",
+	"ai",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupCreateDriver) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_BaseSetupCreateDriver {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_BaseSetupCreateDriver, v)
+	}
+	*j = BaseSetupCreateDriver(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupCreate) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["driver"]; raw != nil && !ok {
+		return fmt.Errorf("field driver in BaseSetupCreate: required")
+	}
+	type Plain BaseSetupCreate
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = BaseSetupCreate(plain)
+	return nil
+}
+
+// One changeable item of the baseline setup.
+type BaseSetupItem struct {
+	// Name shown in the game's setup screen.
+	Label string `json:"label"`
+
+	// Highest raw value.
+	Max float64 `json:"max"`
+
+	// Lowest raw value.
+	Min float64 `json:"min"`
+
+	// Item id in the game's setup.
+	Name string `json:"name"`
+
+	// True when another item of the car does the same job (one per wheel or side):
+	// such an item is never changed alone.
+	Paired bool `json:"paired"`
+
+	// Raw value of one click.
+	Step float64 `json:"step"`
+
+	// Raw value on the baseline setup.
+	Value float64 `json:"value"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupItem) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in BaseSetupItem: required")
+	}
+	if _, ok := raw["max"]; raw != nil && !ok {
+		return fmt.Errorf("field max in BaseSetupItem: required")
+	}
+	if _, ok := raw["min"]; raw != nil && !ok {
+		return fmt.Errorf("field min in BaseSetupItem: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in BaseSetupItem: required")
+	}
+	if _, ok := raw["paired"]; raw != nil && !ok {
+		return fmt.Errorf("field paired in BaseSetupItem: required")
+	}
+	if _, ok := raw["step"]; raw != nil && !ok {
+		return fmt.Errorf("field step in BaseSetupItem: required")
+	}
+	if _, ok := raw["value"]; raw != nil && !ok {
+		return fmt.Errorf("field value in BaseSetupItem: required")
+	}
+	type Plain BaseSetupItem
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
+	}
+	if 0 >= plain.Step {
+		return fmt.Errorf("field %s: must be > %v", "step", 0)
+	}
+	*j = BaseSetupItem(plain)
+	return nil
+}
+
+// A row of the profile that did not go into the base setup, and why.
+type BaseSetupLeftOut struct {
+	// Clicks moved; negative lowers the raw value. Never 0.
+	Clicks int `json:"clicks"`
+
+	// Label corresponds to the JSON schema field "label".
+	Label string `json:"label"`
+
+	// Parameter corresponds to the JSON schema field "parameter".
+	Parameter string `json:"parameter"`
+
+	// Reason corresponds to the JSON schema field "reason".
+	Reason string `json:"reason"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupLeftOut) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["clicks"]; raw != nil && !ok {
+		return fmt.Errorf("field clicks in BaseSetupLeftOut: required")
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in BaseSetupLeftOut: required")
+	}
+	if _, ok := raw["parameter"]; raw != nil && !ok {
+		return fmt.Errorf("field parameter in BaseSetupLeftOut: required")
+	}
+	if _, ok := raw["reason"]; raw != nil && !ok {
+		return fmt.Errorf("field reason in BaseSetupLeftOut: required")
+	}
+	type Plain BaseSetupLeftOut
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Parameter)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)
+	}
+	if utf8.RuneCountInString(string(plain.Reason)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "reason", 1)
+	}
+	*j = BaseSetupLeftOut(plain)
+	return nil
+}
+
+// What this car measured on the judged channel over all corners: one row per item
+// and clicks.
+type BaseSetupMeasured struct {
+	// CiHigh corresponds to the JSON schema field "ci_high".
+	CiHigh float64 `json:"ci_high"`
+
+	// CiLow corresponds to the JSON schema field "ci_low".
+	CiLow float64 `json:"ci_low"`
+
+	// Clicks moved; negative lowers the raw value. Never 0.
+	Clicks int `json:"clicks"`
+
+	// EffectClass corresponds to the JSON schema field "effect_class".
+	EffectClass BaseSetupMeasuredEffectClass `json:"effect_class"`
+
+	// Estimate corresponds to the JSON schema field "estimate".
+	Estimate float64 `json:"estimate"`
+
+	// Label corresponds to the JSON schema field "label".
+	Label string `json:"label"`
+
+	// NPasses corresponds to the JSON schema field "n_passes".
+	NPasses int `json:"n_passes"`
+
+	// Parameter corresponds to the JSON schema field "parameter".
+	Parameter string `json:"parameter"`
+}
+
+type BaseSetupMeasuredEffectClass string
+
+const BaseSetupMeasuredEffectClassInconclusive BaseSetupMeasuredEffectClass = "inconclusive"
+const BaseSetupMeasuredEffectClassNegative BaseSetupMeasuredEffectClass = "negative"
+const BaseSetupMeasuredEffectClassNegligible BaseSetupMeasuredEffectClass = "negligible"
+const BaseSetupMeasuredEffectClassPositive BaseSetupMeasuredEffectClass = "positive"
+
+var enumValues_BaseSetupMeasuredEffectClass = []interface{}{
+	"positive",
+	"negative",
+	"negligible",
+	"inconclusive",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupMeasuredEffectClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_BaseSetupMeasuredEffectClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_BaseSetupMeasuredEffectClass, v)
+	}
+	*j = BaseSetupMeasuredEffectClass(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupMeasured) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ci_high"]; raw != nil && !ok {
+		return fmt.Errorf("field ci_high in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["ci_low"]; raw != nil && !ok {
+		return fmt.Errorf("field ci_low in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["clicks"]; raw != nil && !ok {
+		return fmt.Errorf("field clicks in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["effect_class"]; raw != nil && !ok {
+		return fmt.Errorf("field effect_class in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["estimate"]; raw != nil && !ok {
+		return fmt.Errorf("field estimate in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["label"]; raw != nil && !ok {
+		return fmt.Errorf("field label in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["n_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field n_passes in BaseSetupMeasured: required")
+	}
+	if _, ok := raw["parameter"]; raw != nil && !ok {
+		return fmt.Errorf("field parameter in BaseSetupMeasured: required")
+	}
+	type Plain BaseSetupMeasured
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.NPasses {
+		return fmt.Errorf("field %s: must be >= %v", "n_passes", 0)
+	}
+	if utf8.RuneCountInString(string(plain.Parameter)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)
+	}
+	*j = BaseSetupMeasured(plain)
+	return nil
+}
+
+// What the changes together are expected to do, written down before a lap is
+// driven.
+type BaseSetupPrediction struct {
+	// Channel corresponds to the JSON schema field "channel".
+	Channel string `json:"channel"`
+
+	// CiHigh corresponds to the JSON schema field "ci_high".
+	CiHigh float64 `json:"ci_high"`
+
+	// Interval from the summed variances.
+	CiLow float64 `json:"ci_low"`
+
+	// Sum of the changes' estimates, per corner pass.
+	Estimate float64 `json:"estimate"`
+
+	// Level corresponds to the JSON schema field "level".
+	Level float64 `json:"level"`
+
+	// What the prediction assumes.
+	Note string `json:"note"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupPrediction) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["channel"]; raw != nil && !ok {
+		return fmt.Errorf("field channel in BaseSetupPrediction: required")
+	}
+	if _, ok := raw["ci_high"]; raw != nil && !ok {
+		return fmt.Errorf("field ci_high in BaseSetupPrediction: required")
+	}
+	if _, ok := raw["ci_low"]; raw != nil && !ok {
+		return fmt.Errorf("field ci_low in BaseSetupPrediction: required")
+	}
+	if _, ok := raw["estimate"]; raw != nil && !ok {
+		return fmt.Errorf("field estimate in BaseSetupPrediction: required")
+	}
+	if _, ok := raw["level"]; raw != nil && !ok {
+		return fmt.Errorf("field level in BaseSetupPrediction: required")
+	}
+	if _, ok := raw["note"]; raw != nil && !ok {
+		return fmt.Errorf("field note in BaseSetupPrediction: required")
+	}
+	type Plain BaseSetupPrediction
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Channel)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "channel", 1)
+	}
+	*j = BaseSetupPrediction(plain)
+	return nil
+}
+
+// Core's answer to POST /sessions/{id}/base-setup: the base setup and the
+// experiment that judges it, or, when nothing qualifies, what the car measured and
+// why.
+type BaseSetupReply struct {
+	// BaseSetup corresponds to the JSON schema field "base_setup".
+	BaseSetup BaseSetup `json:"base_setup"`
+
+	// CarName corresponds to the JSON schema field "car_name".
+	CarName string `json:"car_name"`
+
+	// Why no experiment was created; absent when one was.
+	Error *string `json:"error,omitempty,omitzero"`
+
+	// The proposed experiment comparing the baseline with the base setup; absent when
+	// none was created.
+	ExperimentId *int `json:"experiment_id,omitempty,omitzero"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupReply) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["base_setup"]; raw != nil && !ok {
+		return fmt.Errorf("field base_setup in BaseSetupReply: required")
+	}
+	if _, ok := raw["car_name"]; raw != nil && !ok {
+		return fmt.Errorf("field car_name in BaseSetupReply: required")
+	}
+	type Plain BaseSetupReply
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.ExperimentId != nil && 1 > *plain.ExperimentId {
+		return fmt.Errorf("field %s: must be >= %v", "experiment_id", 1)
+	}
+	*j = BaseSetupReply(plain)
+	return nil
+}
+
+// Core asks the engine which measured changes make a base setup (POST
+// /base-setup).
+type BaseSetupRequest struct {
+	// Better corresponds to the JSON schema field "better".
+	Better BaseSetupRequestBetter `json:"better"`
+
+	// The channel experiments are judged on.
+	Channel string `json:"channel"`
+
+	// The car's sensitivity profile.
+	Effects []SensitivityEffect `json:"effects"`
+
+	// Channels that must not get worse; a change measured worse on one is left out.
+	Guardrails []GuardrailSpec `json:"guardrails"`
+
+	// The changeable items of the baseline setup, with their values.
+	Items []BaseSetupItem `json:"items"`
+
+	// Level of the profile's intervals.
+	Level float64 `json:"level"`
+
+	// Band of practical equivalence of that channel.
+	Rope float64 `json:"rope"`
+}
+
+type BaseSetupRequestBetter string
+
+const BaseSetupRequestBetterHigher BaseSetupRequestBetter = "higher"
+const BaseSetupRequestBetterLower BaseSetupRequestBetter = "lower"
+
+var enumValues_BaseSetupRequestBetter = []interface{}{
+	"lower",
+	"higher",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupRequestBetter) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_BaseSetupRequestBetter {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_BaseSetupRequestBetter, v)
+	}
+	*j = BaseSetupRequestBetter(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetupRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["better"]; raw != nil && !ok {
+		return fmt.Errorf("field better in BaseSetupRequest: required")
+	}
+	if _, ok := raw["channel"]; raw != nil && !ok {
+		return fmt.Errorf("field channel in BaseSetupRequest: required")
+	}
+	if _, ok := raw["effects"]; raw != nil && !ok {
+		return fmt.Errorf("field effects in BaseSetupRequest: required")
+	}
+	if _, ok := raw["guardrails"]; raw != nil && !ok {
+		return fmt.Errorf("field guardrails in BaseSetupRequest: required")
+	}
+	if _, ok := raw["items"]; raw != nil && !ok {
+		return fmt.Errorf("field items in BaseSetupRequest: required")
+	}
+	if _, ok := raw["level"]; raw != nil && !ok {
+		return fmt.Errorf("field level in BaseSetupRequest: required")
+	}
+	if _, ok := raw["rope"]; raw != nil && !ok {
+		return fmt.Errorf("field rope in BaseSetupRequest: required")
+	}
+	type Plain BaseSetupRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Channel)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "channel", 1)
+	}
+	if 1 <= plain.Level {
+		return fmt.Errorf("field %s: must be < %v", "level", 1)
+	}
+	if 0 >= plain.Level {
+		return fmt.Errorf("field %s: must be > %v", "level", 0)
+	}
+	if 0 > plain.Rope {
+		return fmt.Errorf("field %s: must be >= %v", "rope", 0)
+	}
+	*j = BaseSetupRequest(plain)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *BaseSetup) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["changes"]; raw != nil && !ok {
+		return fmt.Errorf("field changes in BaseSetup: required")
+	}
+	if _, ok := raw["channel"]; raw != nil && !ok {
+		return fmt.Errorf("field channel in BaseSetup: required")
+	}
+	if _, ok := raw["left_out"]; raw != nil && !ok {
+		return fmt.Errorf("field left_out in BaseSetup: required")
+	}
+	if _, ok := raw["measured"]; raw != nil && !ok {
+		return fmt.Errorf("field measured in BaseSetup: required")
+	}
+	type Plain BaseSetup
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = BaseSetup(plain)
+	return nil
+}
+
 // One experiment that would test the hypothesis: one setup item moved by a number
 // of clicks.
 type Candidate struct {
@@ -1466,6 +2116,7 @@ func (j *ExperimentEvent) UnmarshalJSON(value []byte) error {
 
 type ExperimentKind string
 
+const ExperimentKindBase ExperimentKind = "base"
 const ExperimentKindFactorial ExperimentKind = "factorial"
 const ExperimentKindOfat ExperimentKind = "ofat"
 const ExperimentKindRecheck ExperimentKind = "recheck"
@@ -1474,6 +2125,7 @@ var enumValues_ExperimentKind = []interface{}{
 	"ofat",
 	"factorial",
 	"recheck",
+	"base",
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

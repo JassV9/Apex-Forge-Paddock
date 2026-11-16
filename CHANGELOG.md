@@ -2,6 +2,16 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Unreleased: the driving flow
+
+- Base setup from the car's own measurements (ADR 0018): engine `POST /base-setup` takes each
+  change measured faster on corner time (interval wholly below zero, even inside the 5 ms
+  band), one per item, never a prior, a non-linear row, a guardrail measured worse or a
+  paired item, and predicts the sum with summed variances. Core
+  `POST /sessions/{id}/base-setup {driver}` proposes it as an experiment of kind `base`
+  (migration 00007) or answers 409 with what the car measured; accepted, the base is the
+  champion. Web: a "Base setup" panel in the experiments tab. Unverified in game.
+
 ## AI calibration and the first full AI experiment in the game (2026-11-16)
 
 - agent: calibration learns the grip the AI assumes (its tyre hint, -3 % per lap with an

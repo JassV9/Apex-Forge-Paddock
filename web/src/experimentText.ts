@@ -36,6 +36,7 @@ export function isBlind(experiment: Experiment): boolean {
 /** What the experiment changes, in words. */
 export function changeText(experiment: Experiment): string {
   if (experiment.kind === "recheck") return "Re-check: champion against the original baseline";
+  if (experiment.kind === "base") return experiment.statement;
   const clicks = Math.abs(experiment.clicks);
   const direction = experiment.clicks < 0 ? "−" : "+";
   const name =

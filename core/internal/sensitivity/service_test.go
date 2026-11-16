@@ -76,6 +76,7 @@ func TestExperimentsThatSayNothingAboutOneItemAreLeftOut(t *testing.T) {
 		{name: "still being driven", entry: entry{parameter: "ARB_FRONT", clicks: -1, state: "running"}},
 		{name: "aborted", entry: entry{parameter: "ARB_FRONT", clicks: -1, state: "aborted"}},
 		{name: "a re-check of the champion", entry: entry{parameter: "ARB_FRONT", clicks: -1, kind: "recheck"}},
+		{name: "a base setup (several items at once)", entry: entry{kind: "base"}},
 		{name: "judged at another level", entry: entry{parameter: "ARB_FRONT", clicks: -1, level: 0.95}},
 		{name: "no change", entry: entry{parameter: "ARB_FRONT", clicks: 0}},
 	}

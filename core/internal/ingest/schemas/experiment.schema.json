@@ -37,7 +37,8 @@
       "enum": [
         "ofat",
         "factorial",
-        "recheck"
+        "recheck",
+        "base"
       ]
     },
     "state": {

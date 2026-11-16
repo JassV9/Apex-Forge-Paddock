@@ -40,9 +40,28 @@ local function aiDriver()
     if ui.button("Stop the AI driver") then ghost.stop() end
   elseif plan.blockOrder() then
     if ui.button("Let the AI drive this plan") then ghost.resume() end
-  elseif ui.button("Let the AI drive laps") then
-    ghost.lap()
+  else
+    if ui.button("Calibrate the AI on this car") then ghost.calibrate() end
+    ui.sameLine()
+    if ui.button("Let the AI drive laps") then ghost.lap() end
   end
+end
+
+local function training()
+  ui.header("Train the AI on this car")
+  local program = link.training
+  if program then
+    if program.target > 0 then
+      ui.progressBar(program.done / program.target, vec2(-1, 0),
+        program.done .. " of " .. program.target .. " experiments")
+    end
+    ui.textWrapped(program.message)
+    if ui.button("Stop training") then link.stopTraining(program.id) end
+    return
+  end
+  ui.textColored(string.format("The AI drives the %d best-ranked experiments of this session, one after"
+    .. " another, and judges each. Calibrate first.", link.TRAINING_EXPERIMENTS), GREY)
+  if ghost.allowed() and link.sessionId and ui.button("Start training") then link.train() end
 end
 
 local function experiments()
@@ -104,6 +123,7 @@ function window.draw(agent)
     ui.tabItem("Setups", function()
       if link.message ~= "" then ui.textColored(link.message, link.reachable == false and RED or GREY) end
       experiments()
+      training()
       proposals()
     end)
   end)

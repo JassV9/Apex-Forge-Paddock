@@ -91,5 +91,10 @@ function calibration.release()
 end
 
 function calibration.summary() return aitune.summary(calibration.state) end
+function calibration.calibrated() return aitune.calibrated(calibration.state) end
+
+---Calibrating again checks the learned grip with fresh clean laps: on another setup or day
+---the AI may not keep the car on the track where it did before.
+function calibration.recount() calibration.state.cleanLaps = 0 end
 
 return calibration

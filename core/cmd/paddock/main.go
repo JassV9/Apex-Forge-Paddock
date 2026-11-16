@@ -24,6 +24,7 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/sensitivity"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/store"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/telemetry"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/training"
 )
 
 // version is set at build time: -ldflags "-X main.version=1.2.3".
@@ -37,6 +38,8 @@ const (
 	// The agent writes each spool file to a temporary name and renames it, so a visible file
 	// is complete; the settle time only covers file systems where a rename is not atomic.
 	spoolSettleTime = time.Second
+	// A training program looks at its experiment this often: a block of AI laps takes minutes.
+	trainingInterval = 15 * time.Second
 )
 
 func main() {
@@ -75,30 +78,40 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := startFeatures(ctx, cfg, database, analysis, logger, metrics); err != nil {
 		return err
 	}
+	deps, trainer := services(cfg, database, analysis, logger, metrics)
+	go func() {
+		if err := trainer.Run(ctx, trainingInterval); err != nil {
+			logger.Error("training programs stopped", "error", err)
+		}
+	}()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           api.NewHandler(services(cfg, database, analysis, logger, metrics)),
+		Handler:           api.NewHandler(deps),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 	return serve(ctx, server, logger)
 }
 
-// services wires everything the API serves to the database and the engine.
-func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) api.Deps {
+// services wires everything the API serves to the database and the engine, and returns the
+// training service whose loop runs beside the API.
+func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) (api.Deps, *training.Service) {
 	ledger := experiments.NewService(database, analysis, experiments.Outbox{Dir: cfg.OutboxDir}, logger)
 	if err := ledger.PublishRunning(context.Background()); err != nil {
 		logger.Error("run plans not written again", "error", err)
 	}
 	diagnoses := diagnosis.NewService(database, analysis, ledger, logger)
+	garage := sensitivity.NewService(database, analysis, diagnoses, logger)
+	trainer := training.NewService(database, ledger, garage, diagnoses, logger)
 	return api.Deps{
 		Logger: logger, Version: version, Database: database,
 		Sessions:    store.NewReader(database),
 		Experiments: ledger,
 		Diagnoses:   diagnoses,
 		Passes:      passes.NewService(database, cfg.DataDir),
-		Garage:      sensitivity.NewService(database, analysis, diagnoses, logger),
+		Garage:      garage,
+		Training:    trainer,
 		Metrics:     metrics.Handler,
-	}
+	}, trainer
 }
 
 func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (*sql.DB, error) {

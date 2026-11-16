@@ -54,12 +54,23 @@ command is silently ignored).
 
 ## Calibration
 
-Before an experiment, let the AI drive free laps until the window (or `agent_status.json`)
-says **calibrated**: two clean laps in a row. Every lap where it went off, spun, stopped,
+Before an experiment, press **Calibrate the AI on this car** in the window's Run tab (or send
+`"command": "calibrate"`): the AI drives free laps until the window (or `agent_status.json`)
+says **calibrated**, two clean laps in a row, then parks the car in its pit box. Every lap where it went off, spun, stopped,
 was reset or took damage lowers the grip it assumes by 3 %
 ([ADR 0016](../adr/0016-ai-calibration.md)). The result is kept per car and layout in
 `Documents/Assetto Corsa/paddock/ai_tune/`; `last_incidents` there says in which of the 200
 sections of the lap it last went wrong. Delete the file to start over.
+
+## Training: the AI tests the car by itself
+
+Once calibrated, **Setups › Train the AI on this car › Start training** (or
+`POST /sessions/{id}/training {"experiments": 4}` with the calibrated AI session) runs the
+session's best-ranked experiments one after another with the AI driving. Core judges each one
+when its laps are in, extends a promising inconclusive one once, puts the baseline back after
+a loss, and starts the next untested item ([ADR 0020](../adr/0020-ai-training-program.md)). A
+trade-off waits for you. Leave the game running; about 40 minutes per experiment on a 2:15 lap.
+`GET /training` and the window show where it is; **Stop training** ends it.
 
 ## What the agent does with the car, and when it gives up
 

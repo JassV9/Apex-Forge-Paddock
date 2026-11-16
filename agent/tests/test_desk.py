@@ -119,6 +119,7 @@ class FakeCore:
         self.agent = agent
         self.requests: list[tuple[str, str, Any]] = []
         self.experiments: list[dict[str, Any]] = []
+        self.training: list[dict[str, Any]] = []
 
     def __call__(self, url: str, headers: Any, body: Any) -> tuple[int, str]:
         path = url.removeprefix("http://127.0.0.1:8080")
@@ -127,7 +128,10 @@ class FakeCore:
         answers: dict[str, Any] = {
             "/sessions": [{"id": 11, "spool_id": spool}],
             "/experiments": self.experiments,
+            "/training": self.training,
             "/sessions/11/proposals": PROPOSALS,
+            "/sessions/11/training": {"id": 3, "message": "Experiment 21 is on the car."},
+            "/training/3/stop": {"id": 3, "state": "stopped"},
         }
         if path == "/experiments" and body is not None:
             return 201, json.dumps(experiment(21, "proposed"))
@@ -164,6 +168,69 @@ def test_the_window_offers_the_proposals_and_starts_one_for_the_ai(agent: Agent)
         "/experiments/21/start",
     ]
     assert posts[0][1]["driver"] == "ai" and posts[0][1]["parameter"] == "WING_1"
+
+
+def posted(core: FakeCore) -> list[tuple[str, Any]]:
+    return [
+        (path, json.loads(body) if body else None)
+        for verb, path, body in core.requests
+        if verb == "POST"
+    ]
+
+
+def test_the_window_starts_ai_training_and_shows_it_until_stopped(agent: Agent) -> None:
+    core = FakeCore(agent)
+    agent.mock["web_post"] = core
+    agent.mock["physicsAllowed"] = True
+    assert "Start training" in draw(agent)
+
+    agent.mock["clicks"]["Start training"] = True
+    draw(agent)
+    assert posted(core) == [("/sessions/11/training", {"experiments": 4})]
+
+    agent.mock["clicks"]["Start training"] = False
+    core.training = [
+        {
+            "id": 3,
+            "car_name": "Mazda MX-5 Cup",
+            "state": "running",
+            "target": 4,
+            "message": "The AI is driving experiment 21.",
+            "steps": [{"experiment_id": 21}],
+        },
+    ]
+    agent.rt.eval('require("game.desk_link").refresh')(99, None, "Mazda MX-5 Cup", True)
+    assert "Stop training" in draw(agent)
+    agent.mock["clicks"]["Stop training"] = True
+    draw(agent)
+    assert posted(core)[-1] == ("/training/3/stop", None)
+
+
+def test_only_this_cars_open_program_is_shown(rt):
+    programs = to_lua(
+        rt,
+        [
+            {
+                "id": 1,
+                "car_name": "Ferrari 488 GT3",
+                "state": "done",
+                "target": 2,
+                "steps": [{}, {}],
+            },
+            {
+                "id": 2,
+                "car_name": "Ferrari 488 GT3",
+                "state": "waiting",
+                "target": 4,
+                "message": "trade-off",
+                "steps": [{}],
+            },
+            {"id": 5, "car_name": "Mazda MX-5 Cup", "state": "running", "target": 4, "steps": []},
+        ],
+    )
+    program = to_py(desk(rt).training(programs, "Ferrari 488 GT3"))
+    assert program == {"id": 2, "state": "waiting", "message": "trade-off", "done": 1, "target": 4}
+    assert desk(rt).training(programs, "Lotus 49") is None
 
 
 def test_the_window_asks_core_at_most_every_ten_seconds(agent: Agent) -> None:

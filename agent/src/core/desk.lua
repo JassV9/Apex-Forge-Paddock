@@ -83,4 +83,17 @@ function desk.lastVerdict(experiments, carName)
   return string.format("#%d %s: %s", best.id, best.state, best.verdict.reason or "")
 end
 
+---This car's open AI training program (GET /training), or nil: its id, what it is doing, and
+---how far it is (experiments started of its target).
+function desk.training(programs, carName)
+  if type(programs) ~= "table" then return nil end
+  for _, p in ipairs(programs) do
+    if p.car_name == carName and (p.state == "running" or p.state == "waiting") then
+      return { id = p.id, state = p.state, message = p.message or "",
+        done = type(p.steps) == "table" and #p.steps or 0, target = p.target or 0 }
+    end
+  end
+  return nil
+end
+
 return desk

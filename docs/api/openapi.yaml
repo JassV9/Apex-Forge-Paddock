@@ -273,6 +273,61 @@ paths:
           $ref: "#/components/responses/Problem"
         "422":
           $ref: "#/components/responses/Problem"
+  /sessions/{id}/training:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      operationId: startTraining
+      summary: Start an AI training program on the session's car and track.
+      description: >
+        AC's AI drives the session's top-ranked experiments one after another on the car's
+        calibrated grip. Each is judged when its laps are in; the next is taken from the
+        ranking that verdict changed, skipping items the program has already tested. An open
+        AI experiment on the car is taken over as the first step. 409 when a program is
+        already open on the car or a human's experiment is on it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/TrainingProgram"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "502":
+          $ref: "#/components/responses/Problem"
+  /training:
+    get:
+      operationId: listTraining
+      summary: Every training program, newest first.
+      responses:
+        "200":
+          description: The programs with their steps.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrainingProgram"
+  /training/{id}/stop:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: stopTraining
+      summary: Stop a program. An experiment it started stays as it is, to finish or abort.
+      responses:
+        "200":
+          $ref: "#/components/responses/TrainingProgram"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     SessionId:
@@ -289,7 +344,20 @@ components:
       schema:
         type: integer
         minimum: 1
+    ProgramId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
   responses:
+    TrainingProgram:
+      description: The training program as it is after the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TrainingProgram"
     Experiment:
       description: The experiment as it is after the request.
       content:
@@ -338,6 +406,10 @@ components:
       $ref: "../../contracts/session_passes.schema.json"
     PassTrace:
       $ref: "../../contracts/pass_trace.schema.json"
+    TrainingCreate:
+      $ref: "../../contracts/training_create.schema.json"
+    TrainingProgram:
+      $ref: "../../contracts/training_program.schema.json"
     Problem:
       type: object
       additionalProperties: false

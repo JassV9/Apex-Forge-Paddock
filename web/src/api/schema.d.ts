@@ -261,6 +261,64 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/training": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start an AI training program on the session's car and track.
+     * @description AC's AI drives the session's top-ranked experiments one after another on the car's calibrated grip. Each is judged when its laps are in; the next is taken from the ranking that verdict changed, skipping items the program has already tested. An open AI experiment on the car is taken over as the first step. 409 when a program is already open on the car or a human's experiment is on it.
+     */
+    post: operations["startTraining"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/training": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Every training program, newest first. */
+    get: operations["listTraining"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/training/{id}/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ProgramId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop a program. An experiment it started stays as it is, to finish or abort. */
+    post: operations["stopTraining"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -277,6 +335,8 @@ export interface components {
     Scorecard: components["schemas"]["scorecard.schema"];
     SessionPasses: components["schemas"]["session_passes.schema"];
     PassTrace: components["schemas"]["pass_trace.schema"];
+    TrainingCreate: components["schemas"]["training_create.schema"];
+    TrainingProgram: components["schemas"]["training_program.schema"];
     Problem: {
       /** @description What went wrong, in words. */
       error: string;
@@ -954,8 +1014,57 @@ export interface components {
       /** @description True keeps the variant; false goes back to the baseline. */
       accept: boolean;
     };
+    /**
+     * TrainingCreate
+     * @description Start an AI training program on a session's car and track (docs/adr/0020-ai-training-program.md).
+     */
+    "training_create.schema": {
+      /** @description How many experiments the AI drives before the program ends. An open AI experiment on the car is taken over and counts as the first. */
+      experiments: number;
+    };
+    /** TrainingStep */
+    TrainingStep: {
+      experiment_id: number;
+      parameter: string;
+      clicks: number;
+      /** @description The experiment's state (see experiment.schema.json). */
+      state: string;
+    };
+    /**
+     * TrainingProgram
+     * @description A queue of experiments AC's AI drives on a car one after another; each is judged when its laps are in and the next is taken from the ranking the verdict changed.
+     */
+    "training_program.schema": {
+      id: number;
+      /** @description The AI session whose diagnosis the experiments are ranked from. */
+      session_id: number;
+      car_name: string;
+      track_name: string;
+      /** @description How many experiments the program drives. */
+      target: number;
+      /**
+       * @description running: driving or about to. waiting: needs the driver (a trade-off to decide, or another experiment is on the car). done: target reached or nothing left to test. stopped: by the driver.
+       * @enum {string}
+       */
+      state: "running" | "waiting" | "done" | "stopped";
+      /** @description What the program is doing or why it waits, in words. */
+      message: string;
+      /** Format: date-time */
+      created_at: string;
+      /** @description The program's experiments, oldest first. */
+      steps: components["schemas"]["TrainingStep"][];
+    };
   };
   responses: {
+    /** @description The training program as it is after the request. */
+    TrainingProgram: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["training_program.schema"];
+      };
+    };
     /** @description The experiment as it is after the request. */
     Experiment: {
       headers: {
@@ -987,6 +1096,7 @@ export interface components {
   parameters: {
     SessionId: number;
     ExperimentId: number;
+    ProgramId: number;
   };
   requestBodies: never;
   headers: never;
@@ -1295,6 +1405,64 @@ export interface operations {
       404: components["responses"]["Problem"];
       409: components["responses"]["Problem"];
       422: components["responses"]["Problem"];
+    };
+  };
+  startTraining: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["training_create.schema"];
+      };
+    };
+    responses: {
+      201: components["responses"]["TrainingProgram"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
+      422: components["responses"]["Problem"];
+      502: components["responses"]["Problem"];
+    };
+  };
+  listTraining: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The programs with their steps. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["training_program.schema"][];
+        };
+      };
+    };
+  };
+  stopTraining: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ProgramId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components["responses"]["TrainingProgram"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
     };
   };
 }

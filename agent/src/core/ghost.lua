@@ -99,6 +99,11 @@ local function whileDriving(s, o)
     s.retries = 0
     return goToPits(s, o.block, "AI driver: block done, to the pits for " .. name(o.block) .. ".")
   end
+  if s.block == 0 and s.untilCalibrated and o.calibrated then
+    s.phase, s.free, s.untilCalibrated = "off", false, false
+    s.message = "AI calibrated on this car: the car is yours, or start an experiment."
+    return { act("autopilot_off"), act("teleport_pits") }
+  end
   if s.block == 0 and o.fuel and o.fuel < ghost.RESERVE_L then
     return goToPits(s, 0, "AI driver: refuelling for free laps.")
   end
@@ -126,7 +131,7 @@ end
 ---(physics access), block (order being driven, or nil),
 ---parked (in the pit box and still), onTrack, speedKmh, ai (car is AI controlled), fuel,
 ---damage (the largest damage zone), resets (the car's reset counter), lapsDone (laps the plan
----has counted in this block).
+---has counted in this block), calibrated (the AI calibration has its clean laps).
 ---@return table[] actions, in order: autopilot_on/off, teleport_pits, repair, repair_body,
 ---set_fuel, load, start
 function ghost.step(s, o)
@@ -176,8 +181,15 @@ end
 
 ---Let the AI lap the car on its current setup until stopped (when there is no plan).
 function ghost.lap(s)
-  s.free, s.halted, s.retries = true, false, 0
+  s.free, s.halted, s.retries, s.untilCalibrated = true, false, 0, false
   if s.phase == "failed" then s.phase = "off" end
+end
+
+---Free laps that end by themselves once the calibration says calibrated (`calibrated` in
+---the observation), with the car parked in its pit box.
+function ghost.calibrate(s)
+  ghost.lap(s)
+  s.untilCalibrated = true
 end
 
 ---The session restarted: whatever the AI was doing starts over from the pits.

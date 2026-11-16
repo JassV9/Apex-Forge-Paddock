@@ -8,7 +8,8 @@ local desk = require("core.desk")
 local link = {
   url = "http://127.0.0.1:8080",
   REFRESH_S = 10,
-  sessionId = nil, proposals = {}, experiments = {}, verdict = nil,
+  sessionId = nil, proposals = {}, experiments = {}, verdict = nil, training = nil,
+  TRAINING_EXPERIMENTS = 4,
   message = "", busy = false, reachable = nil,
 }
 
@@ -61,7 +62,10 @@ function link.refresh(now, spoolId, carName, force)
     get("/experiments", function(experiments)
       link.experiments = desk.openExperiments(experiments, carName)
       link.verdict = desk.lastVerdict(experiments, carName)
-      loadProposals(function() done() end)
+      get("/training", function(programs)
+        link.training = desk.training(programs, carName)
+        loadProposals(function() done() end)
+      end)
     end)
   end)
 end
@@ -99,6 +103,27 @@ function link.act(id, action)
   post("/experiments/" .. id .. "/" .. action, nil, function(exp, err)
     nextRefresh = 0
     done(exp and string.format("Experiment %d: %s.", id, exp.state) or err)
+  end)
+end
+
+---Start an AI training program from this session: the AI drives its top-ranked experiments one
+---after another (docs/adr/0020-ai-training-program.md).
+function link.train()
+  if link.busy or not link.sessionId then return end
+  link.busy = true
+  post("/sessions/" .. link.sessionId .. "/training", { experiments = link.TRAINING_EXPERIMENTS }, function(p, err)
+    nextRefresh = 0
+    done(p and ("Training started: " .. (p.message or "")) or ("Training not started: " .. tostring(err)))
+  end)
+end
+
+---Stop this car's training program. Its running experiment stays, to finish or abort.
+function link.stopTraining(id)
+  if link.busy then return end
+  link.busy = true
+  post("/training/" .. id .. "/stop", nil, function(p, err)
+    nextRefresh = 0
+    done(p and "Training stopped." or tostring(err))
   end)
 end
 

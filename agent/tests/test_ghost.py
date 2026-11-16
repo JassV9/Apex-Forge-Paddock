@@ -197,6 +197,28 @@ def start_free_laps(rt: Any, ghost: Any, state: Any) -> None:
     assert state.block == 0
 
 
+def test_calibrating_stops_by_itself_once_calibrated_and_parks_the_car(rt):
+    ghost, state = machine(rt)
+    ghost.calibrate(state)
+    ghost.step(state, obs(rt, **FREE))
+    run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, **FREE)
+    ghost.loaded(state, True, "")
+
+    assert run_for(rt, ghost, state, 5, calibrated=False, **FREE) == [], "laps on until calibrated"
+    seen = names(ghost.step(state, obs(rt, calibrated=True, **FREE)))
+    assert seen == ["autopilot_off", "teleport_pits"]
+    assert state.phase == "off" and "calibrated" in state.message
+    assert names(ghost.step(state, obs(rt, calibrated=True, **FREE))) == [], "and stays parked"
+
+
+def test_plain_free_laps_go_on_after_calibration(rt):
+    ghost, state = machine(rt)
+    start_free_laps(rt, ghost, state)
+
+    assert run_for(rt, ghost, state, 5, calibrated=True, **FREE) == []
+    assert state.phase == "driving"
+
+
 def test_free_laps_go_in_to_refuel_without_counting_a_retry(rt):
     ghost, state = machine(rt)
     start_free_laps(rt, ghost, state)

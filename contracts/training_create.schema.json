@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "training_create.schema.json",
+  "title": "TrainingCreate",
+  "description": "Start an AI training program on a session's car and track (docs/adr/0020-ai-training-program.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["experiments"],
+  "properties": {
+    "experiments": {
+      "description": "How many experiments the AI drives before the program ends. An open AI experiment on the car is taken over and counts as the first.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    }
+  }
+}

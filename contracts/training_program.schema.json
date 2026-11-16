@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "training_program.schema.json",
+  "title": "TrainingProgram",
+  "description": "A queue of experiments AC's AI drives on a car one after another; each is judged when its laps are in and the next is taken from the ranking the verdict changed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "session_id", "car_name", "track_name", "target", "state", "message", "created_at", "steps"],
+  "properties": {
+    "id": {"type": "integer", "minimum": 1},
+    "session_id": {
+      "description": "The AI session whose diagnosis the experiments are ranked from.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "car_name": {"type": "string"},
+    "track_name": {"type": "string"},
+    "target": {
+      "description": "How many experiments the program drives.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "state": {
+      "description": "running: driving or about to. waiting: needs the driver (a trade-off to decide, or another experiment is on the car). done: target reached or nothing left to test. stopped: by the driver.",
+      "type": "string",
+      "enum": ["running", "waiting", "done", "stopped"]
+    },
+    "message": {
+      "description": "What the program is doing or why it waits, in words.",
+      "type": "string"
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "steps": {
+      "description": "The program's experiments, oldest first.",
+      "type": "array",
+      "items": {"$ref": "#/definitions/TrainingStep"}
+    }
+  },
+  "definitions": {
+    "TrainingStep": {
+      "title": "TrainingStep",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["experiment_id", "parameter", "clicks", "state"],
+      "properties": {
+        "experiment_id": {"type": "integer", "minimum": 1},
+        "parameter": {"type": "string"},
+        "clicks": {"type": "integer"},
+        "state": {
+          "description": "The experiment's state (see experiment.schema.json).",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

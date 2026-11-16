@@ -79,7 +79,7 @@ function ghost.update(dt, car)
     block = plan.blockOrder(), parked = car.isInPit and car.speedKmh < 1,
     onTrack = not car.isInPitlane, speedKmh = car.speedKmh, ai = car.isAIControlled, fuel = car.fuel,
     damage = math.max(car.damage[0], car.damage[1], car.damage[2], car.damage[3]),
-    resets = car.resetCounter, lapsDone = lapsDone,
+    resets = car.resetCounter, lapsDone = lapsDone, calibrated = calibration.calibrated(),
   })
   -- a block retried (reset by the game, stuck, damaged) is the clearest incident of all: the
   -- lap it ends is counted before the car leaves the track
@@ -99,9 +99,13 @@ function ghost.allowed() return allowed() end
 function ghost.stop() perform(core.stop(ghost.state)) end
 function ghost.resume() core.resume(ghost.state) end
 function ghost.lap() core.lap(ghost.state) end
+function ghost.calibrate()
+  calibration.recount()
+  core.calibrate(ghost.state)
+end
 
 -- Commands from outside the game (outbox/agent_command.json: {"id": n, "at": unix seconds,
--- "command": "ai_laps" | "stop"}), read every COMMAND_POLL_S. Each id is acted on once,
+-- "command": "ai_laps" | "calibrate" | "stop"}), read every COMMAND_POLL_S. Each id is acted on once,
 -- and only within COMMAND_TTL_S of `at`, so a reloaded agent never replays an old command.
 ghost.COMMAND_POLL_S, ghost.COMMAND_TTL_S = 2, 60
 local nextCommand, lastCommand = 0, nil
@@ -113,7 +117,8 @@ function ghost.pollCommands(now)
   if not ok or type(cmd) ~= "table" or cmd.id == nil or cmd.id == lastCommand then return end
   lastCommand = cmd.id
   if type(cmd.at) ~= "number" or math.abs(os.time() - cmd.at) > ghost.COMMAND_TTL_S then return end
-  if cmd.command == "ai_laps" then ghost.lap() elseif cmd.command == "stop" then ghost.stop() end
+  local run = { ai_laps = ghost.lap, calibrate = ghost.calibrate, stop = ghost.stop }
+  if run[cmd.command] then run[cmd.command]() end
 end
 function ghost.reset() core.reset(ghost.state) end
 

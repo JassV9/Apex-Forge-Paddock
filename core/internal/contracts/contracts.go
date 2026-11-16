@@ -6,6 +6,7 @@ import "encoding/json"
 import "fmt"
 import "reflect"
 import "regexp"
+import "time"
 import "unicode/utf8"
 
 // Another explanation of the same symptom that a setup change would not cure.
@@ -6534,6 +6535,200 @@ func (j *TraceColumns) UnmarshalJSON(value []byte) error {
 		return err
 	}
 	*j = TraceColumns(plain)
+	return nil
+}
+
+// Start an AI training program on a session's car and track
+// (docs/adr/0020-ai-training-program.md).
+type TrainingCreate struct {
+	// How many experiments the AI drives before the program ends. An open AI
+	// experiment on the car is taken over and counts as the first.
+	Experiments int `json:"experiments"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *TrainingCreate) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["experiments"]; raw != nil && !ok {
+		return fmt.Errorf("field experiments in TrainingCreate: required")
+	}
+	type Plain TrainingCreate
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 20 < plain.Experiments {
+		return fmt.Errorf("field %s: must be <= %v", "experiments", 20)
+	}
+	if 1 > plain.Experiments {
+		return fmt.Errorf("field %s: must be >= %v", "experiments", 1)
+	}
+	*j = TrainingCreate(plain)
+	return nil
+}
+
+// A queue of experiments AC's AI drives on a car one after another; each is judged
+// when its laps are in and the next is taken from the ranking the verdict changed.
+type TrainingProgram struct {
+	// CarName corresponds to the JSON schema field "car_name".
+	CarName string `json:"car_name"`
+
+	// CreatedAt corresponds to the JSON schema field "created_at".
+	CreatedAt time.Time `json:"created_at"`
+
+	// Id corresponds to the JSON schema field "id".
+	Id int `json:"id"`
+
+	// What the program is doing or why it waits, in words.
+	Message string `json:"message"`
+
+	// The AI session whose diagnosis the experiments are ranked from.
+	SessionId int `json:"session_id"`
+
+	// running: driving or about to. waiting: needs the driver (a trade-off to decide,
+	// or another experiment is on the car). done: target reached or nothing left to
+	// test. stopped: by the driver.
+	State TrainingProgramState `json:"state"`
+
+	// The program's experiments, oldest first.
+	Steps []TrainingStep `json:"steps"`
+
+	// How many experiments the program drives.
+	Target int `json:"target"`
+
+	// TrackName corresponds to the JSON schema field "track_name".
+	TrackName string `json:"track_name"`
+}
+
+type TrainingProgramState string
+
+const TrainingProgramStateDone TrainingProgramState = "done"
+const TrainingProgramStateRunning TrainingProgramState = "running"
+const TrainingProgramStateStopped TrainingProgramState = "stopped"
+const TrainingProgramStateWaiting TrainingProgramState = "waiting"
+
+var enumValues_TrainingProgramState = []interface{}{
+	"running",
+	"waiting",
+	"done",
+	"stopped",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *TrainingProgramState) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_TrainingProgramState {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_TrainingProgramState, v)
+	}
+	*j = TrainingProgramState(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *TrainingProgram) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["car_name"]; raw != nil && !ok {
+		return fmt.Errorf("field car_name in TrainingProgram: required")
+	}
+	if _, ok := raw["created_at"]; raw != nil && !ok {
+		return fmt.Errorf("field created_at in TrainingProgram: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in TrainingProgram: required")
+	}
+	if _, ok := raw["message"]; raw != nil && !ok {
+		return fmt.Errorf("field message in TrainingProgram: required")
+	}
+	if _, ok := raw["session_id"]; raw != nil && !ok {
+		return fmt.Errorf("field session_id in TrainingProgram: required")
+	}
+	if _, ok := raw["state"]; raw != nil && !ok {
+		return fmt.Errorf("field state in TrainingProgram: required")
+	}
+	if _, ok := raw["steps"]; raw != nil && !ok {
+		return fmt.Errorf("field steps in TrainingProgram: required")
+	}
+	if _, ok := raw["target"]; raw != nil && !ok {
+		return fmt.Errorf("field target in TrainingProgram: required")
+	}
+	if _, ok := raw["track_name"]; raw != nil && !ok {
+		return fmt.Errorf("field track_name in TrainingProgram: required")
+	}
+	type Plain TrainingProgram
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Id {
+		return fmt.Errorf("field %s: must be >= %v", "id", 1)
+	}
+	if 1 > plain.SessionId {
+		return fmt.Errorf("field %s: must be >= %v", "session_id", 1)
+	}
+	if 1 > plain.Target {
+		return fmt.Errorf("field %s: must be >= %v", "target", 1)
+	}
+	*j = TrainingProgram(plain)
+	return nil
+}
+
+type TrainingStep struct {
+	// Clicks corresponds to the JSON schema field "clicks".
+	Clicks int `json:"clicks"`
+
+	// ExperimentId corresponds to the JSON schema field "experiment_id".
+	ExperimentId int `json:"experiment_id"`
+
+	// Parameter corresponds to the JSON schema field "parameter".
+	Parameter string `json:"parameter"`
+
+	// The experiment's state (see experiment.schema.json).
+	State string `json:"state"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *TrainingStep) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["clicks"]; raw != nil && !ok {
+		return fmt.Errorf("field clicks in TrainingStep: required")
+	}
+	if _, ok := raw["experiment_id"]; raw != nil && !ok {
+		return fmt.Errorf("field experiment_id in TrainingStep: required")
+	}
+	if _, ok := raw["parameter"]; raw != nil && !ok {
+		return fmt.Errorf("field parameter in TrainingStep: required")
+	}
+	if _, ok := raw["state"]; raw != nil && !ok {
+		return fmt.Errorf("field state in TrainingStep: required")
+	}
+	type Plain TrainingStep
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.ExperimentId {
+		return fmt.Errorf("field %s: must be >= %v", "experiment_id", 1)
+	}
+	*j = TrainingStep(plain)
 	return nil
 }
 

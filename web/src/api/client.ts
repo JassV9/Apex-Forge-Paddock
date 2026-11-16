@@ -20,6 +20,7 @@ export type SessionPasses = components["schemas"]["SessionPasses"];
 export type PassRecord = SessionPasses["passes"][number];
 export type CornerSummary = SessionPasses["corners"][number];
 export type PassTrace = components["schemas"]["PassTrace"];
+export type TrainingProgram = components["schemas"]["TrainingProgram"];
 export type ExperimentAction =
   paths["/experiments/{id}/{action}"]["post"]["parameters"]["path"]["action"];
 
@@ -122,6 +123,28 @@ export async function actOnExperiment(id: number, action: ExperimentAction): Pro
     params: { path: { id, action } },
   });
   return unwrap(reply, `POST /experiments/{id}/${action}`);
+}
+
+/** Every AI training program, newest first. */
+export async function fetchTraining(): Promise<TrainingProgram[]> {
+  return unwrap(await coreApi.GET("/training"), "GET /training");
+}
+
+/** Starts an AI training program on the session's car (docs/adr/0020-ai-training-program.md). */
+export async function startTraining(
+  sessionId: number,
+  experiments: number,
+): Promise<TrainingProgram> {
+  const reply = await coreApi.POST("/sessions/{id}/training", {
+    params: { path: { id: sessionId } },
+    body: { experiments },
+  });
+  return unwrap(reply, "POST /sessions/{id}/training");
+}
+
+export async function stopTraining(id: number): Promise<TrainingProgram> {
+  const reply = await coreApi.POST("/training/{id}/stop", { params: { path: { id } } });
+  return unwrap(reply, "POST /training/{id}/stop");
 }
 
 /** The driver's call on a trade-off: keep the variant, or go back to the baseline. */

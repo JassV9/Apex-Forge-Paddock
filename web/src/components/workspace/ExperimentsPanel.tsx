@@ -4,6 +4,7 @@ import { ExperimentPage } from "../ExperimentPage";
 import { Ledger } from "../Ledger";
 import { ProposeForm } from "../ProposeForm";
 import { Scorecard } from "../Scorecard";
+import { TrainingPanel } from "./TrainingPanel";
 
 interface ExperimentsPanelProps {
   session: SessionSummary;
@@ -73,6 +74,7 @@ export function ExperimentsPanel({
           <ExperimentPage key={experimentId} id={experimentId} />
         </section>
       )}
+      <TrainingPanel session={session} readOnly={readOnly} />
       <Scorecard />
     </div>
   );

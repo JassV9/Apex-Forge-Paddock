@@ -10,7 +10,7 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "gen": "openapi-typescript ../docs/api/openapi.yaml -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts"
+    "gen": "openapi-typescript ../docs/api/openapi.yaml -o src/api/schema.d.ts && openapi-typescript ../docs/api/launcher.yaml -o src/api/launcher-schema.d.ts && prettier --write src/api/schema.d.ts src/api/launcher-schema.d.ts"
   },
   "dependencies": {
     "openapi-fetch": "^0.17.0",

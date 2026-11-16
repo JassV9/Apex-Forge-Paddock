@@ -6,6 +6,7 @@ import "encoding/json"
 import "fmt"
 import "reflect"
 import "regexp"
+import "time"
 import "unicode/utf8"
 
 // Another explanation of the same symptom that a setup change would not cure.
@@ -337,6 +338,81 @@ func (j *ChannelResult) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "n_passes", 0)
 	}
 	*j = ChannelResult(plain)
+	return nil
+}
+
+type ControlsCheck struct {
+	// When the state was reached.
+	At time.Time `json:"at"`
+
+	// SHA-256 of controls.ini as backed up before the launch.
+	BackupSha256 string `json:"backup_sha256"`
+
+	// What differed, or why the restore failed.
+	Detail *string `json:"detail,omitempty,omitzero"`
+
+	// watching: the game was launched and has not exited yet. unchanged: after the
+	// game, the controllers and every JOY binding were as backed up. restored: they
+	// differed, and the backup was written back. restore_failed: they differed and
+	// the backup could not be written back (the backup file is kept).
+	State ControlsCheckState `json:"state"`
+}
+
+type ControlsCheckState string
+
+const ControlsCheckStateRestoreFailed ControlsCheckState = "restore_failed"
+const ControlsCheckStateRestored ControlsCheckState = "restored"
+const ControlsCheckStateUnchanged ControlsCheckState = "unchanged"
+const ControlsCheckStateWatching ControlsCheckState = "watching"
+
+var enumValues_ControlsCheckState = []interface{}{
+	"watching",
+	"unchanged",
+	"restored",
+	"restore_failed",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ControlsCheckState) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ControlsCheckState {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ControlsCheckState, v)
+	}
+	*j = ControlsCheckState(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ControlsCheck) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["at"]; raw != nil && !ok {
+		return fmt.Errorf("field at in ControlsCheck: required")
+	}
+	if _, ok := raw["backup_sha256"]; raw != nil && !ok {
+		return fmt.Errorf("field backup_sha256 in ControlsCheck: required")
+	}
+	if _, ok := raw["state"]; raw != nil && !ok {
+		return fmt.Errorf("field state in ControlsCheck: required")
+	}
+	type Plain ControlsCheck
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ControlsCheck(plain)
 	return nil
 }
 
@@ -2570,6 +2646,315 @@ func (j *Hypothesis) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s length: must be >= %d", "statement", 1)
 	}
 	*j = Hypothesis(plain)
+	return nil
+}
+
+type LaunchRecord struct {
+	// When Content Manager was asked to start the game.
+	At time.Time `json:"at"`
+
+	// CarId corresponds to the JSON schema field "car_id".
+	CarId string `json:"car_id"`
+
+	// Layout corresponds to the JSON schema field "layout".
+	Layout string `json:"layout"`
+
+	// TrackId corresponds to the JSON schema field "track_id".
+	TrackId string `json:"track_id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LaunchRecord) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["at"]; raw != nil && !ok {
+		return fmt.Errorf("field at in LaunchRecord: required")
+	}
+	if _, ok := raw["car_id"]; raw != nil && !ok {
+		return fmt.Errorf("field car_id in LaunchRecord: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in LaunchRecord: required")
+	}
+	if _, ok := raw["track_id"]; raw != nil && !ok {
+		return fmt.Errorf("field track_id in LaunchRecord: required")
+	}
+	type Plain LaunchRecord
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = LaunchRecord(plain)
+	return nil
+}
+
+// Start Assetto Corsa in Practice from the pits with this car on this layout (POST
+// /launch on paddock-launcher).
+type LaunchRequest struct {
+	// Folder name under content/cars.
+	CarId string `json:"car_id"`
+
+	// Layout folder name; empty for a single-layout track.
+	Layout string `json:"layout"`
+
+	// Folder name under content/tracks.
+	TrackId string `json:"track_id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LaunchRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["car_id"]; raw != nil && !ok {
+		return fmt.Errorf("field car_id in LaunchRequest: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in LaunchRequest: required")
+	}
+	if _, ok := raw["track_id"]; raw != nil && !ok {
+		return fmt.Errorf("field track_id in LaunchRequest: required")
+	}
+	type Plain LaunchRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.CarId)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "car_id", 1)
+	}
+	if utf8.RuneCountInString(string(plain.TrackId)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "track_id", 1)
+	}
+	*j = LaunchRequest(plain)
+	return nil
+}
+
+type LauncherCar struct {
+	// Folder name under content/cars.
+	Id string `json:"id"`
+
+	// name in ui/ui_car.json; the id when the file is missing or unreadable.
+	Name string `json:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LauncherCar) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in LauncherCar: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in LauncherCar: required")
+	}
+	type Plain LauncherCar
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
+	}
+	*j = LauncherCar(plain)
+	return nil
+}
+
+// The cars and tracks installed in Assetto Corsa, as the host launcher found them
+// (GET /content on paddock-launcher).
+type LauncherContent struct {
+	// The Assetto Corsa folder that was scanned.
+	AcRoot string `json:"ac_root"`
+
+	// Every folder of content/cars, by display name.
+	Cars []LauncherCar `json:"cars"`
+
+	// Every folder of content/tracks with at least one layout, by display name.
+	Tracks []LauncherTrack `json:"tracks"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LauncherContent) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ac_root"]; raw != nil && !ok {
+		return fmt.Errorf("field ac_root in LauncherContent: required")
+	}
+	if _, ok := raw["cars"]; raw != nil && !ok {
+		return fmt.Errorf("field cars in LauncherContent: required")
+	}
+	if _, ok := raw["tracks"]; raw != nil && !ok {
+		return fmt.Errorf("field tracks in LauncherContent: required")
+	}
+	type Plain LauncherContent
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = LauncherContent(plain)
+	return nil
+}
+
+type LauncherLayout struct {
+	// True for a Paddock test copy (<layout>_paddock, tools/prepare_test_layout.py):
+	// only there may the agent hand the car to the AI.
+	AiCanDrive bool `json:"ai_can_drive"`
+
+	// Layout folder name; empty for a track with a single layout (ui/ui_track.json).
+	Layout string `json:"layout"`
+
+	// name in the layout's ui_track.json; the folder name otherwise.
+	Name string `json:"name"`
+
+	// The layout id of this layout's test copy when it exists; empty otherwise and
+	// for a test copy itself.
+	TestCopy string `json:"test_copy"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LauncherLayout) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ai_can_drive"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_can_drive in LauncherLayout: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in LauncherLayout: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in LauncherLayout: required")
+	}
+	if _, ok := raw["test_copy"]; raw != nil && !ok {
+		return fmt.Errorf("field test_copy in LauncherLayout: required")
+	}
+	type Plain LauncherLayout
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = LauncherLayout(plain)
+	return nil
+}
+
+// What the host launcher knows: whether the game runs, the last launch and what
+// happened to the wheel bindings (GET /status and POST /launch on
+// paddock-launcher).
+type LauncherStatus struct {
+	// Controls corresponds to the JSON schema field "controls".
+	Controls *ControlsCheck `json:"controls,omitempty,omitzero"`
+
+	// acs.exe is running now.
+	GameRunning bool `json:"game_running"`
+
+	// LastLaunch corresponds to the JSON schema field "last_launch".
+	LastLaunch *LaunchRecord `json:"last_launch,omitempty,omitzero"`
+
+	// Service corresponds to the JSON schema field "service".
+	Service LauncherStatusService `json:"service"`
+
+	// Build version of the launcher.
+	Version string `json:"version"`
+}
+
+type LauncherStatusService string
+
+const LauncherStatusServiceLauncher LauncherStatusService = "launcher"
+
+var enumValues_LauncherStatusService = []interface{}{
+	"launcher",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LauncherStatusService) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_LauncherStatusService {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_LauncherStatusService, v)
+	}
+	*j = LauncherStatusService(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LauncherStatus) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["game_running"]; raw != nil && !ok {
+		return fmt.Errorf("field game_running in LauncherStatus: required")
+	}
+	if _, ok := raw["service"]; raw != nil && !ok {
+		return fmt.Errorf("field service in LauncherStatus: required")
+	}
+	if _, ok := raw["version"]; raw != nil && !ok {
+		return fmt.Errorf("field version in LauncherStatus: required")
+	}
+	type Plain LauncherStatus
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Version)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "version", 1)
+	}
+	*j = LauncherStatus(plain)
+	return nil
+}
+
+type LauncherTrack struct {
+	// Folder name under content/tracks.
+	Id string `json:"id"`
+
+	// Layouts corresponds to the JSON schema field "layouts".
+	Layouts []LauncherLayout `json:"layouts"`
+
+	// Name of the track's first layout, without the layout's own words.
+	Name string `json:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LauncherTrack) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in LauncherTrack: required")
+	}
+	if _, ok := raw["layouts"]; raw != nil && !ok {
+		return fmt.Errorf("field layouts in LauncherTrack: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in LauncherTrack: required")
+	}
+	type Plain LauncherTrack
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
+	}
+	*j = LauncherTrack(plain)
 	return nil
 }
 

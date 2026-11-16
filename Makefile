@@ -18,6 +18,7 @@ help:
 	@echo "setup      install dependencies for every module"
 	@echo "dev        start Postgres + core + engine + web in Docker (http://localhost:5173)"
 	@echo "down       stop the dev stack"
+	@echo "launcher   the host launcher for Start driving, on Windows outside Docker (ARGS=\"--template NJ26\")"
 	@echo "demo       the same stack on the recorded sessions in datasets/demo (no game needed)"
 	@echo "demo-down  stop the demo stack and delete its data"
 	@echo "demo-replica  the public demo as it is deployed: read-only, one replica, http://localhost:5173"
@@ -25,7 +26,7 @@ help:
 	@echo "test       run every test suite"
 	@echo "test-e2e   experiments through the mocked game, core and the engine (needs PostgreSQL)"
 	@echo "lint       run every linter and type checker"
-	@echo "gen        regenerate code from contracts/ and docs/api/openapi.yaml"
+	@echo "gen        regenerate code from contracts/ and docs/api/*.yaml"
 	@echo "gen-check  fail if generated code is out of date (CI)"
 
 setup:
@@ -39,6 +40,11 @@ dev:
 
 down:
 	$(COMPOSE) down
+
+# The dashboard's Start driving button talks to this program on 127.0.0.1:8090. It runs on the
+# Windows host because Docker cannot start Assetto Corsa (docs/adr/0017-host-launcher.md).
+launcher:
+	cd core && go run ./cmd/paddock-launcher $(ARGS)
 
 demo:
 	$(COMPOSE_DEMO) up --build
@@ -110,4 +116,5 @@ gen-web:
 	cd web && npm run gen
 
 gen-check: gen
-	git diff --exit-code -- core/internal/contracts $(GO_SCHEMAS) $(PY_CONTRACTS) web/src/api/schema.d.ts
+	git diff --exit-code -- core/internal/contracts $(GO_SCHEMAS) $(PY_CONTRACTS) web/src/api/schema.d.ts \
+		web/src/api/launcher-schema.d.ts

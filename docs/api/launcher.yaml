@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: Apex Forge Paddock host launcher
+  version: 0.1.0
+  description: >
+    HTTP API of paddock-launcher (core/cmd/paddock-launcher), the small program that runs on
+    the Windows host, not in Docker, and starts Assetto Corsa through Content Manager
+    (docs/adr/0017-host-launcher.md). It listens on 127.0.0.1:8090 only. The TypeScript types
+    in web/src/api/launcher.d.ts are generated from this file (`make gen`). Bodies are the
+    JSON Schemas in contracts/.
+servers:
+  - url: http://127.0.0.1:8090
+paths:
+  /content:
+    get:
+      operationId: getContent
+      summary: Installed cars, and tracks with their layouts and Paddock test copies.
+      responses:
+        "200":
+          description: What content/cars and content/tracks hold.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LauncherContent"
+        "500":
+          $ref: "#/components/responses/Problem"
+  /launch:
+    post:
+      operationId: launch
+      summary: Back up controls.ini, write the Quick Drive preset and ask Content Manager to start.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LaunchRequest"
+      responses:
+        "202":
+          description: Content Manager was asked to start the game; the watcher is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LauncherStatus"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "500":
+          $ref: "#/components/responses/Problem"
+  /status:
+    get:
+      operationId: getStatus
+      summary: Whether the game runs, the last launch and what happened to the bindings.
+      responses:
+        "200":
+          description: The launcher's state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LauncherStatus"
+components:
+  responses:
+    Problem:
+      description: >
+        The request was refused. 409: the game is already running or a launch is still being
+        watched. 422: the request is not valid, or names a car or layout that is not
+        installed. 500: a file could not be read or written, or Content Manager could not be
+        asked.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    LauncherContent:
+      $ref: "../../contracts/launcher_content.schema.json"
+    LaunchRequest:
+      $ref: "../../contracts/launch_request.schema.json"
+    LauncherStatus:
+      $ref: "../../contracts/launcher_status.schema.json"
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          description: What went wrong, in words.
+          type: string

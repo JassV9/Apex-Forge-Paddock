@@ -2,6 +2,19 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Unreleased: the driving flow
+
+- Start driving: a Drive panel at the top of the workspace rail picks a car and a layout
+  (Paddock test copies marked "AI can drive here") and asks `paddock-launcher`, a new host
+  program (`make launcher`, `127.0.0.1:8090`), to start Practice from the pits through Content
+  Manager's Quick Drive (`acmanager://race/quick`), with a copy of the owner's CM preset.
+- The wheel bindings are guarded: `controls.ini` is backed up before each start and put back
+  when the game exits if `[CONTROLLERS]` or any `JOY` index changed (ADR 0017).
+- Contracts `launcher_content`, `launch_request`, `launcher_status`; API `docs/api/launcher.yaml`;
+  runbook `docs/runbooks/driving.md`.
+- Unverified in game and in Content Manager: the launcher was tested without the game, and its
+  `GET /content` and `GET /status` against the real install.
+
 ## AI calibration and the first full AI experiment in the game (2026-11-16)
 
 - agent: calibration learns the grip the AI assumes (its tyre hint, -3 % per lap with an

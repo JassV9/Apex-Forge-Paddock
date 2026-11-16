@@ -4,8 +4,10 @@ import { fetchSessions, type SessionSummary } from "../../api/client";
 import { useLoaded } from "../../hooks/useLoaded";
 import type { Route } from "../../hooks/useRoute";
 import { CoreStatus } from "../CoreStatus";
+import { DrivePanel } from "./DrivePanel";
 import { SessionRail } from "./SessionRail";
 import { type SessionApi, SessionView } from "./SessionView";
+import type { LauncherApi } from "./useLauncher";
 
 interface WorkspaceProps {
   route: Route;
@@ -13,6 +15,7 @@ interface WorkspaceProps {
   /** Injected in tests; the real client by default. */
   loadSessions?: () => Promise<SessionSummary[]>;
   sessionApi?: SessionApi;
+  launcherApi?: LauncherApi;
 }
 
 function TopBar({ railOpen, onRail }: { railOpen: boolean; onRail: () => void }) {
@@ -74,6 +77,7 @@ export function Workspace({
   readOnly,
   loadSessions = fetchSessions,
   sessionApi,
+  launcherApi,
 }: WorkspaceProps) {
   const sessions = useLoaded(loadSessions);
   const [railOpen, setRailOpen] = useState(false);
@@ -94,6 +98,7 @@ export function Workspace({
           setRailOpen(false);
         }}
       >
+        {!readOnly && <DrivePanel {...(launcherApi === undefined ? {} : { api: launcherApi })} />}
         {sessions.kind === "ready" && (
           <SessionRail sessions={list} current={current} tab={route.tab} />
         )}

@@ -16,8 +16,8 @@ const older: SessionSummary = {
   id: 1,
   car_name: "Mazda MX-5 Cup",
   started_at: "2026-11-12T10:00:00Z",
-  passes: 0,
-  corners: 0,
+  passes: 12,
+  corners: 7,
 };
 
 const sessionApi = {

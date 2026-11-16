@@ -17,6 +17,7 @@ local ghost = {
   STUCK_KMH = 15,     -- slower than this on track counts as stuck
   STUCK_S = 20,       -- for this long
   DAMAGE_STEP = 5,    -- a rise in any damage zone above this (AC's units, km/h of impact)
+  LAP_TIMEOUT_S = 600, -- no lap counted for this long: the block is retried
   SETTLE_S = 2,       -- parked this long after a teleport before the setup is loaded
   TELEPORT_RETRY_S = 10,
   MAX_RETRIES = 3,
@@ -36,7 +37,7 @@ end
 local function name(block) return block == 0 and "free laps" or ("block " .. block) end
 
 local function goToPits(s, block, message)
-  s.phase, s.block, s.timer, s.stuck = "to_pits", block, 0, 0
+  s.phase, s.block, s.timer, s.stuck, s.sinceLap = "to_pits", block, 0, 0, 0
   s.message = message
   return { act("autopilot_off"), act("teleport_pits") }
 end
@@ -96,6 +97,12 @@ local function whileDriving(s, o)
   if o.speedKmh < ghost.STUCK_KMH then s.stuck = s.stuck + o.dt else s.stuck = 0 end
   if s.stuck >= ghost.STUCK_S then return retry(s, o, "stuck") end
   if (o.damage or 0) > (s.damage or 0) + ghost.DAMAGE_STEP then return retry(s, o, "damaged") end
+  -- AC puts a car it thinks is lost back on track, often past the line, so the lap never ends
+  if o.resets ~= nil and s.resets ~= nil and o.resets ~= s.resets then return retry(s, o, "reset by the game") end
+  s.resets = o.resets
+  if o.lapsDone ~= s.lapsDone then s.lapsDone, s.sinceLap = o.lapsDone, 0 end
+  s.sinceLap = (s.sinceLap or 0) + o.dt
+  if s.block ~= 0 and s.sinceLap >= ghost.LAP_TIMEOUT_S then return retry(s, o, "no lap counted") end
   if not o.ai then return { act("autopilot_on") } end
   return {}
 end
@@ -103,7 +110,8 @@ end
 ---One frame. `o`: dt, planId (experiment of the loaded plan, or nil), driverAi, allowed
 ---(physics access), block (order being driven, or nil),
 ---parked (in the pit box and still), onTrack, speedKmh, ai (car is AI controlled), fuel,
----damage (the largest damage zone).
+---damage (the largest damage zone), resets (the car's reset counter), lapsDone (laps the plan
+---has counted in this block).
 ---@return table[] actions, in order: autopilot_on/off, teleport_pits, repair, set_fuel, load, start
 function ghost.step(s, o)
   if o.planId ~= s.planId then  -- a new experiment: an earlier stop or choice does not carry over
@@ -129,7 +137,8 @@ function ghost.loaded(s, ok, message)
     s.message = "AI driver stopped: the setup did not load (" .. tostring(message) .. ")."
     return { act("autopilot_off") }
   end
-  s.phase, s.stuck, s.damage = "driving", 0, 0  -- repaired before the load
+  s.phase, s.stuck, s.damage, s.sinceLap = "driving", 0, 0, 0  -- repaired before the load
+  s.resets, s.lapsDone = nil, nil  -- the teleport and the start count as resets; begin afresh
   s.message = "AI driver: driving " .. name(s.block) .. "."
   return { act("autopilot_on"), act("start") }
 end

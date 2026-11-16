@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { SessionSummary } from "../../api/client";
 import { dayOf, plural, timeOf } from "../../format";
 import { sessionHref, type Tab } from "../../hooks/useRoute";
@@ -60,11 +62,15 @@ function RailItem({
   );
 }
 
-/** Every recorded session; the one on screen is marked. */
+/** Every recorded session; the one on screen is marked. Sessions without a single pass (the
+ * game started and left, or the agent reloaded) are folded away unless one is on screen. */
 export function SessionRail({ sessions, current, tab }: SessionRailProps) {
+  const [showEmpty, setShowEmpty] = useState(false);
+  const empty = sessions.filter((s) => s.passes === 0 && s.id !== current).length;
+  const shown = showEmpty ? sessions : sessions.filter((s) => s.passes > 0 || s.id === current);
   return (
     <nav className="rail-list" aria-label="Sessions">
-      {byDay(sessions).map(([day, list]) => (
+      {byDay(shown).map(([day, list]) => (
         <section key={day} aria-label={day}>
           <h2 className="rail-day">{day}</h2>
           <ul>
@@ -79,6 +85,17 @@ export function SessionRail({ sessions, current, tab }: SessionRailProps) {
           </ul>
         </section>
       ))}
+      {empty > 0 && (
+        <button
+          type="button"
+          className="rail-empty-toggle"
+          onClick={() => {
+            setShowEmpty(!showEmpty);
+          }}
+        >
+          {showEmpty ? "Hide" : "Show"} {plural(empty, "empty session", "empty sessions")}
+        </button>
+      )}
     </nav>
   );
 }

@@ -33,6 +33,7 @@ end
 local function aiDriver()
   ui.header("AI driver")
   if ghost.message() ~= "" then ui.textWrapped(ghost.message()) end
+  if ghost.allowed() then ui.textColored(ghost.calibration(), GREY) end
   if not ghost.allowed() then
     ui.textColored("Not on this track: it gives apps no physics access (see tools/prepare_test_layout.py).", GREY)
   elseif ghost.active() then
@@ -53,6 +54,10 @@ local function experiments()
     ui.text(e.title .. (e.driver == "ai" and "  (AI)" or ""))
     if e.lapsTarget > 0 then ui.progressBar(e.lapsDone / e.lapsTarget, vec2(-1, 0), e.lapsDone .. "/" .. e.lapsTarget .. " laps") end
     if e.readyToJudge and ui.button("Judge #" .. e.id) then link.act(e.id, "evaluate") end
+    if e.state == "running" then
+      if e.readyToJudge then ui.sameLine() end
+      if ui.button("Abort #" .. e.id) then link.act(e.id, "abort") end
+    end
   end
   if link.verdict then ui.textWrapped("Last verdict: " .. link.verdict) end
 end

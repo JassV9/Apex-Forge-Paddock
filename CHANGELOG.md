@@ -2,6 +2,27 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Phase 6: AI test driver, setup desk, telemetry workspace (2026-11-15)
+
+- `tools/prepare_test_layout.py` copies a layout with extended physics and Lua app physics
+  access; the original is never edited.
+- agent: Ghost Driver level 2. AC's AI drives the run plan's blocks on the player's car
+  (pits, repair, fixed fuel, setup load with read-back, no own pit stops), on the car's own
+  grip; retries on stuck, damage, a reset by the game or no lap in 10 minutes. Free AI laps
+  learn per-section speed caps, frozen during experiments. AI laps are their own sessions.
+- agent window rebuilt as a setup desk (Run, Setups) talking to core over HTTP.
+- core: experiment `driver` (migration 00006), run plans per car, one running experiment per
+  car, plans re-published at startup; read-only `GET /sessions/{id}/passes` and
+  `GET /sessions/{id}/passes/{seq}/samples`.
+- web: one workspace (session rail, overview grid, overlaid telemetry, diagnosis,
+  experiments, garage) with uPlot.
+- ADRs 0013 to 0016; runbook `ghost-driver.md`; demo script `docs/demos/phase-6.md`.
+
+Seen in Assetto Corsa: the AI driving the 488 GT3 at COTA, free laps recorded, a setup
+changed by the agent and read back, an AI-driven experiment driven block by block, and the
+AI's 1.20x lateral g at default grip. Not verified: formula cars, calibration converging,
+whether AI-measured effects predict a human's, the window clicked in the game.
+
 ## First in-game run (2026-11-12)
 
 - The agent was installed into Assetto Corsa (CSP 0.3.0-preview581) and recorded six laps

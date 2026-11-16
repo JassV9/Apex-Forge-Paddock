@@ -58,16 +58,16 @@ samples, DuckDB inside the engine for queries over Parquet
 
 | Module | Language | Owns | Must never |
 | --- | --- | --- | --- |
-| `agent/` | CSP Lua | Corner map, pass capture with conditions, applying setup values with read-back and rollback, showing the run plan | Judge a setup, call an LLM, write anything but the spool while driving |
+| `agent/` | CSP Lua | Corner map, pass capture with conditions, applying setup values with read-back and rollback, the setup desk window, the AI test driver and its calibration | Judge a setup, call an LLM, write anything but its own files under `paddock/` while driving |
 | `core/internal/ingest` | Go | Tailing the spool, schema validation, Parquet parts, `corner_pass` rows (and the SQL for them) | Compute engineering metrics; write to the spool |
 | `core/internal/setups` | Go | Parameter catalog, setup versions, `.ini` writer, diffing | Accept a value off the step grid or out of range |
 | `core/internal/experiments` | Go | Experiment state machine, run plans, verdict ledger, rollback | Do statistics (it asks the engine) |
-| `core/internal/api` | Go | REST API for the dashboard | Hold logic that belongs to another package |
+| `core/internal/passes` | Go | Read path for a session's passes and their raw samples (Parquet) | Write anything |
+| `core/internal/api` | Go | REST API for the dashboard and the in-game desk | Hold logic that belongs to another package |
 | `core/internal/store` | Go | Database connection, migrations, the API's read queries | — |
 | `core/internal/telemetry` | Go | OpenTelemetry metrics and the Prometheus endpoint | Register anything globally |
 | `engine/` | Python | Features, phases, noise model, verdict statistics, diagnosis, sensitivity, optimizer, LLM explanations | Talk to the game; let an LLM number enter the ledger |
-| `web/` | TypeScript | Dashboard | Hold business logic |
-| `ghost/` | Go | Ghost Driver research (phase 6, optional, behind a flag) | Run without its safety envelope |
+| `web/` | TypeScript | Telemetry workspace | Hold business logic |
 
 Rules that hold everywhere:
 
@@ -229,21 +229,35 @@ flowchart LR
   and has never been applied ([ADR 0012](adr/0012-read-only-demo.md),
   [runbook](runbooks/deploy-demo.md)).
 
+## The AI test driver (phase 6)
+
+1. `tools/prepare_test_layout.py` makes `<layout>_paddock`, where Lua apps may use the
+   physics API.
+2. Free laps: the agent hands the car to AC's AI on the car's own grip, records the laps
+   as an `ai` session, and learns speed caps where the AI goes off.
+3. An experiment with `driver: ai`: core writes the car's run plan; for every block the
+   agent teleports to the pit box, repairs, sets the first block's fuel, loads the setup
+   with read-back, and hands the car to the AI with the caps frozen.
+4. Passes are tagged by block as for a human; core and the engine judge them the same way.
+
+Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
+[ADR 0016](adr/0016-ai-calibration.md); how: [runbooks/ghost-driver.md](runbooks/ghost-driver.md).
+
 ## What exists today (after phase 7)
 
 | Piece | State |
 | --- | --- |
 | Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard; generators and drift check | Working, checked in CI |
-| agent: capture with conditions, setup catalog and setup lines, run-plan window, setup loading with read-back and rollback, block and lap tags, installer (`tools/install_agent.py`) | 97 offline tests pass; capture **verified in game once** (102 passes, 2026-11-12); setup loading, run plans and experiments **unverified in game** |
+| agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 151 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
 | engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 132 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
-| web: sessions, diagnosis page with what to test next, propose form (also filled from a candidate, with its predicted gain), experiment page with its full history, ledger with the scorecard, garage; a read-only build | Working, 78 tests |
+| web: one workspace (session rail, overview grid, overlaid telemetry per corner, diagnosis, experiments with propose panel and scorecard, garage); a read-only build | Working, 123 tests |
 | End to end: the Lua agent on the mocked game, core and the engine through a diagnosis, three experiments, and the profile, ranking and scorecard they leave (`make test-e2e`) | Passes locally and in CI |
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
 | Read-only demo: nginx door, replica layout in Compose, smoke test (`make demo-replica`, `make demo-replica-check`) | Working locally and in CI |
 | Azure deployment of the demo (`infra/azure`, `.github/workflows/publish-demo.yml`) | Terraform validated; **never applied, nothing published** |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
-| Ghost Driver | Not started (phase 6, gated on the game) |
+| Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.

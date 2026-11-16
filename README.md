@@ -12,12 +12,15 @@ local-first platform (Go, Python, PostgreSQL, React, and a Lua agent inside the 
 recommendation is a hypothesis with a prediction, tested against a re-driven baseline, with the
 result recorded even when it fails.
 
-> **Status: capture verified in Assetto Corsa; experiments not yet driven.** Capture, ingest, the
-> measurement statistics, experiments, diagnosis, the sensitivity profile and a read-only
-> demo work and are tested (phases 0 to 5 and 7; phase 6 is optional research). The
-> [roadmap](#roadmap) below says exactly what exists today. The agent has recorded one
-> real practice session in the game (102 corner passes, none rejected); no experiment
-> has been driven there, and the demo is not deployed.
+> **Status: running in Assetto Corsa, with an AI test driver.** Capture, ingest, the
+> measurement statistics, experiments, diagnosis, the sensitivity profile, a telemetry
+> workspace and a read-only demo work and are tested (phases 0 to 7). In the game, the
+> agent records every corner, and AC's own AI can drive an experiment's blocks on the
+> player's car: it loads each setup, drives the laps and retries when it goes wrong. The
+> [roadmap](#roadmap) below says exactly what exists today and what is still unverified;
+> the demo is not deployed.
+
+![Telemetry workspace: one corner's passes overlaid, best against latest](docs/img/dashboard-telemetry.png)
 
 ![The ledger, one experiment and the garage of measured effects](docs/img/experiment-loop.gif)
 
@@ -132,10 +135,10 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | 0 | Skeleton: layout, contracts + codegen, CI, Compose, ADRs, reused v0 capture code under test | **Done** |
 | 1 | Capture and ingest: agent emits corner passes with conditions; spool to Parquet and Postgres | **Done** (verified in game on one session, one car, one track) |
 | 2 | Measurement: features, noise model, mixed model, minimum detectable effect | **Done** (simulated: false decisions 39% to 0%) |
-| 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (end to end on a simulated car; unverified in game) |
+| 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (setups loaded and verified in game by the agent; end to end on a simulated car) |
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | **Done** (on the real COTA session; hosted models unverified) |
 | 5 | Sensitivity profile and experiment ranking: pooled effects with intervals, flagged priors, expected gain per lap | **Done** (on a simulated car; the 20+ experiment optimizer is not built) |
-| 6 | Ghost Driver (research, optional): machine-driven test manoeuvres | Gated |
+| 6 | Ghost Driver: a machine drives the test laps | **Level 2 working in game** (AC's AI on the player's car, real grip, learned speed caps; [ADR 0014](docs/adr/0014-ghost-driver.md), [0016](docs/adr/0016-ai-calibration.md)). Own controller (level 3) not started |
 | 7 | Public read-only demo on recorded data, case study | **Done locally** (read-only door tested in CI; Terraform for Azure validated, **never applied**) |
 
 Each phase has written acceptance criteria ([docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md),
@@ -183,10 +186,21 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   into words: a reply that cites a metric the session never measured, or states a
   number that is not in the evidence, is thrown away and template text is shown.
   Everything works with no model and no API key.
-- A dashboard with a ledger of every experiment and, per experiment, the test that was fixed
-  before driving, the effect of each channel with its interval, and its full history;
-  per session, the diagnosis with its evidence, alternatives and what to test next;
-  a garage of measured effects; and a scorecard of predictions that came true.
+- A telemetry workspace: every session in one place, a timing grid of laps by corners, and
+  each corner's passes overlaid (speed, throttle, brake, steering, front and rear slip)
+  against distance or time; the diagnosis, the experiments with their scorecard and the
+  garage of measured effects sit beside it ([ADR 0013](docs/adr/0013-telemetry-workspace.md)).
+- An AI test driver. AC's own AI drives the experiment on the player's car, on a copy of the
+  layout that allows it: back to the pits, repaired, same fuel, the next setup loaded and
+  read back, and out again, block after block. On the car's own grip it is far more
+  repeatable than a human: the first plan could detect 2.7 ms per corner where a human's
+  laps detect 14. It learns speed caps where it goes off in free laps and freezes them
+  during an experiment, so the driver never changes between two setups
+  ([ADR 0014](docs/adr/0014-ghost-driver.md), [ADR 0016](docs/adr/0016-ai-calibration.md),
+  [runbook](docs/runbooks/ghost-driver.md)).
+- A setup desk in the game window: what to test next, "I drive it" or "AI drives it", the
+  laps of the running experiment and a Judge button, without leaving the car
+  ([ADR 0015](docs/adr/0015-in-game-setup-desk.md)).
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
 - A demo that can go on the internet without becoming writable. nginx lets only reads
@@ -197,7 +211,7 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   ([ADR 0012](docs/adr/0012-read-only-demo.md), [runbook](docs/runbooks/deploy-demo.md)).
   **It has not been deployed**: no cloud account is used from this repository.
 
-Capture has run inside Assetto Corsa once; experiments have not, and the docs say so wherever
+What has run inside Assetto Corsa and what has not is written down, and the docs say so wherever
 it matters ([first-run results and checklist](docs/runbooks/agent-in-game.md)).
 
 ## Run it

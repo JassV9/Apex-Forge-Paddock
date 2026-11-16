@@ -114,6 +114,22 @@
   opacity: 0.45;
 }
 
+.rail-empty-toggle {
+  margin: 0.5rem 1rem 1rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.rail-empty-toggle:hover {
+  color: var(--text);
+}
+
 .rail-car {
   overflow: hidden;
   font-size: 0.86rem;

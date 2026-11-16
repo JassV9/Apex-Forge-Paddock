@@ -126,6 +126,12 @@ function plan.progress()
   return plan.state.pushDone, block.lapsTarget
 end
 
+---Laps counted in the block being driven, the out-lap included (nil without a block).
+function plan.lapsDone()
+  if not runplan.block(plan.state) then return nil end
+  return plan.state.pushDone + (plan.state.outLap and 0 or 1)
+end
+
 ---The order of the block being driven, or nil when there is none left.
 function plan.blockOrder()
   local block = runplan.block(plan.state)

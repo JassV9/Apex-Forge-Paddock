@@ -154,6 +154,32 @@ def test_stop_hands_the_car_back_until_a_new_experiment(rt):
     assert names(ghost.step(state, obs(rt, planId=8))) == ["autopilot_off", "teleport_pits"]
 
 
+def test_a_reset_by_the_game_retries_the_block(rt):
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    assert names(ghost.step(state, obs(rt, resets=4))) == []
+    assert names(ghost.step(state, obs(rt, resets=5))) == ["autopilot_off", "teleport_pits"]
+    assert "reset by the game" in state.message
+
+
+def test_a_block_without_a_counted_lap_for_ten_minutes_is_retried(rt):
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    assert run_for(rt, ghost, state, ghost.LAP_TIMEOUT_S - 1, lapsDone=0) == []
+    assert run_for(rt, ghost, state, 2, lapsDone=0)[-2:] == ["autopilot_off", "teleport_pits"]
+    assert "no lap counted" in state.message
+
+
+def test_counted_laps_keep_the_lap_watchdog_quiet(rt):
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    for done in range(4):
+        assert run_for(rt, ghost, state, ghost.LAP_TIMEOUT_S / 2, lapsDone=done) == []
+
+
 def test_the_ai_is_put_back_in_control_if_it_lost_the_car(rt):
     ghost, state = machine(rt)
     start_driving(rt, ghost, state)

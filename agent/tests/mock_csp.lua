@@ -274,6 +274,8 @@ function physics.resetCarState(i) record("repair") for z = 0, 4 do M.car.damage[
 function ac.tryToStart() record("start") return true end
 function physics.setAILapsToComplete(i, laps) record("laps_to_complete", laps) end
 function physics.setAIPitStopRequest(i, on) record("pit_request", on) end
+function physics.setExtraAIGrip(i, v) record("extra_grip", v) end
+function physics.setAITopSpeed(i, kmh) record("top_speed", kmh) M.topSpeed = kmh end
 
 script = {}
 function setInterval(fn, s) end

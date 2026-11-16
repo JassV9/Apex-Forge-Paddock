@@ -133,6 +133,7 @@ local function writeStatus()
     session_id = agent.sessionId, source = agent.source, passes = agent.passes,
     plan = plan.status(), plan_message = plan.message, ghost = ghost.phase(),
     ghost_message = ghost.message(), ghost_allowed = ghost.allowed(),
+    calibration = ghost.calibration(),
   })
   if text == lastStatus then return end
   lastStatus, lastWriteAt = text, os.preciseClock()

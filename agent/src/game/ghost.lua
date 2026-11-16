@@ -3,6 +3,7 @@
 -- prepare_test_layout.py makes such a copy of a layout). Elsewhere the agent says so and the
 -- human drives. Never used online: AC's autopilot and teleports are offline features.
 
+local calibration = require("game.calibration")
 local core = require("core.ghost")
 local plan = require("game.plan")
 
@@ -10,10 +11,13 @@ local ghost = { state = core.new(), KEEP_OUT_S = 2 }
 
 -- In practice AC's AI drives a stint and then goes back to the pits by itself. It must not:
 -- a pit stop changes fuel and tyres in the middle of a block. CSP's block on pitting wears
--- off, so it is set again every KEEP_OUT_S while the AI drives.
+-- off, so it is set again every KEEP_OUT_S while the AI drives. AC gives AI cars 120 % grip by
+-- default; measured on the player's car the AI pulled 1.20 times the human's lateral g, so
+-- the grip is put back to the car's own, or every effect would be measured on another car.
 local function keepOut()
   physics.setAILapsToComplete(0, 1000)
   physics.setAIPitStopRequest(0, false)
+  physics.setExtraAIGrip(0, 1)
 end
 local nextKeepOut = 0
 
@@ -30,7 +34,10 @@ local handlers = {
     physics.setCarAutopilot(true, false)
     keepOut()
   end,
-  autopilot_off = function() physics.setCarAutopilot(false, false) end,
+  autopilot_off = function()
+    calibration.release()
+    physics.setCarAutopilot(false, false)
+  end,
   teleport_pits = function() physics.teleportCarTo(0, ac.SpawnSet.Pits) end,
   repair = function() physics.resetCarState(0, 1) end,
   set_fuel = function(a) if a.liters then physics.setCarFuel(0, a.liters) end end,
@@ -50,7 +57,13 @@ perform = function(actions)
 end
 
 ---Every frame, before the car is sampled.
+local calibrationLoaded = false
+
 function ghost.update(dt, car)
+  if not calibrationLoaded then
+    calibrationLoaded = true
+    pcall(calibration.load)
+  end
   nextKeepOut = nextKeepOut - dt
   if ghost.state.phase == "driving" and nextKeepOut <= 0 then
     nextKeepOut = ghost.KEEP_OUT_S
@@ -61,12 +74,18 @@ function ghost.update(dt, car)
     block = plan.blockOrder(), parked = car.isInPit and car.speedKmh < 1,
     onTrack = not car.isInPitlane, speedKmh = car.speedKmh, ai = car.isAIControlled, fuel = car.fuel,
     damage = math.max(car.damage[0], car.damage[1], car.damage[2], car.damage[3]),
+    resets = car.resetCounter, lapsDone = plan.lapsDone(),
   }))
+  -- free laps teach the AI where it needs a lower speed; an experiment only applies it
+  if ghost.state.phase == "driving" and not car.isInPitlane then
+    calibration.update(dt, car, ghost.state.block == 0)
+  end
 end
 
 function ghost.active() return core.active(ghost.state) end
 function ghost.phase() return ghost.state.phase end
 function ghost.message() return ghost.state.message end
+function ghost.calibration() return calibration.summary() end
 function ghost.allowed() return allowed() end
 function ghost.stop() perform(core.stop(ghost.state)) end
 function ghost.resume() core.resume(ghost.state) end

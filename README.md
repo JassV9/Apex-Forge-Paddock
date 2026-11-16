@@ -138,7 +138,7 @@ and a Postgres `jobs` table with `SKIP LOCKED` does the queueing.
 | 3 | Experiments: state machine, A-B-A-B run plans, blind code-named setups, verdict ledger, rollback | **Done** (setups loaded and verified in game by the agent; end to end on a simulated car) |
 | 4 | Diagnosis and explanation: hypotheses with evidence, driver-vs-car separation, schema-bound LLM | **Done** (on the real COTA session; hosted models unverified) |
 | 5 | Sensitivity profile and experiment ranking: pooled effects with intervals, flagged priors, expected gain per lap | **Done** (on a simulated car; the 20+ experiment optimizer is not built) |
-| 6 | Ghost Driver: a machine drives the test laps | **Level 2 working in game** (AC's AI on the player's car, real grip, learned speed caps; [ADR 0014](docs/adr/0014-ghost-driver.md), [0016](docs/adr/0016-ai-calibration.md)). Own controller (level 3) not started |
+| 6 | Ghost Driver: a machine drives the test laps | **Level 2 working in game** (AC's AI on the player's car, real grip, a learned grip hint; [ADR 0014](docs/adr/0014-ghost-driver.md), [0016](docs/adr/0016-ai-calibration.md)). Own controller (level 3) not started |
 | 7 | Public read-only demo on recorded data, case study | **Done locally** (read-only door tested in CI; Terraform for Azure validated, **never applied**) |
 
 Each phase has written acceptance criteria ([docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md),
@@ -194,8 +194,9 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   layout that allows it: back to the pits, repaired, same fuel, the next setup loaded and
   read back, and out again, block after block. On the car's own grip it is far more
   repeatable than a human: the first plan could detect 2.7 ms per corner where a human's
-  laps detect 14. It learns speed caps where it goes off in free laps and freezes them
-  during an experiment, so the driver never changes between two setups
+  laps detect 14. In free laps it learns, lap by lap, how much grip the AI may assume
+  before it stops going off, and freezes that during an experiment, so the driver never
+  changes between two setups
   ([ADR 0014](docs/adr/0014-ghost-driver.md), [ADR 0016](docs/adr/0016-ai-calibration.md),
   [runbook](docs/runbooks/ghost-driver.md)).
 - A setup desk in the game window: what to test next, "I drive it" or "AI drives it", the

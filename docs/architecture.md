@@ -234,7 +234,8 @@ flowchart LR
 1. `tools/prepare_test_layout.py` makes `<layout>_paddock`, where Lua apps may use the
    physics API.
 2. Free laps: the agent hands the car to AC's AI on the car's own grip, records the laps
-   as an `ai` session, and learns speed caps where the AI goes off.
+   as an `ai` session, and lowers the grip the AI assumes (its tyre hint) after every lap
+   where it went off, until two laps are clean.
 3. An experiment with `driver: ai`: core writes the car's run plan; for every block the
    agent teleports to the pit box, repairs, sets the first block's fuel, loads the setup
    with read-back, and hands the car to the AI with the caps frozen.

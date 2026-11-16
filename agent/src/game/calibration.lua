@@ -1,7 +1,7 @@
 -- AI calibration in the game: watches the AI on track, hands incidents to core/aitune.lua and
--- applies its speed caps section by section with `physics.setAITopSpeed`. The caps of a car
--- on a layout are kept in Documents/Assetto Corsa/paddock/ai_tune/<car>__<layout>.json, written
--- when a lap changed them.
+-- gives the AI its learned tyre hint with `physics.setAITyresHint`: the car's own hint from its
+-- ai.ini times the learned share. The calibration of a car on a layout is kept in
+-- Documents/Assetto Corsa/paddock/ai_tune/<car>__<track>__<layout>.json, written after a lap.
 
 local aitune = require("core.aitune")
 
@@ -14,13 +14,23 @@ local calibration = {
 }
 
 -- damage starts unknown: the first frame on track is its baseline, not an incident
-local last = { pos = nil, section = -1, reset = nil, damage = nil, slow = 0 }
+local last = { pos = nil, reset = nil, damage = nil, slow = 0, applied = nil }
+local baseHint = nil
 
 local function safe(text) return (tostring(text or ""):gsub("[^%w%._%-]+", "_")) end
 
 local function path()
   return ac.getFolder(ac.FolderID.ACDocuments) .. "\\paddock\\ai_tune\\"
     .. safe(ac.getCarID(0)) .. "__" .. safe(ac.getTrackID()) .. "__" .. safe(ac.getTrackLayout()) .. ".json"
+end
+
+---The car's own tyre hint, read once.
+local function base()
+  if baseHint == nil then
+    local ok, v = pcall(function() return ac.INIConfig.carData(0, "ai.ini"):get("TYRES", "HINT", 1) end)
+    baseHint = ok and tonumber(v) or 1
+  end
+  return baseHint
 end
 
 function calibration.load()
@@ -43,30 +53,33 @@ local function incident(car, dt)
   return hit, reset
 end
 
----Every frame while the AI drives on track. `learning` is true in free laps only: during an
----experiment the caps are applied but never changed.
-function calibration.update(dt, car, learning)
-  local pos = car.splinePosition
-  local hit, reset = incident(car, dt)
-  aitune.observe(calibration.state, pos, car.speedKmh, hit)
-  local crossed = last.pos and last.pos > 0.9 and pos < 0.1 and not reset
-  if crossed then
-    local before = JSON.stringify(aitune.snapshot(calibration.state).caps)
-    aitune.endLap(calibration.state, learning)
-    if JSON.stringify(aitune.snapshot(calibration.state).caps) ~= before or learning then save() end
-  end
-  last.pos = pos
-  local section = aitune.section(pos)
-  if section ~= last.section then
-    last.section = section
-    physics.setAITopSpeed(0, aitune.capAt(calibration.state, pos) or 1e9)
+local function apply()
+  local hint = base() * aitune.hint(calibration.state)
+  if hint ~= last.applied then
+    last.applied = hint
+    physics.setAITyresHint(0, hint)
   end
 end
 
----The AI is handed the car or gives it back: no cap may outlive the run, nothing carries over.
+---Every frame while the AI drives on track. `learning` is true in free laps only: during an
+---experiment the hint is applied but never changed.
+function calibration.update(dt, car, learning)
+  apply()
+  local pos = car.splinePosition
+  local hit, reset = incident(car, dt)
+  aitune.observe(calibration.state, pos, hit)
+  if last.pos and last.pos > 0.9 and pos < 0.1 and not reset then
+    aitune.endLap(calibration.state, learning)
+    save()
+  end
+  last.pos = pos
+end
+
+---The AI is handed the car or gives it back: the car's own hint is put back, nothing carries
+---over.
 function calibration.release()
-  last.pos, last.section, last.reset, last.slow, last.damage = nil, -1, nil, 0, nil
-  pcall(physics.setAITopSpeed, 0, 1e9)
+  last.pos, last.reset, last.slow, last.damage, last.applied = nil, nil, 0, nil, nil
+  pcall(physics.setAITyresHint, 0, base())
 end
 
 function calibration.summary() return aitune.summary(calibration.state) end

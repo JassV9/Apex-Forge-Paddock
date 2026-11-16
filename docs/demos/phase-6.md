@@ -15,8 +15,9 @@ cd agent && uv run pytest tests/test_ghost.py tests/test_aitune.py tests/test_de
 | --- | --- |
 | `test_the_agent_drives_a_two_block_plan_with_the_ai_in_its_own_session` | Both blocks loaded, driven and tagged; every block starts with the first block's fuel; the AI is kept from its own pit stops; the car is handed back at the end |
 | `test_a_reset_by_the_game_retries_the_block` and `..._no_lap_counted...` | A setup the AI cannot drive ends the run with a reason instead of looping |
-| `test_free_laps_learn_a_cap_where_the_ai_went_off_and_apply_it` | A cap where the car went off, applied on track, on the car's own grip |
-| `test_an_experiment_applies_the_caps_without_learning` | The driver does not change during an experiment |
+| `test_free_laps_lower_the_hint_where_the_ai_went_off_and_apply_it` | Laps where the car went off lower the grip the AI assumes, applied on track, on the car's own grip |
+| `test_an_experiment_applies_the_hint_without_learning` | The driver does not change during an experiment |
+| `test_brushing_the_pit_wall_on_the_way_out_is_repaired_in_place_not_retried` | A scrape at the pit exit does not end the run |
 | `test_the_window_offers_the_proposals_and_starts_one_for_the_ai` | "AI drives it" proposes, plans and starts the experiment through core's API |
 
 ```bash
@@ -51,5 +52,7 @@ and **Telemetry**: pick a corner, tick passes to overlay them on the best one.
 | AI laps are far more repeatable | The plan's detectable effect: 2.7 ms per corner with the AI against about 14 ms for the owner's laps |
 | The AI had 20 % more grip by default | Peak lateral g 1.20 times the owner's over 16 corners; fixed by `setExtraAIGrip(0, 1)` |
 | Watchdogs | A stuck car and a reset by the game were retried from the pits during experiment 2 |
+| Speed caps do not stop the AI going off | Seen: section 184 capped to 106 km/h on the approach, the AI still arrived at 119 and went off ([ADR 0016](../adr/0016-ai-calibration.md) amendment) |
+| A lower tyre hint does | Seen: hint 0.90, a lap with no wheel off the track |
 | Calibration converges, formula cars stay on track | **Not verified** |
 | AI-measured effects predict a human's | **Not verified** |

@@ -1,6 +1,7 @@
 # ADR 0016: The AI drives on the car's own grip, and learns speed caps in free laps only
 
-Status: accepted (2026-11-15).
+Status: accepted (2026-11-15); amended 2026-11-16, speed caps replaced by a learned tyre hint
+(see the amendment at the end).
 
 ## Context
 
@@ -59,3 +60,36 @@ tune away.
 - How many laps calibration takes, and whether caps alone keep a formula car on track.
 - That 1.20 is the grip ratio and not partly a line or driving difference; it matches the
   documented default.
+
+## Amendment (2026-11-16): the AI learns the grip it assumes, not speed caps
+
+**What the game showed.** On real grip the 488 GT3 went off at the same two places every
+lap: the esses (section 51) and turn 19 (section 184), all four wheels out. After one lap
+sections 178 to 183 were capped at 171 down to 106 km/h, and the next lap the AI still arrived
+at section 184 at 119 km/h and went off again. `setAITopSpeed` limits how fast the AI
+accelerates; it does not make it brake earlier for a corner it misjudges, so the caps only
+shrank lap after lap.
+
+What the AI plans its corners with is its tyre hint (`ai.ini [TYRES] HINT`, 1.0 for this car):
+the grip it believes the car has. With the hint at 0.90 the next lap had no wheel off the
+track at all, turn 19 included.
+
+**Decision.** `aitune.lua` (version 2) learns one number per car and layout: the share of the
+car's own tyre hint the AI drives with. It starts at 1. A free lap where the AI went off,
+spun, stopped, was reset or took damage lowers it by 3 %, down to 70 %; two clean laps in a
+row mark the car calibrated. The game side applies it with `physics.setAITyresHint` while the
+AI is on track and puts the car's own hint back when the AI hands the car over. Frozen during
+experiments, kept in the same file; a version 1 file (speed caps) is dropped.
+
+A run of incident sections counts once: after going off, the car crawls through the next
+sections, and those are the result of the mistake, not new ones. The file records where the
+last lap went wrong.
+
+**Alternatives.** Per-section hints would slow the AI only where it goes wrong, but a hint
+changed in a braking zone acts on the AI's lookahead in ways not yet measured. One number is
+what the game showed to work; per section is the next step if a car needs it. Lowering
+`setAIBrakeHint` (0.97 for this car) was not tried.
+
+**Consequences.** The AI is slower everywhere, not only where it went wrong: on this car it
+drives below the limit in corners it already handled. Effects that only appear at the very
+limit of grip can be understated; the experiment's statistics still compare like with like.

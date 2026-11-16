@@ -153,6 +153,7 @@ function ac.INIConfig.carData(_, file)
       local t = M.tyres and M.tyres[base]
       if t and t[key] then return t[key] end
     end
+    if file == "ai.ini" and section == "TYRES" and key == "HINT" then return M.aiTyresHint or default end
     return default
   end
   return obj
@@ -280,7 +281,7 @@ end
 function physics.setAILapsToComplete(i, laps) record("laps_to_complete", laps) end
 function physics.setAIPitStopRequest(i, on) record("pit_request", on) end
 function physics.setExtraAIGrip(i, v) record("extra_grip", v) end
-function physics.setAITopSpeed(i, kmh) record("top_speed", kmh) M.topSpeed = kmh end
+function physics.setAITyresHint(i, v) record("tyres_hint", v) end
 
 script = {}
 function setInterval(fn, s) end

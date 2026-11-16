@@ -47,7 +47,19 @@ echo "{\"id\": \"$(date +%s)\", \"at\": $(date +%s), \"command\": \"ai_laps\"}" 
   > "$HOME/Documents/Assetto Corsa/paddock/outbox/agent_command.json"
 ```
 
-`"command": "stop"` stops it. A command older than 60 seconds is ignored.
+`"command": "stop"` stops it. A command more than 60 seconds from the game's clock is ignored.
+`at` is Unix time in UTC: in Windows PowerShell 5.1 use
+`[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`, not `Get-Date -UFormat %s` (local time, so the
+command is silently ignored).
+
+## Calibration
+
+Before an experiment, let the AI drive free laps until the window (or `agent_status.json`)
+says **calibrated**: two clean laps in a row. Every lap where it went off, spun, stopped,
+was reset or took damage lowers the grip it assumes by 3 %
+([ADR 0016](../adr/0016-ai-calibration.md)). The result is kept per car and layout in
+`Documents/Assetto Corsa/paddock/ai_tune/`; `last_incidents` there says in which of the 200
+sections of the lap it last went wrong. Delete the file to start over.
 
 ## What the agent does with the car, and when it gives up
 
@@ -56,8 +68,12 @@ echo "{\"id\": \"$(date +%s)\", \"at\": $(date +%s), \"command\": \"ai_laps\"}" 
 | Start of every block | Teleport to the pit box, repair, fuel as at the first block, load the block's setup and read it back, hand to the AI |
 | The AI wants its own pit stop | Prevented every 2 s (`setAILapsToComplete`, `setAIPitStopRequest`) |
 | Under 15 km/h for 20 s (on track or parked in the pit lane) | Back to the pits, the block is retried |
-| More than 5 units of damage in any zone | Back to the pits, repaired, the block is retried |
-| Three retries in one block | The run stops and the window says why |
+| More than 5 units of damage in any zone on track | Back to the pits, repaired, the block is retried |
+| Any damage in the pit lane on the way out (brushing the pit wall) | Repaired on the spot, the AI drives on |
+| Reset by the game, or no lap counted for 10 minutes | Back to the pits, the block is retried |
+| Less than 30 L at the start | Every block starts with 30 L (or the first block's fuel, if more) |
+| Free laps below 4 L | Back to the pits to refuel; not a retry |
+| Three retries in one block (in free laps: without a lap in between) | The run stops and the window says why |
 | A setup value does not take | Every change is undone and the run stops |
 | The track gives no physics access | Nothing happens to the car; the window says so |
 
@@ -76,11 +92,27 @@ Ferrari 488 GT3 at COTA F1 2026 (Paddock test), practice, CSP 0.3.0-preview581.
 | Setup editable in the pit box | Yes, without opening the setup screen |
 | The AI's own pit stops | In practice it pits after a stint (and refuelled once); blocked as above |
 | Damage | One run picked up 24 to 26 units and the AI pitted itself; this is why blocks now retry on damage |
-| An AI-driven experiment | See the next section |
+| An AI-driven experiment | Experiment 2 (120 % grip) stuck at turns 19 and 20 on the softer bar and was aborted; experiment 3 below |
+
+## Results seen in Assetto Corsa (2026-11-16): calibration and a full AI experiment
+
+Same car, track and CSP.
+
+| Check | Result |
+| --- | --- |
+| Leaving the pits on real grip | The AI brushes the pit wall at about 9 km/h on every exit; repaired in place since |
+| Speed caps (method 1) | Did not work: section 184 capped to 106 km/h on the approach, the AI still arrived at 119 and went off |
+| Tyre hint (method 2) | 1.00, 0.97, 0.94, 0.91: off at the esses and turn 19 every lap; 0.885: clean |
+| Fuel | Free-lap restarts kept the car's fuel; at 2 L the AI headed for the pits at turn 20 and AC counted a reset, taken for a mistake twice. Runs now start with at least 30 L |
+| Calibrated | Two clean laps at 88.5 % of the car's tyre hint; first clean flying lap 2:15.8 (owner's best 2:12.65) |
+| Experiment 3: ARB front 3 against 2, AI-driven, 4 blocks of 3 laps | Driven to the end on its own: 4 setups loaded and read back, 16 laps, 18 clean laps in a row, no retry |
+| Its verdict | Inconclusive: the softer bar is 4.2 ms per corner faster (90 % interval -6.8 to -1.6 ms, 204 passes), straddling the 5 ms that counts as worth having; guardrails unchanged |
+| Precision | ±2.6 ms per corner from 12 laps |
 
 ## Not verified
 
 - Other cars and tracks. The AI's quality depends on the car's AI data and the layout's AI line.
-- Whether an effect measured with the AI predicts the effect for a human driver.
+- Whether an effect measured with the AI predicts the effect for a human driver: the AI drives
+  at 88.5 % of its planned grip, below the limit where a human finds the last tenths.
 - The window's look in the game was seen once, from a screenshot taken inside the game; its
   buttons were not clicked in the game.

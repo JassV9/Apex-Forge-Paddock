@@ -2,6 +2,19 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## AI calibration and the first full AI experiment in the game (2026-11-16)
+
+- agent: calibration learns the grip the AI assumes (its tyre hint, -3 % per lap with an
+  incident, calibrated after two clean laps) instead of per-section speed caps, which the game
+  showed do not make the AI brake earlier (ADR 0016 amended). A retried lap is an incident;
+  a run of incident sections counts once.
+- agent: pit-lane scrapes repaired in place; runs start with at least 30 L and free laps
+  refuel below 4 L; free laps get three retries per lap.
+- Seen in Assetto Corsa: the 488 GT3 calibrated at 88.5 % (2:15.8 clean, owner 2:12.65), then
+  drove experiment 3 (ARB front 3 against 2) to the end on its own, 18 clean laps in a row.
+  Verdict inconclusive: -4.2 ms per corner [-6.8, -1.6] for the softer bar, at ±2.6 ms
+  precision from 12 laps. See `docs/runbooks/ghost-driver.md`.
+
 ## Phase 6: AI test driver, setup desk, telemetry workspace (2026-11-15)
 
 - `tools/prepare_test_layout.py` copies a layout with extended physics and Lua app physics

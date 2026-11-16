@@ -6,6 +6,7 @@ import { App } from "./App";
 import type { Route } from "./hooks/useRoute";
 import { Workspace } from "./components/workspace/Workspace";
 import { cotaPasses, cotaSession, traceOf } from "./test-passes";
+import { cotaReference } from "./test-reference";
 
 vi.mock("./components/charts/UPlotChart", () => ({
   UPlotChart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
@@ -23,6 +24,7 @@ const older: SessionSummary = {
 const sessionApi = {
   passes: () => Promise.resolve(cotaPasses),
   trace: (_: number, seq: number) => Promise.resolve(traceOf(seq)),
+  reference: () => Promise.resolve(cotaReference),
 };
 
 function open(route: Route, readOnly = false) {
@@ -74,7 +76,7 @@ describe("Workspace", () => {
     );
     const views = screen.getByRole("navigation", { name: "Views" });
     expect(within(views).getByRole("link", { current: "page" })).toHaveTextContent("Telemetry");
-    expect(within(views).getAllByRole("link")).toHaveLength(5);
+    expect(within(views).getAllByRole("link")).toHaveLength(6);
     expect(await screen.findByRole("navigation", { name: "Corners" })).toBeVisible();
   });
 

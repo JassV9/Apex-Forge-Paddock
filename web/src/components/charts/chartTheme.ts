@@ -9,6 +9,8 @@ export const INK = {
   best: "#c77dff",
   /** The pass picked for a closer look. */
   picked: "#3ad0ff",
+  /** AC's AI on the same car and setup, the reference driver (docs/adr/0019). */
+  ai: "#2ee6a6",
 };
 
 /** Colours of the other passes overlaid, and of the four tyres FL, FR, RL, RR. */

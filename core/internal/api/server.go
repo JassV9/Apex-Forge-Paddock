@@ -33,6 +33,8 @@ type Deps struct {
 	Diagnoses Diagnoses
 	// Passes serves /sessions/{id}/passes and the samples of a pass; nil leaves them out.
 	Passes Passes
+	// Reference serves /sessions/{id}/reference and /reference; nil leaves them out.
+	Reference Reference
 	// Garage serves /sensitivity, /scorecard and /sessions/{id}/proposals; nil leaves
 	// them out.
 	Garage Garage
@@ -53,6 +55,9 @@ func NewHandler(deps Deps) http.Handler {
 	}
 	if deps.Passes != nil {
 		registerPasses(mux, deps.Logger, deps.Passes)
+	}
+	if deps.Reference != nil {
+		registerReference(mux, deps.Logger, deps.Reference)
 	}
 	if deps.Garage != nil {
 		registerGarage(mux, deps.Logger, deps.Garage)

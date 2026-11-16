@@ -2,6 +2,19 @@
 
 One short entry per phase. Dates are when the phase was finished, not accepted.
 
+## Unreleased: the driving flow
+
+- The AI as the reference driver (ADR 0019). core: `GET /sessions/{id}/reference` compares
+  each corner of a session with the calibrated AI on the same car, track and setup (newest AI
+  session, else the nearest setup, said per corner): best and median, the AI's robust spread,
+  a driver/car class and the technique metrics that differ, with counts. `GET /reference`
+  gives the game the AI's times on one setup. No migration.
+- agent: a "Paddock Hotlap" window: the last corner pass for six seconds against your best on
+  this setup and the AI, with front lock, rear lock, wheelspin or off track from its samples;
+  a corners table on a toggle; nothing while the AI drives. **Unverified in game.**
+- web: an "Against the AI" view of a human session, sorted by time lost; the AI's best pass
+  of a corner on the same setup can be overlaid in the telemetry.
+
 ## AI calibration and the first full AI experiment in the game (2026-11-16)
 
 - agent: calibration learns the grip the AI assumes (its tyre hint, -3 % per lap with an

@@ -199,6 +199,13 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
   changes between two setups
   ([ADR 0014](docs/adr/0014-ghost-driver.md), [ADR 0016](docs/adr/0016-ai-calibration.md),
   [runbook](docs/runbooks/ghost-driver.md)).
+- The AI as the reference driver for hotlapping. Each corner of a human session is compared
+  with the calibrated AI on the same car and setup: slower than the AI by more than its own
+  scatter reads "practise this corner", as fast or faster reads "the car or the setup", with
+  the brake point, speeds or throttle pickup that differ and the passes behind every number.
+  In the game a small hotlap window shows each corner's time against your best and the AI;
+  in the dashboard the AI's best pass can be overlaid on yours
+  ([ADR 0019](docs/adr/0019-ai-reference-driver.md); the window is **unverified in game**).
 - A setup desk in the game window: what to test next, "I drive it" or "AI drives it", the
   laps of the running experiment and a Judge button, without leaving the car
   ([ADR 0015](docs/adr/0015-in-game-setup-desk.md)).

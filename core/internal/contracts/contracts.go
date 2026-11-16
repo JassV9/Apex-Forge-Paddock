@@ -8,6 +8,122 @@ import "reflect"
 import "regexp"
 import "unicode/utf8"
 
+type AiCornerTime struct {
+	// Corner number on the newest corner map of the track.
+	Corner int `json:"corner"`
+
+	// The spread or the floor, whichever is larger: a pass slower than the median by
+	// more is the driver's.
+	MarginS float64 `json:"margin_s"`
+
+	// MedianS corresponds to the JSON schema field "median_s".
+	MedianS float64 `json:"median_s"`
+
+	// AI passes behind the numbers.
+	N int `json:"n"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name"`
+
+	// 1.4826 times the median absolute deviation, seconds.
+	SpreadS float64 `json:"spread_s"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AiCornerTime) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in AiCornerTime: required")
+	}
+	if _, ok := raw["margin_s"]; raw != nil && !ok {
+		return fmt.Errorf("field margin_s in AiCornerTime: required")
+	}
+	if _, ok := raw["median_s"]; raw != nil && !ok {
+		return fmt.Errorf("field median_s in AiCornerTime: required")
+	}
+	if _, ok := raw["n"]; raw != nil && !ok {
+		return fmt.Errorf("field n in AiCornerTime: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in AiCornerTime: required")
+	}
+	if _, ok := raw["spread_s"]; raw != nil && !ok {
+		return fmt.Errorf("field spread_s in AiCornerTime: required")
+	}
+	type Plain AiCornerTime
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 0 > plain.MarginS {
+		return fmt.Errorf("field %s: must be >= %v", "margin_s", 0)
+	}
+	if 1 > plain.N {
+		return fmt.Errorf("field %s: must be >= %v", "n", 1)
+	}
+	if 0 > plain.SpreadS {
+		return fmt.Errorf("field %s: must be >= %v", "spread_s", 0)
+	}
+	*j = AiCornerTime(plain)
+	return nil
+}
+
+// AC's AI zone times per corner on one car, track, layout and setup, for the
+// in-game hotlap display (docs/adr/0019-ai-reference-driver.md). Only corners with
+// enough AI passes on exactly this setup are listed; empty when there are none.
+type AiReference struct {
+	// Car corresponds to the JSON schema field "car".
+	Car string `json:"car"`
+
+	// Corners corresponds to the JSON schema field "corners".
+	Corners []AiCornerTime `json:"corners"`
+
+	// Layout corresponds to the JSON schema field "layout".
+	Layout string `json:"layout"`
+
+	// SetupHash corresponds to the JSON schema field "setup_hash".
+	SetupHash string `json:"setup_hash"`
+
+	// Track corresponds to the JSON schema field "track".
+	Track string `json:"track"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AiReference) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["car"]; raw != nil && !ok {
+		return fmt.Errorf("field car in AiReference: required")
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in AiReference: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in AiReference: required")
+	}
+	if _, ok := raw["setup_hash"]; raw != nil && !ok {
+		return fmt.Errorf("field setup_hash in AiReference: required")
+	}
+	if _, ok := raw["track"]; raw != nil && !ok {
+		return fmt.Errorf("field track in AiReference: required")
+	}
+	type Plain AiReference
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = AiReference(plain)
+	return nil
+}
+
 // Another explanation of the same symptom that a setup change would not cure.
 type Alternative struct {
 	// Ids of the evidence it rests on.
@@ -337,6 +453,219 @@ func (j *ChannelResult) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "n_passes", 0)
 	}
 	*j = ChannelResult(plain)
+	return nil
+}
+
+// One corner: the driver's times, the AI's on the matched setup, the gap and its
+// class.
+type CornerReference struct {
+	// AiBestS corresponds to the JSON schema field "ai_best_s".
+	AiBestS *float64 `json:"ai_best_s,omitempty,omitzero"`
+
+	// AiBestSeq corresponds to the JSON schema field "ai_best_seq".
+	AiBestSeq *int `json:"ai_best_seq,omitempty,omitzero"`
+
+	// The AI session of the AI's fastest pass, for overlaying its samples.
+	AiBestSessionId *int `json:"ai_best_session_id,omitempty,omitzero"`
+
+	// AiMedianS corresponds to the JSON schema field "ai_median_s".
+	AiMedianS *float64 `json:"ai_median_s,omitempty,omitzero"`
+
+	// AI passes behind the AI's numbers.
+	AiN int `json:"ai_n"`
+
+	// The setup the AI passes were driven on.
+	AiSetupHash *string `json:"ai_setup_hash,omitempty,omitzero"`
+
+	// 1.4826 times the median absolute deviation of the AI's zone times: a standard
+	// deviation that one incident lap does not inflate.
+	AiSpreadS *float64 `json:"ai_spread_s,omitempty,omitzero"`
+
+	// driver: the typical pass is slower than the AI's median by more than the
+	// margin; car: within the margin or faster; no_reference: too few AI passes to
+	// compare.
+	Class CornerReferenceClass `json:"class"`
+
+	// Corner corresponds to the JSON schema field "corner".
+	Corner int `json:"corner"`
+
+	// Driver's best minus the AI's median, seconds; positive is slower than the AI.
+	DeltaBestS *float64 `json:"delta_best_s,omitempty,omitzero"`
+
+	// Driver's median minus the AI's median, seconds; positive is slower than the AI.
+	// The class is decided on this.
+	DeltaMedianS *float64 `json:"delta_median_s,omitempty,omitzero"`
+
+	// Technique metrics whose medians differ from the AI's by at least their step,
+	// largest first, at most three.
+	Differences []FeatureDifference `json:"differences"`
+
+	// HumanBestS corresponds to the JSON schema field "human_best_s".
+	HumanBestS float64 `json:"human_best_s"`
+
+	// HumanBestSeq corresponds to the JSON schema field "human_best_seq".
+	HumanBestSeq int `json:"human_best_seq"`
+
+	// The typical pass: median zone time, seconds.
+	HumanMedianS float64 `json:"human_median_s"`
+
+	// The session's valid passes of this corner on the compared setup.
+	HumanN int `json:"human_n"`
+
+	// The AI's spread or margin_floor_s, whichever is larger.
+	MarginS *float64 `json:"margin_s,omitempty,omitzero"`
+
+	// Which AI passes the corner is compared with: on the same setup, on the nearest
+	// setup the AI drove, or none.
+	Match CornerReferenceMatch `json:"match"`
+
+	// The corner's name on the map; empty when it has none.
+	Name string `json:"name"`
+
+	// The rule that gave the class, in words.
+	Reason string `json:"reason"`
+
+	// Items that differ between the compared setup and the AI's (0 on the same
+	// setup).
+	SetupChanges *int `json:"setup_changes,omitempty,omitzero"`
+}
+
+type CornerReferenceClass string
+
+const CornerReferenceClassCar CornerReferenceClass = "car"
+const CornerReferenceClassDriver CornerReferenceClass = "driver"
+const CornerReferenceClassNoReference CornerReferenceClass = "no_reference"
+
+var enumValues_CornerReferenceClass = []interface{}{
+	"driver",
+	"car",
+	"no_reference",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *CornerReferenceClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_CornerReferenceClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_CornerReferenceClass, v)
+	}
+	*j = CornerReferenceClass(v)
+	return nil
+}
+
+type CornerReferenceMatch string
+
+const CornerReferenceMatchNearest CornerReferenceMatch = "nearest"
+const CornerReferenceMatchNone CornerReferenceMatch = "none"
+const CornerReferenceMatchSame CornerReferenceMatch = "same"
+
+var enumValues_CornerReferenceMatch = []interface{}{
+	"same",
+	"nearest",
+	"none",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *CornerReferenceMatch) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_CornerReferenceMatch {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_CornerReferenceMatch, v)
+	}
+	*j = CornerReferenceMatch(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *CornerReference) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ai_n"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_n in CornerReference: required")
+	}
+	if _, ok := raw["class"]; raw != nil && !ok {
+		return fmt.Errorf("field class in CornerReference: required")
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in CornerReference: required")
+	}
+	if _, ok := raw["differences"]; raw != nil && !ok {
+		return fmt.Errorf("field differences in CornerReference: required")
+	}
+	if _, ok := raw["human_best_s"]; raw != nil && !ok {
+		return fmt.Errorf("field human_best_s in CornerReference: required")
+	}
+	if _, ok := raw["human_best_seq"]; raw != nil && !ok {
+		return fmt.Errorf("field human_best_seq in CornerReference: required")
+	}
+	if _, ok := raw["human_median_s"]; raw != nil && !ok {
+		return fmt.Errorf("field human_median_s in CornerReference: required")
+	}
+	if _, ok := raw["human_n"]; raw != nil && !ok {
+		return fmt.Errorf("field human_n in CornerReference: required")
+	}
+	if _, ok := raw["match"]; raw != nil && !ok {
+		return fmt.Errorf("field match in CornerReference: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in CornerReference: required")
+	}
+	if _, ok := raw["reason"]; raw != nil && !ok {
+		return fmt.Errorf("field reason in CornerReference: required")
+	}
+	type Plain CornerReference
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.AiBestSeq != nil && 1 > *plain.AiBestSeq {
+		return fmt.Errorf("field %s: must be >= %v", "ai_best_seq", 1)
+	}
+	if plain.AiBestSessionId != nil && 1 > *plain.AiBestSessionId {
+		return fmt.Errorf("field %s: must be >= %v", "ai_best_session_id", 1)
+	}
+	if 0 > plain.AiN {
+		return fmt.Errorf("field %s: must be >= %v", "ai_n", 0)
+	}
+	if plain.AiSpreadS != nil && 0 > *plain.AiSpreadS {
+		return fmt.Errorf("field %s: must be >= %v", "ai_spread_s", 0)
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 1 > plain.HumanBestSeq {
+		return fmt.Errorf("field %s: must be >= %v", "human_best_seq", 1)
+	}
+	if 1 > plain.HumanN {
+		return fmt.Errorf("field %s: must be >= %v", "human_n", 1)
+	}
+	if plain.MarginS != nil && 0 > *plain.MarginS {
+		return fmt.Errorf("field %s: must be >= %v", "margin_s", 0)
+	}
+	if plain.SetupChanges != nil && 0 > *plain.SetupChanges {
+		return fmt.Errorf("field %s: must be >= %v", "setup_changes", 0)
+	}
+	*j = CornerReference(plain)
 	return nil
 }
 
@@ -2011,6 +2340,114 @@ func (j *FeatureCorner) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "zone_start_m", 0)
 	}
 	*j = FeatureCorner(plain)
+	return nil
+}
+
+type FeatureDifference struct {
+	// AiMedian corresponds to the JSON schema field "ai_median".
+	AiMedian float64 `json:"ai_median"`
+
+	// AiN corresponds to the JSON schema field "ai_n".
+	AiN int `json:"ai_n"`
+
+	// Driver's median minus the AI's, in the metric's unit.
+	Difference float64 `json:"difference"`
+
+	// HumanMedian corresponds to the JSON schema field "human_median".
+	HumanMedian float64 `json:"human_median"`
+
+	// HumanN corresponds to the JSON schema field "human_n".
+	HumanN int `json:"human_n"`
+
+	// The engine's metric id, such as brake_dist_m or v_min_kmh.
+	Metric string `json:"metric"`
+
+	// Phase corresponds to the JSON schema field "phase".
+	Phase FeatureDifferencePhase `json:"phase"`
+
+	// The smallest difference of this metric that is reported.
+	Step float64 `json:"step"`
+}
+
+type FeatureDifferencePhase string
+
+const FeatureDifferencePhaseBrake FeatureDifferencePhase = "brake"
+const FeatureDifferencePhaseEntry FeatureDifferencePhase = "entry"
+const FeatureDifferencePhaseExit FeatureDifferencePhase = "exit"
+const FeatureDifferencePhaseMid FeatureDifferencePhase = "mid"
+
+var enumValues_FeatureDifferencePhase = []interface{}{
+	"brake",
+	"entry",
+	"mid",
+	"exit",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeatureDifferencePhase) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_FeatureDifferencePhase {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_FeatureDifferencePhase, v)
+	}
+	*j = FeatureDifferencePhase(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *FeatureDifference) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ai_median"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_median in FeatureDifference: required")
+	}
+	if _, ok := raw["ai_n"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_n in FeatureDifference: required")
+	}
+	if _, ok := raw["difference"]; raw != nil && !ok {
+		return fmt.Errorf("field difference in FeatureDifference: required")
+	}
+	if _, ok := raw["human_median"]; raw != nil && !ok {
+		return fmt.Errorf("field human_median in FeatureDifference: required")
+	}
+	if _, ok := raw["human_n"]; raw != nil && !ok {
+		return fmt.Errorf("field human_n in FeatureDifference: required")
+	}
+	if _, ok := raw["metric"]; raw != nil && !ok {
+		return fmt.Errorf("field metric in FeatureDifference: required")
+	}
+	if _, ok := raw["phase"]; raw != nil && !ok {
+		return fmt.Errorf("field phase in FeatureDifference: required")
+	}
+	if _, ok := raw["step"]; raw != nil && !ok {
+		return fmt.Errorf("field step in FeatureDifference: required")
+	}
+	type Plain FeatureDifference
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.AiN {
+		return fmt.Errorf("field %s: must be >= %v", "ai_n", 1)
+	}
+	if 1 > plain.HumanN {
+		return fmt.Errorf("field %s: must be >= %v", "human_n", 1)
+	}
+	if 0 >= plain.Step {
+		return fmt.Errorf("field %s: must be > %v", "step", 0)
+	}
+	*j = FeatureDifference(plain)
 	return nil
 }
 
@@ -4283,6 +4720,38 @@ func (j *RankedReply) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type ReferenceSetup struct {
+	// Valid passes of the session on it.
+	Passes int `json:"passes"`
+
+	// The agent's fingerprint of the setup.
+	SetupHash string `json:"setup_hash"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ReferenceSetup) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in ReferenceSetup: required")
+	}
+	if _, ok := raw["setup_hash"]; raw != nil && !ok {
+		return fmt.Errorf("field setup_hash in ReferenceSetup: required")
+	}
+	type Plain ReferenceSetup
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.Passes {
+		return fmt.Errorf("field %s: must be >= %v", "passes", 0)
+	}
+	*j = ReferenceSetup(plain)
+	return nil
+}
+
 // What the agent must load and for how many laps. Written by core as runplan.json;
 // the agent reads it in the pits. Labels are code names: the plan does not say
 // which setup is the baseline.
@@ -5069,6 +5538,88 @@ func (j *SessionPasses) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be > %v", "track_length_m", 0)
 	}
 	*j = SessionPasses(plain)
+	return nil
+}
+
+// A session's corners against AC's AI on the same car, track, layout and setup
+// (docs/adr/0019-ai-reference-driver.md). Every number is computed by core from
+// stored passes, with the count of passes behind it. Read-only.
+type SessionReference struct {
+	// Valid AI passes stored on this car and track, on any setup.
+	AiPasses int `json:"ai_passes"`
+
+	// The car's id in the game.
+	Car string `json:"car"`
+
+	// Every corner of the session with a valid pass on the compared setup, by number.
+	Corners []CornerReference `json:"corners"`
+
+	// Track layout; empty for single-layout tracks.
+	Layout string `json:"layout"`
+
+	// The smallest margin a corner is classed with, seconds, whatever the AI's
+	// spread.
+	MarginFloorS float64 `json:"margin_floor_s"`
+
+	// SessionId corresponds to the JSON schema field "session_id".
+	SessionId int `json:"session_id"`
+
+	// The setup of the session that is compared: the one asked for, else the setup of
+	// the session's latest pass. Absent when the session recorded no setup.
+	SetupHash *string `json:"setup_hash,omitempty,omitzero"`
+
+	// Every setup the session drove, with its valid passes, most passes first.
+	Setups []ReferenceSetup `json:"setups"`
+
+	// The track's id in the game.
+	Track string `json:"track"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SessionReference) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ai_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_passes in SessionReference: required")
+	}
+	if _, ok := raw["car"]; raw != nil && !ok {
+		return fmt.Errorf("field car in SessionReference: required")
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in SessionReference: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in SessionReference: required")
+	}
+	if _, ok := raw["margin_floor_s"]; raw != nil && !ok {
+		return fmt.Errorf("field margin_floor_s in SessionReference: required")
+	}
+	if _, ok := raw["session_id"]; raw != nil && !ok {
+		return fmt.Errorf("field session_id in SessionReference: required")
+	}
+	if _, ok := raw["setups"]; raw != nil && !ok {
+		return fmt.Errorf("field setups in SessionReference: required")
+	}
+	if _, ok := raw["track"]; raw != nil && !ok {
+		return fmt.Errorf("field track in SessionReference: required")
+	}
+	type Plain SessionReference
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.AiPasses {
+		return fmt.Errorf("field %s: must be >= %v", "ai_passes", 0)
+	}
+	if 0 > plain.MarginFloorS {
+		return fmt.Errorf("field %s: must be >= %v", "margin_floor_s", 0)
+	}
+	if 1 > plain.SessionId {
+		return fmt.Errorf("field %s: must be >= %v", "session_id", 1)
+	}
+	*j = SessionReference(plain)
 	return nil
 }
 

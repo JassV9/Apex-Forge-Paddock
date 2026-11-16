@@ -154,6 +154,72 @@ paths:
           $ref: "#/components/responses/Problem"
         "422":
           $ref: "#/components/responses/Problem"
+  /sessions/{id}/reference:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - name: setup_hash
+        in: query
+        description: The session's setup to compare (default the setup of its latest pass).
+        schema:
+          type: string
+          minLength: 1
+    get:
+      operationId: getSessionReference
+      summary: Every corner of the session against AC's AI on the same car, track and setup.
+      description: >
+        Per corner the driver's best and median zone time, the AI's median and spread on the
+        same setup (or the nearest setup the AI drove, said per corner), the gaps, and a
+        class: driver when the typical pass is slower than the AI by more than the AI's own
+        spread, car otherwise. Technique metrics that differ are listed with their counts.
+      responses:
+        "200":
+          description: The comparison, corner by corner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionReference"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /reference:
+    parameters:
+      - name: car
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: track
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: layout
+        in: query
+        schema:
+          type: string
+      - name: setup_hash
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+    get:
+      operationId: getAiReference
+      summary: The AI's median zone time per corner on one car, track and setup.
+      description: >
+        Small, for the in-game hotlap display. Corner numbers are those of the track's
+        newest corner map; a corner with fewer than three AI passes on exactly this setup is
+        left out.
+      responses:
+        "200":
+          description: The AI's times; no corners when the AI never drove this setup here.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiReference"
+        "422":
+          $ref: "#/components/responses/Problem"
   /sensitivity:
     get:
       operationId: listSensitivity
@@ -338,6 +404,10 @@ components:
       $ref: "../../contracts/session_passes.schema.json"
     PassTrace:
       $ref: "../../contracts/pass_trace.schema.json"
+    SessionReference:
+      $ref: "../../contracts/session_reference.schema.json"
+    AiReference:
+      $ref: "../../contracts/ai_reference.schema.json"
     Problem:
       type: object
       additionalProperties: false

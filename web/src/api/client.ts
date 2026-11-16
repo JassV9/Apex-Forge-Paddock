@@ -20,6 +20,9 @@ export type SessionPasses = components["schemas"]["SessionPasses"];
 export type PassRecord = SessionPasses["passes"][number];
 export type CornerSummary = SessionPasses["corners"][number];
 export type PassTrace = components["schemas"]["PassTrace"];
+export type SessionReference = components["schemas"]["SessionReference"];
+export type CornerReference = SessionReference["corners"][number];
+export type FeatureDifference = CornerReference["differences"][number];
 export type ExperimentAction =
   paths["/experiments/{id}/{action}"]["post"]["parameters"]["path"]["action"];
 
@@ -92,6 +95,20 @@ export async function fetchTrace(
     },
   });
   return unwrap(reply, "GET /sessions/{id}/passes/{seq}/samples");
+}
+
+/** The session's corners against AC's AI on the same car and setup (docs/adr/0019). */
+export async function fetchReference(
+  sessionId: number,
+  setupHash?: string,
+): Promise<SessionReference> {
+  const reply = await coreApi.GET("/sessions/{id}/reference", {
+    params: {
+      path: { id: sessionId },
+      query: setupHash === undefined ? {} : { setup_hash: setupHash },
+    },
+  });
+  return unwrap(reply, "GET /sessions/{id}/reference");
 }
 
 /** Every car's sensitivity profile, rebuilt from the finished experiments. */

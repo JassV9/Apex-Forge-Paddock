@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ai_reference.schema.json",
+  "title": "AiReference",
+  "description": "AC's AI zone times per corner on one car, track, layout and setup, for the in-game hotlap display (docs/adr/0019-ai-reference-driver.md). Only corners with enough AI passes on exactly this setup are listed; empty when there are none.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "car",
+    "track",
+    "layout",
+    "setup_hash",
+    "corners"
+  ],
+  "properties": {
+    "car": {
+      "type": "string"
+    },
+    "track": {
+      "type": "string"
+    },
+    "layout": {
+      "type": "string"
+    },
+    "setup_hash": {
+      "type": "string"
+    },
+    "corners": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AiCornerTime"
+      }
+    }
+  },
+  "definitions": {
+    "AiCornerTime": {
+      "title": "AiCornerTime",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corner",
+        "name",
+        "n",
+        "median_s",
+        "spread_s",
+        "margin_s"
+      ],
+      "properties": {
+        "corner": {
+          "description": "Corner number on the newest corner map of the track.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "n": {
+          "description": "AI passes behind the numbers.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "median_s": {
+          "type": "number"
+        },
+        "spread_s": {
+          "description": "1.4826 times the median absolute deviation, seconds.",
+          "type": "number",
+          "minimum": 0
+        },
+        "margin_s": {
+          "description": "The spread or the floor, whichever is larger: a pass slower than the median by more is the driver's.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

@@ -12,7 +12,14 @@ export interface Prefill {
   gain?: { low: number; high: number };
 }
 
-export const TABS = ["overview", "telemetry", "diagnosis", "experiments", "garage"] as const;
+export const TABS = [
+  "overview",
+  "telemetry",
+  "reference",
+  "diagnosis",
+  "experiments",
+  "garage",
+] as const;
 export type Tab = (typeof TABS)[number];
 
 /**

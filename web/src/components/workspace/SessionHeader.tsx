@@ -6,10 +6,16 @@ import { SOURCE_LABEL, trackText } from "./SessionRail";
 const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
   telemetry: "Telemetry",
+  reference: "Against the AI",
   diagnosis: "Diagnosis",
   experiments: "Experiments",
   garage: "Garage",
 };
+
+/** A session the AI drove has no AI to be compared with. */
+export function hasReference(session: SessionSummary): boolean {
+  return session.source === "human" || session.source === "demo";
+}
 
 /** The session on screen, and the views of it. Experiments and the garage are per car. */
 export function SessionHeader({ session, tab }: { session: SessionSummary; tab: Tab }) {
@@ -33,7 +39,7 @@ export function SessionHeader({ session, tab }: { session: SessionSummary; tab: 
         </p>
       </div>
       <nav className="tabs" aria-label="Views">
-        {TABS.map((name) => (
+        {TABS.filter((name) => name !== "reference" || hasReference(session)).map((name) => (
           <a
             key={name}
             href={sessionHref(session.id, name)}

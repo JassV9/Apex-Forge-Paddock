@@ -13,6 +13,7 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/engine"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/passes"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/reference"
 )
 
 // Experiments is every action on experiments. *experiments.Service implements it.
@@ -162,7 +163,8 @@ func (e experimentRoutes) fail(w http.ResponseWriter, r *http.Request, err error
 func fail(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err error) {
 	status := http.StatusInternalServerError
 	switch {
-	case errors.Is(err, experiments.ErrNotFound), errors.Is(err, passes.ErrNotFound):
+	case errors.Is(err, experiments.ErrNotFound), errors.Is(err, passes.ErrNotFound),
+		errors.Is(err, reference.ErrNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, experiments.ErrInvalid):
 		status = http.StatusUnprocessableEntity

@@ -1,0 +1,260 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "session_reference.schema.json",
+  "title": "SessionReference",
+  "description": "A session's corners against AC's AI on the same car, track, layout and setup (docs/adr/0019-ai-reference-driver.md). Every number is computed by core from stored passes, with the count of passes behind it. Read-only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "car",
+    "track",
+    "layout",
+    "setups",
+    "margin_floor_s",
+    "ai_passes",
+    "corners"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "car": {
+      "description": "The car's id in the game.",
+      "type": "string"
+    },
+    "track": {
+      "description": "The track's id in the game.",
+      "type": "string"
+    },
+    "layout": {
+      "description": "Track layout; empty for single-layout tracks.",
+      "type": "string"
+    },
+    "setup_hash": {
+      "description": "The setup of the session that is compared: the one asked for, else the setup of the session's latest pass. Absent when the session recorded no setup.",
+      "type": "string"
+    },
+    "setups": {
+      "description": "Every setup the session drove, with its valid passes, most passes first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ReferenceSetup"
+      }
+    },
+    "margin_floor_s": {
+      "description": "The smallest margin a corner is classed with, seconds, whatever the AI's spread.",
+      "type": "number",
+      "minimum": 0
+    },
+    "ai_passes": {
+      "description": "Valid AI passes stored on this car and track, on any setup.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "corners": {
+      "description": "Every corner of the session with a valid pass on the compared setup, by number.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CornerReference"
+      }
+    }
+  },
+  "definitions": {
+    "ReferenceSetup": {
+      "title": "ReferenceSetup",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setup_hash",
+        "passes"
+      ],
+      "properties": {
+        "setup_hash": {
+          "description": "The agent's fingerprint of the setup.",
+          "type": "string"
+        },
+        "passes": {
+          "description": "Valid passes of the session on it.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "CornerReference": {
+      "title": "CornerReference",
+      "description": "One corner: the driver's times, the AI's on the matched setup, the gap and its class.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corner",
+        "name",
+        "human_n",
+        "human_best_s",
+        "human_best_seq",
+        "human_median_s",
+        "match",
+        "ai_n",
+        "class",
+        "reason",
+        "differences"
+      ],
+      "properties": {
+        "corner": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "description": "The corner's name on the map; empty when it has none.",
+          "type": "string"
+        },
+        "human_n": {
+          "description": "The session's valid passes of this corner on the compared setup.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "human_best_s": {
+          "type": "number"
+        },
+        "human_best_seq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "human_median_s": {
+          "description": "The typical pass: median zone time, seconds.",
+          "type": "number"
+        },
+        "match": {
+          "description": "Which AI passes the corner is compared with: on the same setup, on the nearest setup the AI drove, or none.",
+          "type": "string",
+          "enum": [
+            "same",
+            "nearest",
+            "none"
+          ]
+        },
+        "ai_setup_hash": {
+          "description": "The setup the AI passes were driven on.",
+          "type": "string"
+        },
+        "setup_changes": {
+          "description": "Items that differ between the compared setup and the AI's (0 on the same setup).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "ai_n": {
+          "description": "AI passes behind the AI's numbers.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "ai_median_s": {
+          "type": "number"
+        },
+        "ai_spread_s": {
+          "description": "1.4826 times the median absolute deviation of the AI's zone times: a standard deviation that one incident lap does not inflate.",
+          "type": "number",
+          "minimum": 0
+        },
+        "ai_best_s": {
+          "type": "number"
+        },
+        "ai_best_session_id": {
+          "description": "The AI session of the AI's fastest pass, for overlaying its samples.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "ai_best_seq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "delta_best_s": {
+          "description": "Driver's best minus the AI's median, seconds; positive is slower than the AI.",
+          "type": "number"
+        },
+        "delta_median_s": {
+          "description": "Driver's median minus the AI's median, seconds; positive is slower than the AI. The class is decided on this.",
+          "type": "number"
+        },
+        "margin_s": {
+          "description": "The AI's spread or margin_floor_s, whichever is larger.",
+          "type": "number",
+          "minimum": 0
+        },
+        "class": {
+          "description": "driver: the typical pass is slower than the AI's median by more than the margin; car: within the margin or faster; no_reference: too few AI passes to compare.",
+          "type": "string",
+          "enum": [
+            "driver",
+            "car",
+            "no_reference"
+          ]
+        },
+        "reason": {
+          "description": "The rule that gave the class, in words.",
+          "type": "string"
+        },
+        "differences": {
+          "description": "Technique metrics whose medians differ from the AI's by at least their step, largest first, at most three.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FeatureDifference"
+          }
+        }
+      }
+    },
+    "FeatureDifference": {
+      "title": "FeatureDifference",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "phase",
+        "human_median",
+        "ai_median",
+        "difference",
+        "step",
+        "human_n",
+        "ai_n"
+      ],
+      "properties": {
+        "metric": {
+          "description": "The engine's metric id, such as brake_dist_m or v_min_kmh.",
+          "type": "string"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "brake",
+            "entry",
+            "mid",
+            "exit"
+          ]
+        },
+        "human_median": {
+          "type": "number"
+        },
+        "ai_median": {
+          "type": "number"
+        },
+        "difference": {
+          "description": "Driver's median minus the AI's, in the metric's unit.",
+          "type": "number"
+        },
+        "step": {
+          "description": "The smallest difference of this metric that is reported.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "human_n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ai_n": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

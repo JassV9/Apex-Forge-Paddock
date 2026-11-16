@@ -5,6 +5,7 @@
 local carlink = require("game.carlink")
 local corners = require("core.corners")
 local ghost = require("game.ghost")
+local hotlap = require("game.hotlap")
 local lines = require("core.spool_lines")
 local plan = require("game.plan")
 local recorder = require("core.recorder")
@@ -145,6 +146,7 @@ end
 local function encode(raw, car)
   if agent.job then agent.out:add(lines.finish(agent.job)) end
   agent.passes = agent.passes + 1
+  if agent.source == "human" then hotlap.pass(raw, agent.setupHash, agent.t) end
   agent.job = lines.beginPass(raw, {
     sessionId = agent.sessionId, seq = agent.passes,
     startMs = nowMs() - (raw.tOut - raw.tIn) * 1000,

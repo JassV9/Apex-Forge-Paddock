@@ -5,6 +5,7 @@ package.add("src")
 
 local agent = require("game.agent")
 local window = require("game.window")
+local hotlap = require("game.hotlap")
 
 local ok, err = pcall(agent.init)
 if not ok then
@@ -26,6 +27,10 @@ end
 
 function script.windowMain()
   window.draw(agent)
+end
+
+function script.windowHotlap()
+  hotlap.draw(agent)
 end
 
 ac.onRelease(function() pcall(agent.shutdown) end)

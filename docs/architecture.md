@@ -47,6 +47,7 @@ flowchart LR
 | agent to core | Files: the agent writes numbered chunk files of JSON lines to `Documents/Assetto Corsa/paddock/spool/<session-id>/`; core tails the directory and never writes to it ([ADR 0003](adr/0003-spool-transport.md)) | `contracts/spool_session.schema.json`, `contracts/spool_pass.schema.json` |
 | core to agent | Files: one run plan per car (`runplans/<car>.json`) and setup `.ini` files in `Documents/Assetto Corsa/paddock/outbox/`, read by the agent every two seconds, in the pits or while the AI drives ([ADR 0009](adr/0009-experiments.md), [ADR 0014](adr/0014-ghost-driver.md)) | `contracts/runplan.schema.json` |
 | agent window to core | HTTP to core's REST API, only while the window is drawn, at most every 10 s, and on a click ([ADR 0015](adr/0015-in-game-setup-desk.md)) | `docs/api/openapi.yaml` |
+| hotlap window to core | `GET /reference` only while the window is drawn, one request at a time, on a setup change and at most every 30 s ([ADR 0019](adr/0019-ai-reference-driver.md)) | `contracts/ai_reference.schema.json` |
 | core to engine | HTTP/JSON on localhost; long work goes through the `jobs` table, claimed with `SELECT ... FOR UPDATE SKIP LOCKED` ([ADR 0006](adr/0006-no-kafka-no-kubernetes.md)) | `contracts/*.schema.json` |
 | web to core | REST | `docs/api/openapi.yaml` |
 | web to launcher | HTTP from the browser to `paddock-launcher` on the Windows host, `127.0.0.1:8090`, CORS for the dev origins only ([ADR 0017](adr/0017-host-launcher.md)) | `docs/api/launcher.yaml` |
@@ -65,6 +66,7 @@ samples, DuckDB inside the engine for queries over Parquet
 | `core/internal/setups` | Go | Parameter catalog, setup versions, `.ini` writer, diffing | Accept a value off the step grid or out of range |
 | `core/internal/experiments` | Go | Experiment state machine, run plans, verdict ledger, rollback | Do statistics (it asks the engine) |
 | `core/internal/passes` | Go | Read path for a session's passes and their raw samples (Parquet) | Write anything |
+| `core/internal/reference` | Go | A session's corners against the AI on the same car, track and setup: matching, the driver/car class, the technique metrics that differ | Write anything; let anything but its rule decide a class |
 | `core/internal/api` | Go | REST API for the dashboard and the in-game desk | Hold logic that belongs to another package |
 | `core/internal/store` | Go | Database connection, migrations, the API's read queries | — |
 | `core/internal/launcher` (`cmd/paddock-launcher`) | Go, on the Windows host | Listing installed cars and layouts, starting Practice through Content Manager, backing up `controls.ini` and restoring it when the game changed the bindings | Write anything outside `paddock/` except putting back its own `controls.ini` backup; change CM's presets or settings |
@@ -256,6 +258,20 @@ flowchart LR
 Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
 [ADR 0016](adr/0016-ai-calibration.md); how: [runbooks/ghost-driver.md](runbooks/ghost-driver.md).
 
+## The AI as the reference driver
+
+1. `GET /sessions/{id}/reference`: `core/internal/reference` takes the session's valid passes
+   on one of its setups and the AI's on the same car and track, from the newest AI session with
+   three passes of the corner on that setup (else the nearest setup, said per corner).
+2. Per corner: medians, the AI's robust spread, the gaps, and the class: driver when the
+   typical pass is slower than the AI by more than `max(spread, 10 ms)`, car otherwise; the
+   technique metrics that differ beyond their step.
+3. `GET /reference?car=&track=&layout=&setup_hash=` gives the game the AI's times on exactly
+   that setup; the hotlap window (`agent/src/core/hotlap.lua`, `agent/src/game/hotlap.lua`)
+   shows each pass against them.
+
+The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/0019-ai-reference-driver.md).
+
 ## What exists today (after phase 7)
 
 | Piece | State |
@@ -274,6 +290,7 @@ Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
 | AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
+| AI as the reference driver: `GET /sessions/{id}/reference`, `GET /reference`, the hotlap window, "Against the AI" and the AI overlay in the dashboard ([ADR 0019](adr/0019-ai-reference-driver.md)) | Tested offline and against a real PostgreSQL; run on real AI sessions only; the window is **unverified in game** |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.

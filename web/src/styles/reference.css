@@ -1,0 +1,44 @@
+/* Against the AI (docs/adr/0019): the corners table and the AI line in the telemetry. */
+
+.panel-reference .setup-chooser {
+  display: inline-block;
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.reference-table {
+  width: 100%;
+}
+
+.reference-table td small {
+  display: block;
+  color: var(--faint);
+}
+
+.reference-table td.num small {
+  display: inline;
+}
+
+.reference-table .class-driver td:nth-child(6) {
+  color: var(--bad);
+}
+
+.reference-table .class-car td:nth-child(6) {
+  color: var(--good);
+}
+
+.reference-table .class-no_reference td {
+  color: var(--faint);
+}
+
+.ai-overlay {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .reference-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

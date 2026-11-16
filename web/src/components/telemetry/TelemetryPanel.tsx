@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { CornerSummary, PassRecord, SessionPasses } from "../../api/client";
 import { telemetryHref } from "../../hooks/useRoute";
+import { type AiPassSource, useAiOverlay } from "./AiOverlay";
 import { PassPicker } from "./PassPicker";
 import { colorsOf, passLabel, pickCorner, pickPass } from "./picks";
 import { type ShownPass, TraceCharts } from "./TraceCharts";
@@ -14,6 +15,8 @@ interface TelemetryPanelProps {
   corner?: number;
   pass?: number;
   loadTrace: TraceLoader;
+  /** The AI's best pass per corner, to overlay; absent for a session without a reference. */
+  ai?: AiPassSource;
 }
 
 function CornerChooser({
@@ -95,6 +98,7 @@ function useOverlay(passes: PassRecord[], summary: CornerSummary | undefined, as
 /** One corner: which passes to overlay, and their channels. */
 function CornerView(props: CornerViewProps) {
   const { sessionId, corner, passes, summary, pass, loadTrace, trackLength } = props;
+  const ai = useAiOverlay(props.ai, corner);
   const { best, picked, order, colors, toggle } = useOverlay(passes, summary, pass);
   const [xAxis, setXAxis] = useState<XAxis>("distance");
   const traces = useTraces(order, loadTrace);
@@ -104,6 +108,7 @@ function CornerView(props: CornerViewProps) {
     if (!order.includes(p.seq) || trace === undefined) return [];
     return [{ seq: p.seq, label: passLabel(p, best), color: colors.get(p.seq) ?? "", trace }];
   });
+  if (ai.shown !== undefined) drawn.push(ai.shown);
   return (
     <div className="telemetry">
       <aside className="telemetry-side">
@@ -117,6 +122,7 @@ function CornerView(props: CornerViewProps) {
           hrefOf={(seq) => telemetryHref(sessionId, corner, seq)}
           onToggle={toggle}
         />
+        {ai.control}
         {traces.failed.size > 0 && (
           <p role="alert">Samples of {traces.failed.size} pass(es) could not be loaded.</p>
         )}
@@ -133,7 +139,8 @@ function CornerView(props: CornerViewProps) {
 }
 
 /** A corner's passes overlaid: speed, pedals, steering and slip per axle, best against picked. */
-export function TelemetryPanel({ sessionId, data, corner, pass, loadTrace }: TelemetryPanelProps) {
+export function TelemetryPanel(props: TelemetryPanelProps) {
+  const { sessionId, data, corner, pass, loadTrace, ai } = props;
   const current = pickCorner(data, corner);
   if (current === undefined) return <p className="empty">This session has no corner passes.</p>;
   const passes = data.passes.filter((p) => p.corner === current);
@@ -150,6 +157,7 @@ export function TelemetryPanel({ sessionId, data, corner, pass, loadTrace }: Tel
         {...(pass === undefined ? {} : { pass })}
         loadTrace={loadTrace}
         trackLength={data.track_length_m}
+        {...(ai === undefined ? {} : { ai })}
       />
     </div>
   );

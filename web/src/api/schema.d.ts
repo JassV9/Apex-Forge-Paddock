@@ -169,6 +169,56 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/reference": {
+    parameters: {
+      query?: {
+        /** @description The session's setup to compare (default the setup of its latest pass). */
+        setup_hash?: string;
+      };
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Every corner of the session against AC's AI on the same car, track and setup.
+     * @description Per corner the driver's best and median zone time, the AI's median and spread on the same setup (or the nearest setup the AI drove, said per corner), the gaps, and a class: driver when the typical pass is slower than the AI by more than the AI's own spread, car otherwise. Technique metrics that differ are listed with their counts.
+     */
+    get: operations["getSessionReference"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/reference": {
+    parameters: {
+      query: {
+        car: string;
+        track: string;
+        layout?: string;
+        setup_hash: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * The AI's median zone time per corner on one car, track and setup.
+     * @description Small, for the in-game hotlap display. Corner numbers are those of the track's newest corner map; a corner with fewer than three AI passes on exactly this setup is left out.
+     */
+    get: operations["getAiReference"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/sensitivity": {
     parameters: {
       query?: never;
@@ -361,6 +411,8 @@ export interface components {
     PassTrace: components["schemas"]["pass_trace.schema"];
     TrainingCreate: components["schemas"]["training_create.schema"];
     TrainingProgram: components["schemas"]["training_program.schema"];
+    SessionReference: components["schemas"]["session_reference.schema"];
+    AiReference: components["schemas"]["ai_reference.schema"];
     Problem: {
       /** @description What went wrong, in words. */
       error: string;
@@ -845,6 +897,123 @@ export interface components {
         front_slip_deg: number[];
         rear_slip_deg: number[];
       };
+    };
+    /** FeatureDifference */
+    FeatureDifference: {
+      /** @description The engine's metric id, such as brake_dist_m or v_min_kmh. */
+      metric: string;
+      /** @enum {string} */
+      phase: "brake" | "entry" | "mid" | "exit";
+      human_median: number;
+      ai_median: number;
+      /** @description Driver's median minus the AI's, in the metric's unit. */
+      difference: number;
+      /** @description The smallest difference of this metric that is reported. */
+      step: number;
+      human_n: number;
+      ai_n: number;
+    };
+    /** ReferenceSetup */
+    ReferenceSetup: {
+      /** @description The agent's fingerprint of the setup. */
+      setup_hash: string;
+      /** @description Valid passes of the session on it. */
+      passes: number;
+    };
+    /**
+     * CornerReference
+     * @description One corner: the driver's times, the AI's on the matched setup, the gap and its class.
+     */
+    CornerReference: {
+      corner: number;
+      /** @description The corner's name on the map; empty when it has none. */
+      name: string;
+      /** @description The session's valid passes of this corner on the compared setup. */
+      human_n: number;
+      human_best_s: number;
+      human_best_seq: number;
+      /** @description The typical pass: median zone time, seconds. */
+      human_median_s: number;
+      /**
+       * @description Which AI passes the corner is compared with: on the same setup, on the nearest setup the AI drove, or none.
+       * @enum {string}
+       */
+      match: "same" | "nearest" | "none";
+      /** @description The setup the AI passes were driven on. */
+      ai_setup_hash?: string;
+      /** @description Items that differ between the compared setup and the AI's (0 on the same setup). */
+      setup_changes?: number;
+      /** @description AI passes behind the AI's numbers. */
+      ai_n: number;
+      ai_median_s?: number;
+      /** @description 1.4826 times the median absolute deviation of the AI's zone times: a standard deviation that one incident lap does not inflate. */
+      ai_spread_s?: number;
+      ai_best_s?: number;
+      /** @description The AI session of the AI's fastest pass, for overlaying its samples. */
+      ai_best_session_id?: number;
+      ai_best_seq?: number;
+      /** @description Driver's best minus the AI's median, seconds; positive is slower than the AI. */
+      delta_best_s?: number;
+      /** @description Driver's median minus the AI's median, seconds; positive is slower than the AI. The class is decided on this. */
+      delta_median_s?: number;
+      /** @description The AI's spread or margin_floor_s, whichever is larger. */
+      margin_s?: number;
+      /**
+       * @description driver: the typical pass is slower than the AI's median by more than the margin; car: within the margin or faster; no_reference: too few AI passes to compare.
+       * @enum {string}
+       */
+      class: "driver" | "car" | "no_reference";
+      /** @description The rule that gave the class, in words. */
+      reason: string;
+      /** @description Technique metrics whose medians differ from the AI's by at least their step, largest first, at most three. */
+      differences: components["schemas"]["FeatureDifference"][];
+    };
+    /**
+     * SessionReference
+     * @description A session's corners against AC's AI on the same car, track, layout and setup (docs/adr/0019-ai-reference-driver.md). Every number is computed by core from stored passes, with the count of passes behind it. Read-only.
+     */
+    "session_reference.schema": {
+      session_id: number;
+      /** @description The car's id in the game. */
+      car: string;
+      /** @description The track's id in the game. */
+      track: string;
+      /** @description Track layout; empty for single-layout tracks. */
+      layout: string;
+      /** @description The setup of the session that is compared: the one asked for, else the setup of the session's latest pass. Absent when the session recorded no setup. */
+      setup_hash?: string;
+      /** @description Every setup the session drove, with its valid passes, most passes first. */
+      setups: components["schemas"]["ReferenceSetup"][];
+      /** @description The smallest margin a corner is classed with, seconds, whatever the AI's spread. */
+      margin_floor_s: number;
+      /** @description Valid AI passes stored on this car and track, on any setup. */
+      ai_passes: number;
+      /** @description Every corner of the session with a valid pass on the compared setup, by number. */
+      corners: components["schemas"]["CornerReference"][];
+    };
+    /** AiCornerTime */
+    AiCornerTime: {
+      /** @description Corner number on the newest corner map of the track. */
+      corner: number;
+      name: string;
+      /** @description AI passes behind the numbers. */
+      n: number;
+      median_s: number;
+      /** @description 1.4826 times the median absolute deviation, seconds. */
+      spread_s: number;
+      /** @description The spread or the floor, whichever is larger: a pass slower than the median by more is the driver's. */
+      margin_s: number;
+    };
+    /**
+     * AiReference
+     * @description AC's AI zone times per corner on one car, track, layout and setup, for the in-game hotlap display (docs/adr/0019-ai-reference-driver.md). Only corners with enough AI passes on exactly this setup are listed; empty when there are none.
+     */
+    "ai_reference.schema": {
+      car: string;
+      track: string;
+      layout: string;
+      setup_hash: string;
+      corners: components["schemas"]["AiCornerTime"][];
     };
     /**
      * SensitivityEffect
@@ -1437,6 +1606,58 @@ export interface operations {
         };
       };
       404: components["responses"]["Problem"];
+      422: components["responses"]["Problem"];
+    };
+  };
+  getSessionReference: {
+    parameters: {
+      query?: {
+        /** @description The session's setup to compare (default the setup of its latest pass). */
+        setup_hash?: string;
+      };
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The comparison, corner by corner. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["session_reference.schema"];
+        };
+      };
+      404: components["responses"]["Problem"];
+    };
+  };
+  getAiReference: {
+    parameters: {
+      query: {
+        car: string;
+        track: string;
+        layout?: string;
+        setup_hash: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The AI's times; no corners when the AI never drove this setup here. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ai_reference.schema"];
+        };
+      };
       422: components["responses"]["Problem"];
     };
   };

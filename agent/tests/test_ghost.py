@@ -179,17 +179,47 @@ def test_brushing_the_pit_wall_on_the_way_out_is_repaired_in_place_not_retried(r
     assert names(ghost.step(state, obs(rt, damage=8.8))) == ["autopilot_off", "teleport_pits"]
 
 
+def test_a_run_never_starts_on_an_almost_empty_tank(rt):
+    ghost, state = machine(rt)
+
+    ghost.step(state, obs(rt, fuel=2))
+    assert state.fuel == ghost.MIN_FUEL_L
+
+
+FREE = {"block": None, "planId": None}
+
+
+def start_free_laps(rt: Any, ghost: Any, state: Any) -> None:
+    ghost.lap(state)
+    ghost.step(state, obs(rt, **FREE))
+    run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, **FREE)
+    ghost.loaded(state, True, "")
+    assert state.block == 0
+
+
+def test_free_laps_go_in_to_refuel_without_counting_a_retry(rt):
+    ghost, state = machine(rt)
+    start_free_laps(rt, ghost, state)
+
+    seen = names(ghost.step(state, obs(rt, fuel=ghost.RESERVE_L - 1, **FREE)))
+    assert seen == ["autopilot_off", "teleport_pits"]
+    assert "refuelling" in state.message and state.retries == 0
+    actions = []
+    for _ in range(round((ghost.SETTLE_S + 0.1) / FRAME)):
+        actions += to_py(ghost.step(state, obs(rt, parked=True, onTrack=False, fuel=3, **FREE))) or []
+    assert {"name": "set_fuel", "liters": 40} in actions
+
+
 def test_free_laps_allow_three_retries_between_two_laps_not_three_ever(rt):
     ghost, state = machine(rt)
-    ghost.lap(state)
-    start_driving(rt, ghost, state)
+    start_free_laps(rt, ghost, state)
 
     for laps in range(1, 6):
-        ghost.step(state, obs(rt, block=None, lapsDone=laps))
-        run_for(rt, ghost, state, ghost.STUCK_S + 0.1, block=None, speedKmh=3, lapsDone=laps)
-        run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, block=None, parked=True, onTrack=False)
-        ghost.loaded(state, True, "ok")
-    assert state.phase == "driving", "one retry per lap for five laps is not a failure"
+        run_for(rt, ghost, state, ghost.STUCK_S + 0.1, speedKmh=3, lapsDone=laps, **FREE)
+        assert state.phase == "to_pits", f"retry on lap {laps}"
+        run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, **FREE)
+        ghost.loaded(state, True, "")
+    assert state.retries == 1, "one retry per lap for five laps is not a failure"
 
 
 def test_a_reset_by_the_game_retries_the_block(rt):

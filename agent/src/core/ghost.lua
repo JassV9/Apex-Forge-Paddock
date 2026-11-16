@@ -21,6 +21,8 @@ local ghost = {
   SETTLE_S = 2,       -- parked this long after a teleport before the setup is loaded
   TELEPORT_RETRY_S = 10,
   MAX_RETRIES = 3,
+  MIN_FUEL_L = 30,    -- every block starts with the first block's fuel, but never less than this
+  RESERVE_L = 4,      -- free laps go in to refuel below this; a dry car heads for the pits
 }
 
 function ghost.new()
@@ -57,7 +59,7 @@ local function fromOff(s, o)
     s.message = "The AI cannot drive here: this track does not give apps physics access."
     return {}
   end
-  s.fuel, s.retries = o.fuel, 0
+  s.fuel, s.retries = math.max(o.fuel or 0, ghost.MIN_FUEL_L), 0
   return goToPits(s, o.block, "AI driver: to the pits for " .. name(o.block) .. ".")
 end
 
@@ -96,6 +98,9 @@ local function whileDriving(s, o)
   if o.block ~= s.block then
     s.retries = 0
     return goToPits(s, o.block, "AI driver: block done, to the pits for " .. name(o.block) .. ".")
+  end
+  if s.block == 0 and o.fuel and o.fuel < ghost.RESERVE_L then
+    return goToPits(s, 0, "AI driver: refuelling for free laps.")
   end
   if o.speedKmh < ghost.STUCK_KMH then s.stuck = s.stuck + o.dt else s.stuck = 0 end
   if s.stuck >= ghost.STUCK_S then return retry(s, o, "stuck") end

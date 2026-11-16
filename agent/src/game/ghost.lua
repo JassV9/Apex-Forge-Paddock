@@ -71,13 +71,20 @@ function ghost.update(dt, car)
     nextKeepOut = ghost.KEEP_OUT_S
     pcall(keepOut)
   end
-  perform(core.step(ghost.state, {
+  local retries = ghost.state.retries
+  local lapsDone = plan.lapsDone()  -- the plan's count; a free run counts the car's laps
+  if plan.blockOrder() == nil then lapsDone = car.lapCount end
+  local actions = core.step(ghost.state, {
     dt = dt, planId = plan.experimentId(), driverAi = plan.driver() == "ai", allowed = allowed(),
     block = plan.blockOrder(), parked = car.isInPit and car.speedKmh < 1,
     onTrack = not car.isInPitlane, speedKmh = car.speedKmh, ai = car.isAIControlled, fuel = car.fuel,
     damage = math.max(car.damage[0], car.damage[1], car.damage[2], car.damage[3]),
-    resets = car.resetCounter, lapsDone = plan.lapsDone(),
-  }))
+    resets = car.resetCounter, lapsDone = lapsDone,
+  })
+  -- a block retried (reset by the game, stuck, damaged) is the clearest incident of all: the
+  -- lap it ends is counted before the car leaves the track
+  if ghost.state.retries > retries then calibration.aborted(ghost.state.block == 0) end
+  perform(actions)
   -- free laps teach the AI where it needs a lower speed; an experiment only applies it
   if ghost.state.phase == "driving" and not car.isInPitlane then
     calibration.update(dt, car, ghost.state.block == 0)

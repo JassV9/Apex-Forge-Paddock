@@ -111,6 +111,19 @@ def test_free_laps_lower_the_hint_where_the_ai_went_off_and_apply_it(agent: Agen
     assert len(saved) == 1
 
 
+def test_a_lap_ended_by_a_retry_counts_as_an_incident(agent: Agent) -> None:
+    agent.mock["physicsAllowed"] = True
+    calibration = agent.rt.eval('require("game.calibration")')
+    car = agent.mock["car"]
+    car["splinePosition"] = 0.96
+    calibration.update(0.1, car, True)
+
+    calibration.aborted(True)
+    state = to_py(calibration.state)
+    assert state["laps"] == 1 and state["where"] == [192]
+    assert tune(agent.rt).hint(calibration.state) < 1
+
+
 def test_an_experiment_applies_the_hint_without_learning(agent: Agent) -> None:
     base, soft = setups(agent)
     agent.mock["physicsAllowed"] = True

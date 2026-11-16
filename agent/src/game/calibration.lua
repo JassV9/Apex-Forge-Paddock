@@ -75,6 +75,14 @@ function calibration.update(dt, car, learning)
   last.pos = pos
 end
 
+---The lap ended with a retry: an incident where the car is, and the lap is over.
+function calibration.aborted(learning)
+  if last.pos == nil then return end
+  aitune.observe(calibration.state, last.pos, true)
+  aitune.endLap(calibration.state, learning)
+  save()
+end
+
 ---The AI is handed the car or gives it back: the car's own hint is put back, nothing carries
 ---over.
 function calibration.release()

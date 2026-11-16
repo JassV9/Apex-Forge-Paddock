@@ -75,6 +75,9 @@ local function inPits(s, o)
 end
 
 local function retry(s, o, why)
+  -- free laps have no end: three retries without a lap in between stop them, not three ever
+  if s.block == 0 and o.lapsDone ~= s.retryLap then s.retries = 0 end
+  s.retryLap = o.lapsDone
   s.retries = s.retries + 1
   if s.retries > ghost.MAX_RETRIES then
     s.phase = "failed"

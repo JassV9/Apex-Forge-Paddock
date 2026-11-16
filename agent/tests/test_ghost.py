@@ -179,6 +179,19 @@ def test_brushing_the_pit_wall_on_the_way_out_is_repaired_in_place_not_retried(r
     assert names(ghost.step(state, obs(rt, damage=8.8))) == ["autopilot_off", "teleport_pits"]
 
 
+def test_free_laps_allow_three_retries_between_two_laps_not_three_ever(rt):
+    ghost, state = machine(rt)
+    ghost.lap(state)
+    start_driving(rt, ghost, state)
+
+    for laps in range(1, 6):
+        ghost.step(state, obs(rt, block=None, lapsDone=laps))
+        run_for(rt, ghost, state, ghost.STUCK_S + 0.1, block=None, speedKmh=3, lapsDone=laps)
+        run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, block=None, parked=True, onTrack=False)
+        ghost.loaded(state, True, "ok")
+    assert state.phase == "driving", "one retry per lap for five laps is not a failure"
+
+
 def test_a_reset_by_the_game_retries_the_block(rt):
     ghost, state = machine(rt)
     start_driving(rt, ghost, state)

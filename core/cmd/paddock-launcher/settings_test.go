@@ -49,6 +49,25 @@ func TestParseSettings(t *testing.T) {
 	}
 }
 
+func TestTheWeatherIsFixedUnlessTheTemplateIsAskedFor(t *testing.T) {
+	tests := []struct {
+		args []string
+		env  string
+		want string
+	}{
+		{nil, "", "3_clear"},
+		{nil, "1_heavy_fog", "1_heavy_fog"},
+		{[]string{"--weather", "template"}, "", ""},
+	}
+	for _, tt := range tests {
+		env := map[string]string{"PADDOCK_DOCUMENTS": "D", "PADDOCK_WEATHER": tt.env}
+		got, err := parseSettings(tt.args, func(key string) string { return env[key] })
+		if err != nil || got.Weather != tt.want {
+			t.Errorf("%v %q: weather %q, %v; want %q", tt.args, tt.env, got.Weather, err, tt.want)
+		}
+	}
+}
+
 func TestParseSettingsRefusesUnknownFlags(t *testing.T) {
 	env := func(key string) string { return map[string]string{"PADDOCK_DOCUMENTS": "D"}[key] }
 	if _, err := parseSettings([]string{"--skin", "red"}, env); err == nil {

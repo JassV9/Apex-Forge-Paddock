@@ -19,8 +19,9 @@ const (
 
 // settings are the flags, each with an environment variable and a default.
 type settings struct {
-	Paths launcher.Paths
-	Port  int
+	Paths   launcher.Paths
+	Port    int
+	Weather string
 }
 
 // parseSettings reads flags over environment variables over defaults.
@@ -42,6 +43,9 @@ func parseSettings(args []string, getenv func(string) string) (settings, error) 
 		"Content Manager Quick Drive preset to copy: a name in its Presets\\Quick Drive folder or "+
 			"a .cmpreset path (env PADDOCK_CM_PRESET); it is read, never changed")
 	port := flags.Int("port", defaultPort, "port on 127.0.0.1")
+	weather := flags.String("weather", orDefault(getenv("PADDOCK_WEATHER"), launcher.DefaultWeather),
+		"Content Manager weather id for every launch, e.g. 3_clear (env PADDOCK_WEATHER); "+
+			"\"template\" keeps the preset's own")
 	if err := flags.Parse(args); err != nil {
 		return settings{}, fmt.Errorf("read flags: %w", err)
 	}
@@ -50,8 +54,16 @@ func parseSettings(args []string, getenv func(string) string) (settings, error) 
 			ACRoot: *acRoot, Documents: *documentsFlag,
 			Template: templatePath(*template, getenv("LOCALAPPDATA")),
 		},
-		Port: *port,
+		Port: *port, Weather: weatherOf(*weather),
 	}, nil
+}
+
+// weatherOf is the weather to force on every launch; "template" forces none.
+func weatherOf(flagValue string) string {
+	if flagValue == "template" {
+		return ""
+	}
+	return flagValue
 }
 
 // templatePath turns a preset name into its file in Content Manager's Quick Drive folder.

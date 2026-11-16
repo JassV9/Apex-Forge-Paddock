@@ -2,9 +2,11 @@
 
 ## Start here: from Start driving to telemetry
 
-Why it works this way: [ADR 0017](../adr/0017-host-launcher.md). **Unverified in game**: the
-launcher's tests run without the game; Content Manager starting Practice from this button has
-not been seen yet.
+Why it works this way: [ADR 0017](../adr/0017-host-launcher.md). **Seen in game (2026-11-16):**
+Start driving opened CM, which started the game 7 s later in Practice, in the pits, on the
+chosen car and test layout, clear and 100 % grip; after the game closed the launcher found the
+bindings unchanged (same SHA-256), also when it was restarted in between. A restore after a
+real change of bindings has not happened yet.
 
 ### Once
 
@@ -28,13 +30,17 @@ not been seen yet.
 
    Flags (and environment variables): `--ac-root` (`PADDOCK_AC_ROOT`, default the Steam
    folder), `--documents` (`PADDOCK_DOCUMENTS`, default your Documents folder), `--template`
-   (`PADDOCK_CM_PRESET`, a preset name or a `.cmpreset` path), `--port` (default 8090).
+   (`PADDOCK_CM_PRESET`, a preset name or a `.cmpreset` path), `--weather` (`PADDOCK_WEATHER`,
+   default `3_clear`, with the Optimum track; `template` keeps the preset's), `--port`
+   (default 8090).
 3. Open http://localhost:5173. In the **Drive** panel at the top of the session rail, pick the
    car and the track. A layout marked "AI can drive" is a Paddock test copy; on an original the
    panel shows the command that makes one.
 4. Press **Start driving**. The launcher backs up `controls.ini`, writes
    `Documents/Assetto Corsa/paddock/launch/paddock.cmpreset` and asks CM to start Practice in
-   the pits. If CM cannot start, it says so in its own window.
+   the pits, clear, on an optimum track. If CM cannot start, it says so in its own window.
+   Drive the "(Paddock test)" layout: your corners are compared with the AI's only on the
+   same layout and setup ([ADR 0019](../adr/0019-ai-reference-driver.md)).
 5. Drive. The agent records every corner pass; core ingests them as you go.
 6. Leave the game. Within a few seconds the panel says whether the wheel bindings were
    unchanged or restored.

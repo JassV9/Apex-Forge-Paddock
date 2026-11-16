@@ -52,7 +52,7 @@ func TestBuildPreset(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			preset, err := BuildPreset([]byte(tt.template), tt.request)
+			preset, err := BuildPreset([]byte(tt.template), tt.request, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -75,8 +75,41 @@ func TestBuildPreset(t *testing.T) {
 	}
 }
 
+func TestBuildPresetFixesTheWeather(t *testing.T) {
+	tests := []struct {
+		name, template, weather string
+		want                    any
+	}{
+		{"a template without weather gets the fixed one", templatePreset, DefaultWeather, DefaultWeather},
+		{"a template's own weather and track state are replaced",
+			`{"WeatherId":"*15","RealConditions":true,"TrackPropertiesPresetFilename":"Auto.cmpreset"}`,
+			"3_clear", "3_clear"},
+		{"empty keeps the template's", `{"WeatherId":"*15"}`, "", "*15"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preset, err := BuildPreset([]byte(tt.template), contracts.LaunchRequest{CarId: "a", TrackId: "b"}, tt.weather)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fields, _ := decodePreset(t, preset)
+			if fields["WeatherId"] != tt.want {
+				t.Errorf("WeatherId = %v, want %v", fields["WeatherId"], tt.want)
+			}
+			if tt.weather != "" && fields["RealConditions"] != false {
+				t.Errorf("RealConditions = %v: real weather would override the fixed one", fields["RealConditions"])
+			}
+			_, hasTrackPreset := fields["TrackPropertiesPresetFilename"]
+			if tt.weather != "" && (fields["TrackPropertiesData"] != optimumTrack || hasTrackPreset) {
+				t.Errorf("track state %v (preset file kept: %v), want the optimum track",
+					fields["TrackPropertiesData"], hasTrackPreset)
+			}
+		})
+	}
+}
+
 func TestBuildPresetRefusesBrokenTemplate(t *testing.T) {
-	if _, err := BuildPreset([]byte("not json"), contracts.LaunchRequest{CarId: "a", TrackId: "b"}); err == nil {
+	if _, err := BuildPreset([]byte("not json"), contracts.LaunchRequest{CarId: "a", TrackId: "b"}, ""); err == nil {
 		t.Fatal("a broken template should be refused")
 	}
 }

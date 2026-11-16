@@ -45,8 +45,10 @@ type Config struct {
 	Processes Processes
 	Opener    URLOpener
 	Timing    Timing
-	Now       func() time.Time
-	Logger    *slog.Logger
+	// Weather is the Content Manager weather id every launch uses; empty keeps the template's.
+	Weather string
+	Now     func() time.Time
+	Logger  *slog.Logger
 }
 
 // Service launches the game and watches each launch until the bindings are checked.
@@ -173,7 +175,7 @@ func (s *Service) preset(request contracts.LaunchRequest) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the Quick Drive template %s: %w", s.cfg.Paths.Template, err)
 	}
-	return BuildPreset(template, request)
+	return BuildPreset(template, request, s.cfg.Weather)
 }
 
 func launchedState(request contracts.LaunchRequest, backup ControlsBackup, now time.Time) state {

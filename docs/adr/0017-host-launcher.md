@@ -38,8 +38,12 @@ cannot start the game with a form post. API: `docs/api/launcher.yaml`; bodies in
 never written), sets `CarId`, `TrackId` (`track/layout`), `Mode` (Practice) and `StartType`
 `PIT`, writes it to `Documents/Assetto Corsa/paddock/launch/paddock.cmpreset`, and opens
 `acmanager://race/quick?presetFile=<that path>`. CM's `ProcessRaceQuick` loads the preset and
-presses Go with no dialog; on failure CM shows a toast. Everything else in the preset (weather,
-time, track state, assists) stays the owner's. The URL is handed over with `ShellExecuteW`
+presses Go with no dialog; on failure CM shows a toast. Time, temperature and assists stay
+the owner's. **The conditions do not:** every launch sets weather `3_clear` (`--weather`),
+real conditions off and CM's Optimum track state (100 % grip), because the first launch from
+the `NJ` preset, which names no weather and a track state "set by weather", came up in light
+drizzle with 93 % grip while the AI had been calibrated at 100 %. Calibration, experiments
+and hotlaps only compare in like conditions. `--weather template` keeps the preset's own. The URL is handed over with `ShellExecuteW`
 ("open"), exactly as a click on an `acmanager://` link, so no shell parses it.
 
 The launcher checks the car and layout are installed before asking: CM silently keeps its

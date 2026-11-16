@@ -27,9 +27,20 @@ func TrackID(trackID, layout string) string {
 	return trackID + "/" + layout
 }
 
-// BuildPreset copies a Quick Drive preset and sets the car, the layout, Practice and the pit
-// start. Everything else (weather, time, track state, assists) stays the owner's.
-func BuildPreset(template []byte, request contracts.LaunchRequest) ([]byte, error) {
+// DefaultWeather is the weather every launch drives in unless told otherwise. It is fixed, not
+// the template's: a preset without one lets Content Manager pick (seen in game: light drizzle
+// and 93 % grip), and AI calibration, experiments and hotlaps only compare in like conditions.
+const DefaultWeather = "3_clear"
+
+// optimumTrack is Content Manager's "Optimum" track state: full grip from the start, no
+// transfer, no randomness. A track state "set by weather" gave 93 % grip in clear weather; the
+// AI was calibrated at 100 %.
+const optimumTrack = `{"s":1.0,"t":1.0,"r":0.0,"g":1,"d":"Perfect track for hotlapping.","w":false}`
+
+// BuildPreset copies a Quick Drive preset and sets the car, the layout, Practice, the pit start
+// and, when weather is not empty, fixed conditions: that weather, real conditions off and the
+// optimum track. Everything else (time, temperature, assists) stays the owner's.
+func BuildPreset(template []byte, request contracts.LaunchRequest, weather string) ([]byte, error) {
 	var preset map[string]json.RawMessage
 	if err := json.Unmarshal(bytes.TrimPrefix(template, []byte("\xef\xbb\xbf")), &preset); err != nil {
 		return nil, fmt.Errorf("read the Quick Drive template: %w", err)
@@ -43,6 +54,11 @@ func BuildPreset(template []byte, request contracts.LaunchRequest) ([]byte, erro
 		"TrackId":  TrackID(request.TrackId, request.Layout),
 		"Mode":     PracticeMode,
 		"ModeData": modeData,
+	}
+	if weather != "" {
+		values["WeatherId"], values["RealConditions"] = weather, false
+		values["TrackPropertiesData"] = optimumTrack
+		delete(preset, "TrackPropertiesPresetFilename") // a preset file would win over the data
 	}
 	for key, value := range values {
 		encoded, err := json.Marshal(value)

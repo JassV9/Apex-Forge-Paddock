@@ -50,6 +50,7 @@ func run(args []string, logger *slog.Logger) error {
 	defer stop()
 	service := launcher.NewService(launcher.Config{
 		Paths: settings.Paths, Version: version, Logger: logger, Timing: launcher.DefaultTiming,
+		Weather:   settings.Weather,
 		Processes: launcher.SystemProcesses{}, Opener: launcher.SystemOpener{},
 	})
 	if err := service.Start(ctx); err != nil {

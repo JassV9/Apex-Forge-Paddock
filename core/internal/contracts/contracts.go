@@ -8449,7 +8449,8 @@ type VerdictSummary struct {
 	// RFC 3339, UTC.
 	DecidedAt string `json:"decided_at"`
 
-	// DecidedBy corresponds to the JSON schema field "decided_by".
+	// engine: the statistics. driver: the human. training: an AI training program's
+	// rule (docs/adr/0020-ai-training-program.md).
 	DecidedBy VerdictSummaryDecidedBy `json:"decided_by"`
 
 	// Decision corresponds to the JSON schema field "decision".
@@ -8469,10 +8470,12 @@ type VerdictSummaryDecidedBy string
 
 const VerdictSummaryDecidedByDriver VerdictSummaryDecidedBy = "driver"
 const VerdictSummaryDecidedByEngine VerdictSummaryDecidedBy = "engine"
+const VerdictSummaryDecidedByTraining VerdictSummaryDecidedBy = "training"
 
 var enumValues_VerdictSummaryDecidedBy = []interface{}{
 	"engine",
 	"driver",
+	"training",
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

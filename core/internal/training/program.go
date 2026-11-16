@@ -25,7 +25,9 @@ type Ledger interface {
 	Start(ctx context.Context, id int64) (contracts.Experiment, error)
 	Evaluate(ctx context.Context, id int64) (contracts.Experiment, error)
 	Extend(ctx context.Context, id int64) (contracts.Experiment, error)
-	Revert(ctx context.Context, id int64) (contracts.Experiment, error)
+	// RevertByTraining puts the baseline back with the program's reason in the ledger, never the
+	// driver's: the ledger says who decided.
+	RevertByTraining(ctx context.Context, id int64, reason string) (contracts.Experiment, error)
 }
 
 // Ranker ranks the experiments a session's diagnosis names. *sensitivity.Service implements it.

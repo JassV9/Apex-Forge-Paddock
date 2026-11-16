@@ -133,6 +133,15 @@ export function ResultsSection({ experiment }: { experiment: Experiment }) {
   );
 }
 
+type Verdict = NonNullable<Experiment["verdict"]>;
+
+/** Who took the decision, as the sentence names them. */
+const DECIDED_BY: Record<Verdict["decided_by"], string> = {
+  engine: "the engine",
+  driver: "the driver",
+  training: "the AI training program",
+};
+
 export function VerdictSection({ experiment }: { experiment: Experiment }) {
   const verdict = experiment.verdict;
   if (verdict === undefined) return null;
@@ -140,8 +149,8 @@ export function VerdictSection({ experiment }: { experiment: Experiment }) {
     <section aria-label="Verdict">
       <h3>Verdict</h3>
       <p>
-        <strong>{STATE_LABEL[verdict.decision]}</strong>, decided by the {verdict.decided_by} on{" "}
-        {formatTime(verdict.decided_at)}. {verdict.reason}
+        <strong>{STATE_LABEL[verdict.decision]}</strong>, decided by{" "}
+        {DECIDED_BY[verdict.decided_by]} on {formatTime(verdict.decided_at)}. {verdict.reason}
       </p>
       {verdict.prediction_total > 0 && (
         <p>

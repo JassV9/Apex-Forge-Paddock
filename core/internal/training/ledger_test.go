@@ -16,6 +16,7 @@ type fakeLedger struct {
 	actions  []string
 	occupied bool // Start answers with a conflict, as when another experiment is on the car
 	created  []contracts.ExperimentCreate
+	reasons  []string // what each revert wrote in the ledger
 }
 
 func (l *fakeLedger) record(action string, id int64) {
@@ -81,7 +82,8 @@ func (l *fakeLedger) Extend(_ context.Context, id int64) (contracts.Experiment, 
 	return exp, err
 }
 
-func (l *fakeLedger) Revert(_ context.Context, id int64) (contracts.Experiment, error) {
+func (l *fakeLedger) RevertByTraining(_ context.Context, id int64, reason string) (contracts.Experiment, error) {
+	l.reasons = append(l.reasons, reason)
 	return l.move("revert", id, experiments.Reverted)
 }
 

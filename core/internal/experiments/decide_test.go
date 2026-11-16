@@ -192,6 +192,25 @@ func TestDriverCanKeepTheBaselineOnAnInconclusiveResult(t *testing.T) {
 	}
 }
 
+func TestATrainingProgramsRevertIsRecordedAsTheProgramsDecision(t *testing.T) {
+	f := newFixture(t, "exp_revert_training")
+	exp := f.run(t, -1, inconclusive)
+
+	reverted, err := f.service.RevertByTraining(t.Context(), int64(exp.Id), "Training program 1 kept the baseline.")
+
+	if err != nil || reverted.State != Reverted {
+		t.Fatalf("state %s, err %v", reverted.State, err)
+	}
+	if v := reverted.Verdict; v.DecidedBy != contracts.VerdictSummaryDecidedByTraining ||
+		v.Reason != "Training program 1 kept the baseline." || v.PredictionTotal != 1 {
+		t.Errorf("verdict = %+v: the ledger must say the program decided", v)
+	}
+	last := reverted.Events[len(reverted.Events)-1]
+	if last.Reason != "Training program 1 kept the baseline." {
+		t.Errorf("last event %q", last.Reason)
+	}
+}
+
 func TestDriverDecidesATradeoff(t *testing.T) {
 	cases := map[string]struct {
 		accept   bool

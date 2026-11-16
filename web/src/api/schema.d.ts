@@ -1206,8 +1206,11 @@ export interface components {
       /** @enum {string} */
       decision: "accepted" | "rejected" | "tradeoff" | "inconclusive" | "reverted" | "aborted";
       reason: string;
-      /** @enum {string} */
-      decided_by: "engine" | "driver";
+      /**
+       * @description engine: the statistics. driver: the human. training: an AI training program's rule (docs/adr/0020-ai-training-program.md).
+       * @enum {string}
+       */
+      decided_by: "engine" | "driver" | "training";
       /** @description RFC 3339, UTC. */
       decided_at: string;
       prediction_hits: number;

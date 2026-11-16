@@ -82,6 +82,9 @@ func TestAPromisingInconclusiveIsExtendedOnceThenTheNextItemIsTested(t *testing.
 	if !slices.Equal(f.ledger.actions, want) {
 		t.Errorf("actions %v\nwant    %v", f.ledger.actions, want)
 	}
+	if len(f.ledger.reasons) != 1 || !strings.HasPrefix(f.ledger.reasons[0], "Training program 1 kept the baseline") {
+		t.Errorf("the ledger must say the program decided, not the driver: %q", f.ledger.reasons)
+	}
 	if f.ledger.created[1].Parameter != "ARB_REAR" {
 		t.Errorf("the second experiment tests %s, want the untested ARB_REAR", f.ledger.created[1].Parameter)
 	}

@@ -84,10 +84,12 @@ func (s *Service) tend(ctx context.Context, id int64, exp contracts.Experiment) 
 			_, err := s.ledger.Extend(ctx, eid)
 			return true, err
 		}
-		_, err := s.ledger.Revert(ctx, eid)
+		_, err := s.ledger.RevertByTraining(ctx, eid, fmt.Sprintf(
+			"Training program %d kept the baseline: still unclear after %d extension(s).", id, exp.Extensions))
 		return true, err
 	case experiments.Rejected:
-		_, err := s.ledger.Revert(ctx, eid)
+		_, err := s.ledger.RevertByTraining(ctx, eid, fmt.Sprintf(
+			"Training program %d put the baseline back after the change was rejected.", id))
 		return true, err
 	case experiments.Tradeoff:
 		return true, s.setState(ctx, id, contracts.TrainingProgramStateWaiting,

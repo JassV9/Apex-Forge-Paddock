@@ -133,8 +133,18 @@ func (s *Service) Extend(ctx context.Context, id int64) (contracts.Experiment, e
 // Revert goes back to the baseline: giving up on an inconclusive experiment, declining a
 // trade-off, or rolling back an accepted experiment whose variant is the current champion.
 func (s *Service) Revert(ctx context.Context, id int64) (contracts.Experiment, error) {
+	return s.revert(ctx, id, "The driver kept the baseline.", contracts.VerdictSummaryDecidedByDriver)
+}
+
+// RevertByTraining is a training program keeping the baseline after an unclear or a rejected
+// change (docs/adr/0020-ai-training-program.md). The ledger records the program's reason and
+// that the program decided, never the driver.
+func (s *Service) RevertByTraining(ctx context.Context, id int64, reason string) (contracts.Experiment, error) {
+	return s.revert(ctx, id, reason, contracts.VerdictSummaryDecidedByTraining)
+}
+
+func (s *Service) revert(ctx context.Context, id int64, reason string, by contracts.VerdictSummaryDecidedBy) (contracts.Experiment, error) {
 	return s.act(ctx, id, true, func(tx *sql.Tx, exp record) error {
-		reason := "The driver kept the baseline."
 		if exp.state == Accepted {
 			other, err := otherOccupying(ctx, tx, id)
 			if err != nil {
@@ -148,7 +158,7 @@ func (s *Service) Revert(ctx context.Context, id int64) (contracts.Experiment, e
 		if err := restore(ctx, tx, exp, exp.state, reason); err != nil {
 			return err
 		}
-		return driverVerdict(ctx, tx, id, contracts.VerdictSummaryDecisionReverted, reason)
+		return decidedVerdict(ctx, tx, id, contracts.VerdictSummaryDecisionReverted, reason, by)
 	})
 }
 

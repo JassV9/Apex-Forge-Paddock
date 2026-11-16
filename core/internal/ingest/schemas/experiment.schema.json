@@ -451,10 +451,12 @@
           "type": "string"
         },
         "decided_by": {
+          "description": "engine: the statistics. driver: the human. training: an AI training program's rule (docs/adr/0020-ai-training-program.md).",
           "type": "string",
           "enum": [
             "engine",
-            "driver"
+            "driver",
+            "training"
           ]
         },
         "decided_at": {

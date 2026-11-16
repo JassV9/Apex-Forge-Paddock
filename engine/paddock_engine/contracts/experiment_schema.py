@@ -216,8 +216,13 @@ class Decision(StrEnum):
 
 
 class DecidedBy(StrEnum):
+    """
+    engine: the statistics. driver: the human. training: an AI training program's rule (docs/adr/0020-ai-training-program.md).
+    """
+
     engine = "engine"
     driver = "driver"
+    training = "training"
 
 
 class VerdictSummary(BaseModel):
@@ -230,7 +235,10 @@ class VerdictSummary(BaseModel):
     )
     decision: Decision
     reason: str
-    decided_by: DecidedBy
+    decided_by: DecidedBy = Field(
+        ...,
+        description="engine: the statistics. driver: the human. training: an AI training program's rule (docs/adr/0020-ai-training-program.md).",
+    )
     decided_at: str = Field(..., description="RFC 3339, UTC.")
     prediction_hits: int = Field(..., ge=0)
     prediction_total: int = Field(..., ge=0)

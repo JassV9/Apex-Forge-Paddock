@@ -124,11 +124,18 @@ func addVerdict(ctx context.Context, tx *sql.Tx, id int64, v verdict) error {
 // driverVerdict records a decision the driver made; the prediction score of the engine's
 // last verdict is carried over, so it stays on the latest row.
 func driverVerdict(ctx context.Context, tx *sql.Tx, id int64, decision contracts.VerdictSummaryDecision, reason string) error {
+	return decidedVerdict(ctx, tx, id, decision, reason, contracts.VerdictSummaryDecidedByDriver)
+}
+
+// decidedVerdict records a decision taken after the engine's verdict, by whom it was taken,
+// keeping the prediction score of the engine's verdict.
+func decidedVerdict(ctx context.Context, tx *sql.Tx, id int64, decision contracts.VerdictSummaryDecision,
+	reason string, by contracts.VerdictSummaryDecidedBy) error {
 	last, err := readVerdict(ctx, tx, id)
 	if err != nil {
 		return fmt.Errorf("read last verdict of experiment %d: %w", id, err)
 	}
-	v := verdict{decision: decision, reason: reason, decidedBy: contracts.VerdictSummaryDecidedByDriver}
+	v := verdict{decision: decision, reason: reason, decidedBy: by}
 	if last != nil {
 		v.hits, v.total = last.PredictionHits, last.PredictionTotal
 	}

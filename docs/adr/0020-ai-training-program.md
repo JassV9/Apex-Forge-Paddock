@@ -35,6 +35,11 @@ negligible or worse ([ADR 0011](0011-sensitivity-and-ranking.md)) and is rebuilt
 ledger on every call, so each verdict changes what comes next. The program ends at its target
 or when nothing is left to test.
 
+**The ledger says who decided.** A baseline the program keeps is recorded with the program's
+reason and `decided_by: training` (migration 00009), never as the driver's call. The first
+program in the game wrote "The driver kept the baseline." on experiment 3 before this was
+fixed; the ledger is append-only, so that line stays.
+
 **Only the ledger's own actions.** The program calls the experiment service's `create`, `plan`,
 `start`, `evaluate`, `extend` and `revert`, so every rule holds as for a human: one experiment
 on a car at a time, the champion as the baseline, the success test fixed before driving.

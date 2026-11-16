@@ -96,7 +96,9 @@ local function whileDriving(s, o)
   end
   if o.speedKmh < ghost.STUCK_KMH then s.stuck = s.stuck + o.dt else s.stuck = 0 end
   if s.stuck >= ghost.STUCK_S then return retry(s, o, "stuck") end
-  if (o.damage or 0) > (s.damage or 0) + ghost.DAMAGE_STEP then return retry(s, o, "damaged") end
+  -- the damage a block starts with is its baseline: a repair may show a frame late
+  if s.damage == nil then s.damage = o.damage or 0 end
+  if (o.damage or 0) > s.damage + ghost.DAMAGE_STEP then return retry(s, o, "damaged") end
   -- AC puts a car it thinks is lost back on track, often past the line, so the lap never ends
   if o.resets ~= nil and s.resets ~= nil and o.resets ~= s.resets then return retry(s, o, "reset by the game") end
   s.resets = o.resets
@@ -137,7 +139,7 @@ function ghost.loaded(s, ok, message)
     s.message = "AI driver stopped: the setup did not load (" .. tostring(message) .. ")."
     return { act("autopilot_off") }
   end
-  s.phase, s.stuck, s.damage, s.sinceLap = "driving", 0, 0, 0  -- repaired before the load
+  s.phase, s.stuck, s.damage, s.sinceLap = "driving", 0, nil, 0
   s.resets, s.lapsDone = nil, nil  -- the teleport and the start count as resets; begin afresh
   s.message = "AI driver: driving " .. name(s.block) .. "."
   return { act("autopilot_on"), act("start") }

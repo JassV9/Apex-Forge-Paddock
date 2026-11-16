@@ -154,6 +154,15 @@ def test_stop_hands_the_car_back_until_a_new_experiment(rt):
     assert names(ghost.step(state, obs(rt, planId=8))) == ["autopilot_off", "teleport_pits"]
 
 
+def test_damage_still_showing_after_the_repair_is_the_baseline_not_a_retry(rt):
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    assert names(ghost.step(state, obs(rt, damage=30))) == [], "the first frame sets the baseline"
+    assert names(ghost.step(state, obs(rt, damage=33))) == []
+    assert names(ghost.step(state, obs(rt, damage=40))) == ["autopilot_off", "teleport_pits"]
+
+
 def test_a_reset_by_the_game_retries_the_block(rt):
     ghost, state = machine(rt)
     start_driving(rt, ghost, state)

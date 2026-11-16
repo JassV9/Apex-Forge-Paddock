@@ -206,7 +206,9 @@ def test_free_laps_go_in_to_refuel_without_counting_a_retry(rt):
     assert "refuelling" in state.message and state.retries == 0
     actions = []
     for _ in range(round((ghost.SETTLE_S + 0.1) / FRAME)):
-        actions += to_py(ghost.step(state, obs(rt, parked=True, onTrack=False, fuel=3, **FREE))) or []
+        actions += (
+            to_py(ghost.step(state, obs(rt, parked=True, onTrack=False, fuel=3, **FREE))) or []
+        )
     assert {"name": "set_fuel", "liters": 40} in actions
 
 

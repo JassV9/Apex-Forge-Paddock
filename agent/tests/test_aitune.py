@@ -82,7 +82,8 @@ def test_the_calibration_survives_a_restart_and_a_change_of_method_drops_it(rt):
     saved = to_py(a.snapshot(state))
 
     assert a.hint(a.restore(to_lua(rt, saved))) == a.hint(state)
-    assert a.hint(a.restore(to_lua(rt, saved | {"v": 1}))) == 1, "speed caps of version 1 are dropped"
+    old = a.restore(to_lua(rt, saved | {"v": 1}))
+    assert a.hint(old) == 1, "speed caps of version 1 are dropped"
 
 
 # The whole agent ---------------------------------------------------------------------------

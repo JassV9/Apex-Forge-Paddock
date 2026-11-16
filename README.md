@@ -208,6 +208,10 @@ section 5) and ends with a demo script in [docs/demos/](docs/demos/).
 - A setup desk in the game window: what to test next, "I drive it" or "AI drives it", the
   laps of the running experiment and a Judge button, without leaving the car
   ([ADR 0015](docs/adr/0015-in-game-setup-desk.md)).
+- A Start driving button: the dashboard asks a small launcher on the Windows host to start
+  Practice from the pits through Content Manager with your usual settings, and the launcher
+  puts your wheel bindings back if the game changed them
+  ([ADR 0017](docs/adr/0017-host-launcher.md); **unverified in game**).
 - One contract for all of it: the same schema files generate the Go, Python and TypeScript
   types and validate what the Lua agent writes. CI fails on drift.
 - A demo that can go on the internet without becoming writable. nginx lets only reads
@@ -235,7 +239,11 @@ make gen     # regenerate Go, Python and TypeScript types from contracts/
 make demo    # full stack in Docker on a recorded session, http://localhost:5173
 make demo-replica  # the read-only public demo, laid out as it would run on Azure
 make dev     # the same stack, ingesting what the in-game agent writes
+make launcher  # on Windows, outside Docker: lets the dashboard's Start driving open the game
 ```
+
+To drive: `make dev`, then `make launcher`, then pick a car and a layout in the dashboard's
+Drive panel and press Start driving ([runbook](docs/runbooks/driving.md)).
 
 ## Repository tour
 

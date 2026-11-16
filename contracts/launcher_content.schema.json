@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "launcher_content.schema.json",
+  "title": "LauncherContent",
+  "description": "The cars and tracks installed in Assetto Corsa, as the host launcher found them (GET /content on paddock-launcher).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ac_root", "cars", "tracks"],
+  "properties": {
+    "ac_root": {
+      "description": "The Assetto Corsa folder that was scanned.",
+      "type": "string"
+    },
+    "cars": {
+      "description": "Every folder of content/cars, by display name.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/LauncherCar" }
+    },
+    "tracks": {
+      "description": "Every folder of content/tracks with at least one layout, by display name.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/LauncherTrack" }
+    }
+  },
+  "definitions": {
+    "LauncherCar": {
+      "title": "LauncherCar",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "description": "Folder name under content/cars.", "type": "string", "minLength": 1 },
+        "name": {
+          "description": "name in ui/ui_car.json; the id when the file is missing or unreadable.",
+          "type": "string"
+        }
+      }
+    },
+    "LauncherTrack": {
+      "title": "LauncherTrack",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "layouts"],
+      "properties": {
+        "id": { "description": "Folder name under content/tracks.", "type": "string", "minLength": 1 },
+        "name": { "description": "Name of the track's first layout, without the layout's own words.", "type": "string" },
+        "layouts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/LauncherLayout" }
+        }
+      }
+    },
+    "LauncherLayout": {
+      "title": "LauncherLayout",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layout", "name", "ai_can_drive", "test_copy"],
+      "properties": {
+        "layout": {
+          "description": "Layout folder name; empty for a track with a single layout (ui/ui_track.json).",
+          "type": "string"
+        },
+        "name": { "description": "name in the layout's ui_track.json; the folder name otherwise.", "type": "string" },
+        "ai_can_drive": {
+          "description": "True for a Paddock test copy (<layout>_paddock, tools/prepare_test_layout.py): only there may the agent hand the car to the AI.",
+          "type": "boolean"
+        },
+        "test_copy": {
+          "description": "The layout id of this layout's test copy when it exists; empty otherwise and for a test copy itself.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

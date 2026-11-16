@@ -49,6 +49,8 @@ flowchart LR
 | agent window to core | HTTP to core's REST API, only while the window is drawn, at most every 10 s, and on a click ([ADR 0015](adr/0015-in-game-setup-desk.md)) | `docs/api/openapi.yaml` |
 | core to engine | HTTP/JSON on localhost; long work goes through the `jobs` table, claimed with `SELECT ... FOR UPDATE SKIP LOCKED` ([ADR 0006](adr/0006-no-kafka-no-kubernetes.md)) | `contracts/*.schema.json` |
 | web to core | REST | `docs/api/openapi.yaml` |
+| web to launcher | HTTP from the browser to `paddock-launcher` on the Windows host, `127.0.0.1:8090`, CORS for the dev origins only ([ADR 0017](adr/0017-host-launcher.md)) | `docs/api/launcher.yaml` |
+| launcher to Content Manager | A Quick Drive preset in `Documents/Assetto Corsa/paddock/launch/` and an `acmanager://race/quick?presetFile=` URL | CM's preset format (copied from the owner's preset) |
 
 Storage: PostgreSQL for structured data, a directory of Parquet parts per session for raw
 samples, DuckDB inside the engine for queries over Parquet
@@ -65,6 +67,7 @@ samples, DuckDB inside the engine for queries over Parquet
 | `core/internal/passes` | Go | Read path for a session's passes and their raw samples (Parquet) | Write anything |
 | `core/internal/api` | Go | REST API for the dashboard and the in-game desk | Hold logic that belongs to another package |
 | `core/internal/store` | Go | Database connection, migrations, the API's read queries | — |
+| `core/internal/launcher` (`cmd/paddock-launcher`) | Go, on the Windows host | Listing installed cars and layouts, starting Practice through Content Manager, backing up `controls.ini` and restoring it when the game changed the bindings | Write anything outside `paddock/` except putting back its own `controls.ini` backup; change CM's presets or settings |
 | `core/internal/telemetry` | Go | OpenTelemetry metrics and the Prometheus endpoint | Register anything globally |
 | `engine/` | Python | Features, phases, noise model, verdict statistics, diagnosis, sensitivity, optimizer, LLM explanations | Talk to the game; let an LLM number enter the ledger |
 | `web/` | TypeScript | Telemetry workspace | Hold business logic |
@@ -108,6 +111,7 @@ boundary. `docs/api/openapi.yaml` describes core's REST API and refers to those 
 | `contracts/*.schema.json` | `tools/sync_schemas.py` (copy) | `core/internal/ingest/schemas/` |
 | `contracts/*.schema.json` | `datamodel-code-generator` | `engine/paddock_engine/contracts/` |
 | `docs/api/openapi.yaml` | `openapi-typescript` | `web/src/api/schema.d.ts` |
+| `docs/api/launcher.yaml` | `openapi-typescript` | `web/src/api/launcher-schema.d.ts` |
 
 `make gen` regenerates all of them. `make gen-check` (run in CI) fails when the committed
 output differs from what the generators produce. The agent's Lua writes its lines by hand; its
@@ -266,6 +270,8 @@ Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
 | Read-only demo: nginx door, replica layout in Compose, smoke test (`make demo-replica`, `make demo-replica-check`) | Working locally and in CI |
 | Azure deployment of the demo (`infra/azure`, `.github/workflows/publish-demo.yml`) | Terraform validated; **never applied, nothing published** |
 | Base setup from the car's own measurements: `contracts/base_setup*.schema.json`, engine `POST /base-setup`, core `POST /sessions/{id}/base-setup`, experiment kind `base` (migration 00007), web "Base setup" panel in the experiments tab | Working, tested (pytest with hypothesis, Go against PostgreSQL, Vitest); **unverified in game** ([ADR 0018](adr/0018-base-setup.md)) |
+| Start driving: Drive panel in the workspace, host launcher (`make launcher`) through CM's Quick Drive, `controls.ini` backup and restore ([ADR 0017](adr/0017-host-launcher.md), [runbook](runbooks/driving.md)) | Unit-tested without the game (temp folders, scripted process list); `GET /content` and `/status` read the real install; **unverified in game and in CM** |
+| AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
 
@@ -279,6 +285,7 @@ phase that first uses it.
 | core | 8080 | `PADDOCK_DATABASE_URL` (required), `PADDOCK_HTTP_ADDR` (default `:8080`), `PADDOCK_SPOOL_DIR` (the agent's spool; unset turns ingest off), `PADDOCK_DATA_DIR` (Parquet files; default `data`), `PADDOCK_ENGINE_URL` (unset: no features, experiments cannot be planned or judged), `PADDOCK_OUTBOX_DIR` (the agent's outbox; unset: nothing is written for the agent) |
 | engine | 8000 | `PADDOCK_LLM_PROVIDER` (`none`, `gemini` or `openrouter`; unset: Gemini when its key is present, otherwise no model), `PADDOCK_LLM_MODEL` (model id; default per provider), `GEMINI_API_KEY`, `OPENROUTER_API_KEY` (environment, or the OS keyring under service `paddock` when the `keyring` package is installed) |
 | web (dev server) | 5173 | `PADDOCK_CORE_URL` (default `http://localhost:8080`), target of the `/api` proxy |
+| paddock-launcher (Windows host) | 8090 on 127.0.0.1 | `PADDOCK_AC_ROOT` (default the Steam folder), `PADDOCK_DOCUMENTS` (default the Documents known folder), `PADDOCK_CM_PRESET` (CM Quick Drive preset name or path; default `NJ`); flags `--ac-root`, `--documents`, `--template`, `--port`. The dashboard reads `VITE_PADDOCK_LAUNCHER_URL` (default `http://127.0.0.1:8090`) |
 | PostgreSQL | 5432 | Set in `deploy/docker-compose.yml` |
 | web (demo image, nginx) | 8088 | `PADDOCK_WEB_PORT` (default `8088`), `PADDOCK_CORE_URL` (default `http://localhost:8080`); built with `VITE_READ_ONLY=1` |
 

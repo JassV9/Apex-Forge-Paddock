@@ -1,0 +1,68 @@
+/* The Drive panel at the top of the session rail: pick a car and a layout, start the game. */
+.drive {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0 1rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.drive .rail-day {
+  padding: 0.7rem 0 0;
+}
+
+.drive label {
+  font-size: 0.76rem;
+}
+
+.drive select {
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.drive button {
+  justify-self: start;
+}
+
+.drive-hint,
+.drive-help p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.drive-hint.is-good {
+  color: var(--good);
+}
+
+.drive-hint.is-warn {
+  color: var(--warn);
+}
+
+.drive code {
+  overflow-wrap: anywhere;
+  font-size: 0.72rem;
+}
+
+.drive-help {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(229, 185, 60, 0.35);
+  border-radius: 8px;
+  background: rgba(229, 185, 60, 0.06);
+}
+
+.drive-status {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  list-style: none;
+}
+
+.drive [role="alert"] {
+  margin: 0;
+  font-size: 0.76rem;
+}

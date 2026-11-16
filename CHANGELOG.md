@@ -11,6 +11,22 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
   `POST /sessions/{id}/base-setup {driver}` proposes it as an experiment of kind `base`
   (migration 00007) or answers 409 with what the car measured; accepted, the base is the
   champion. Web: a "Base setup" panel in the experiments tab. Unverified in game.
+- Start driving: a Drive panel at the top of the workspace rail picks a car and a layout
+  (Paddock test copies marked "AI can drive here") and asks `paddock-launcher`, a new host
+  program (`make launcher`, `127.0.0.1:8090`), to start Practice from the pits through Content
+  Manager's Quick Drive (`acmanager://race/quick`), with a copy of the owner's CM preset.
+- The wheel bindings are guarded: `controls.ini` is backed up before each start and put back
+  when the game exits if `[CONTROLLERS]` or any `JOY` index changed (ADR 0017).
+- Contracts `launcher_content`, `launch_request`, `launcher_status`; API `docs/api/launcher.yaml`;
+  runbook `docs/runbooks/driving.md`.
+- Unverified in game and in Content Manager: the launcher was tested without the game, and its
+  `GET /content` and `GET /status` against the real install.
+- AI training program (ADR 0020): `POST /sessions/{id}/training {experiments}` queues AI-driven
+  experiments on one car; core's loop judges each when its laps are in, extends a promising
+  inconclusive one once, reverts a loss, waits on a trade-off and starts the best-ranked
+  untested item next (migration 00008). In the game, "Calibrate the AI on this car" drives free
+  laps that stop once calibrated, and the Setups tab starts and stops training; in the web, a
+  "Train the AI" card. Unverified in game beyond one AI experiment judged by hand.
 
 ## AI calibration and the first full AI experiment in the game (2026-11-16)
 

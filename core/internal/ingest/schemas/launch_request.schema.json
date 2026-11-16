@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "launch_request.schema.json",
+  "title": "LaunchRequest",
+  "description": "Start Assetto Corsa in Practice from the pits with this car on this layout (POST /launch on paddock-launcher).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["car_id", "track_id", "layout"],
+  "properties": {
+    "car_id": { "description": "Folder name under content/cars.", "type": "string", "minLength": 1 },
+    "track_id": { "description": "Folder name under content/tracks.", "type": "string", "minLength": 1 },
+    "layout": { "description": "Layout folder name; empty for a single-layout track.", "type": "string" }
+  }
+}

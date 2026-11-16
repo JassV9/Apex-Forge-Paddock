@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "launcher_status.schema.json",
+  "title": "LauncherStatus",
+  "description": "What the host launcher knows: whether the game runs, the last launch and what happened to the wheel bindings (GET /status and POST /launch on paddock-launcher).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["service", "version", "game_running"],
+  "properties": {
+    "service": { "type": "string", "enum": ["launcher"] },
+    "version": { "description": "Build version of the launcher.", "type": "string", "minLength": 1 },
+    "game_running": { "description": "acs.exe is running now.", "type": "boolean" },
+    "last_launch": { "$ref": "#/definitions/LaunchRecord" },
+    "controls": { "$ref": "#/definitions/ControlsCheck" }
+  },
+  "definitions": {
+    "LaunchRecord": {
+      "title": "LaunchRecord",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["car_id", "track_id", "layout", "at"],
+      "properties": {
+        "car_id": { "type": "string" },
+        "track_id": { "type": "string" },
+        "layout": { "type": "string" },
+        "at": { "description": "When Content Manager was asked to start the game.", "type": "string", "format": "date-time" }
+      }
+    },
+    "ControlsCheck": {
+      "title": "ControlsCheck",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "at", "backup_sha256"],
+      "properties": {
+        "state": {
+          "description": "watching: the game was launched and has not exited yet. unchanged: after the game, the controllers and every JOY binding were as backed up. restored: they differed, and the backup was written back. restore_failed: they differed and the backup could not be written back (the backup file is kept).",
+          "type": "string",
+          "enum": ["watching", "unchanged", "restored", "restore_failed"]
+        },
+        "at": { "description": "When the state was reached.", "type": "string", "format": "date-time" },
+        "backup_sha256": { "description": "SHA-256 of controls.ini as backed up before the launch.", "type": "string" },
+        "detail": { "description": "What differed, or why the restore failed.", "type": "string" }
+      }
+    }
+  }
+}

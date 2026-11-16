@@ -10,6 +10,7 @@ local M = MOCK
 -- vectors / colours ------------------------------------------------------------------------
 function vec2(x, y) return { x = x or 0, y = y or x or 0 } end
 function vec3(x, y, z) return { x = x or 0, y = y or 0, z = z or 0 } end
+function vec4(x, y, z, w) return { x = x or 0, y = y or 0, z = z or 0, w = w or 0 } end
 rgbm = setmetatable({}, { __call = function(_, r, g, b, m) return { r = r, g = g, b = b, mult = m } end })
 rgb = function(r, g, b) return { r = r, g = g, b = b } end
 function math.clamp(x, a, b) return math.max(a, math.min(b, x)) end
@@ -272,6 +273,10 @@ end
 function physics.setCarFuel(i, liters) record("fuel", liters) M.car.fuel = liters end
 function physics.resetCarState(i) record("repair") for z = 0, 4 do M.car.damage[z] = 0 end end
 function ac.tryToStart() record("start") return true end
+function physics.setCarBodyDamage(i, d)
+  record("repair_body", d.x, d.y, d.z, d.w)
+  for z = 0, 3 do M.car.damage[z] = 0 end
+end
 function physics.setAILapsToComplete(i, laps) record("laps_to_complete", laps) end
 function physics.setAIPitStopRequest(i, on) record("pit_request", on) end
 function physics.setExtraAIGrip(i, v) record("extra_grip", v) end

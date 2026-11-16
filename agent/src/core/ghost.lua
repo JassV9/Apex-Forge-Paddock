@@ -96,9 +96,14 @@ local function whileDriving(s, o)
   end
   if o.speedKmh < ghost.STUCK_KMH then s.stuck = s.stuck + o.dt else s.stuck = 0 end
   if s.stuck >= ghost.STUCK_S then return retry(s, o, "stuck") end
-  -- the damage a block starts with is its baseline: a repair may show a frame late
-  if s.damage == nil then s.damage = o.damage or 0 end
-  if (o.damage or 0) > s.damage + ghost.DAMAGE_STEP then return retry(s, o, "damaged") end
+  -- the damage a block starts with is its baseline (a repair may show a frame late); a
+  -- repair lowers it
+  local damage = o.damage or 0
+  s.damage = math.min(s.damage or damage, damage)
+  -- brushing the pit wall on the way out is not a crash, and nothing is measured yet: any of
+  -- it is repaired, so every block reaches the track on an undamaged car
+  if not o.onTrack and damage > s.damage then return { act("repair_body") } end
+  if damage > s.damage + ghost.DAMAGE_STEP then return retry(s, o, "damaged") end
   -- AC puts a car it thinks is lost back on track, often past the line, so the lap never ends
   if o.resets ~= nil and s.resets ~= nil and o.resets ~= s.resets then return retry(s, o, "reset by the game") end
   s.resets = o.resets
@@ -114,7 +119,8 @@ end
 ---parked (in the pit box and still), onTrack, speedKmh, ai (car is AI controlled), fuel,
 ---damage (the largest damage zone), resets (the car's reset counter), lapsDone (laps the plan
 ---has counted in this block).
----@return table[] actions, in order: autopilot_on/off, teleport_pits, repair, set_fuel, load, start
+---@return table[] actions, in order: autopilot_on/off, teleport_pits, repair, repair_body,
+---set_fuel, load, start
 function ghost.step(s, o)
   if o.planId ~= s.planId then  -- a new experiment: an earlier stop or choice does not carry over
     s.planId, s.halted, s.override, s.free = o.planId, false, false, false

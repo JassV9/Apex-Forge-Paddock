@@ -37,6 +37,17 @@ def test_an_incident_caps_the_speed_on_its_approach(rt):
     assert a.capAt(state, 0.5025) is not None and a.capAt(state, 0.2) is None
 
 
+def test_an_out_lap_caps_only_the_sections_it_drove(rt):
+    a = tune(rt)
+    state = a.new()
+    for i in range(14, a.SECTIONS):  # joins the track from the pit exit at section 14
+        pos = (i + 0.5) / a.SECTIONS
+        a.observe(state, pos, 74, i == 14)
+
+    a.endLap(state, True)
+    assert caps(rt, state) == {14: round(74 * a.CAP_FACTOR, 1)}
+
+
 def test_a_repeated_incident_lowers_the_cap_again_and_never_raises_it(rt):
     a = tune(rt)
     state = a.new()

@@ -38,7 +38,10 @@ end
 
 local function lower(state, s, carried)
   local current = state.caps[s]
-  local proposed = current and current * aitune.STEP or (carried or 200) * aitune.CAP_FACTOR
+  -- a section the AI did not drive this lap (an out-lap joins past the line) has no speed to
+  -- cap from
+  if current == nil and carried == nil then return end
+  local proposed = current and current * aitune.STEP or carried * aitune.CAP_FACTOR
   state.caps[s] = math.max(aitune.MIN_KMH, current and math.min(current, proposed) or proposed)
 end
 

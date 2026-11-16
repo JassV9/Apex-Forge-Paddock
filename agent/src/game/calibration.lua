@@ -13,7 +13,8 @@ local calibration = {
   DAMAGE_STEP = 1,
 }
 
-local last = { pos = nil, section = -1, reset = nil, damage = 0, slow = 0 }
+-- damage starts unknown: the first frame on track is its baseline, not an incident
+local last = { pos = nil, section = -1, reset = nil, damage = nil, slow = 0 }
 
 local function safe(text) return (tostring(text or ""):gsub("[^%w%._%-]+", "_")) end
 
@@ -37,7 +38,7 @@ local function incident(car, dt)
   local reset = last.reset ~= nil and car.resetCounter ~= last.reset
   last.slow = car.speedKmh < calibration.SLOW_KMH and last.slow + dt or 0
   local hit = car.wheelsOutside >= calibration.OFF_WHEELS or reset or last.slow >= calibration.SLOW_S
-    or damage > last.damage + calibration.DAMAGE_STEP
+    or damage > (last.damage or damage) + calibration.DAMAGE_STEP
   last.reset, last.damage = car.resetCounter, damage
   return hit, reset
 end
@@ -64,7 +65,7 @@ end
 
 ---The AI is handed the car or gives it back: no cap may outlive the run, nothing carries over.
 function calibration.release()
-  last.pos, last.section, last.reset, last.slow = nil, -1, nil, 0
+  last.pos, last.section, last.reset, last.slow, last.damage = nil, -1, nil, 0, nil
   pcall(physics.setAITopSpeed, 0, 1e9)
 end
 

@@ -40,6 +40,8 @@ local handlers = {
   end,
   teleport_pits = function() physics.teleportCarTo(0, ac.SpawnSet.Pits) end,
   repair = function() physics.resetCarState(0, 1) end,
+  -- body only, without resetCarState's fuel reset: the car keeps driving
+  repair_body = function() physics.setCarBodyDamage(0, vec4(0, 0, 0, 0)) end,
   set_fuel = function(a) if a.liters then physics.setCarFuel(0, a.liters) end end,
   start = function() if ac.tryToStart then ac.tryToStart(true) end end,
   load = function()

@@ -163,6 +163,22 @@ def test_damage_still_showing_after_the_repair_is_the_baseline_not_a_retry(rt):
     assert names(ghost.step(state, obs(rt, damage=40))) == ["autopilot_off", "teleport_pits"]
 
 
+def test_brushing_the_pit_wall_on_the_way_out_is_repaired_in_place_not_retried(rt):
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    assert names(ghost.step(state, obs(rt, onTrack=False, speedKmh=42))) == []
+    hit = obs(rt, onTrack=False, speedKmh=42, damage=8.8)
+    assert names(ghost.step(state, hit)) == ["repair_body"]
+    assert names(ghost.step(state, hit)) == ["repair_body"], "until the repair shows"
+    assert names(ghost.step(state, obs(rt, onTrack=False, speedKmh=42))) == []
+    graze = obs(rt, onTrack=False, speedKmh=42, damage=2)
+    assert names(ghost.step(state, graze)) == ["repair_body"], "even below the crash threshold"
+    assert names(ghost.step(state, obs(rt, onTrack=False, speedKmh=42))) == []
+    assert state.phase == "driving" and state.retries == 0
+    assert names(ghost.step(state, obs(rt, damage=8.8))) == ["autopilot_off", "teleport_pits"]
+
+
 def test_a_reset_by_the_game_retries_the_block(rt):
     ghost, state = machine(rt)
     start_driving(rt, ghost, state)

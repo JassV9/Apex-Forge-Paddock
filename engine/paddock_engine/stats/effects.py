@@ -10,6 +10,10 @@ block (measured in tests/test_stats_acceptance.py; see docs/adr/0008-effect-mode
 - the interval is estimate +- t x bootstrap standard error, with Student's t for the number of
   laps, instead of the percentiles of the resamples.
 
+Corners are weighted by their own scatter (stats/weights.py, ADR 0023). The weights are measured
+once on all passes and held fixed in every resample: measuring them again from resampled laps
+(duplicates included) made the intervals about a third wider than the estimates scatter.
+
 The random seed is fixed, so the same passes always give the same verdict.
 """
 
@@ -23,6 +27,7 @@ from paddock_engine.io.samples import FloatArray
 from paddock_engine.stats.model import IntArray, NotEstimableError, fit_random_intercept
 from paddock_engine.stats.observations import Design, Observation, build_design
 from paddock_engine.stats.rope import EffectClass, classify
+from paddock_engine.stats.weights import corner_scales, corner_weights
 
 DEFAULT_LEVEL = 0.90
 DEFAULT_REPLICATES = 400
@@ -40,9 +45,10 @@ class Effect:
     effect_class: EffectClass
     n_passes: int  # passes used, both arms
     corners: int
-    sigma_residual: float  # pass-to-pass scatter within a corner, from the model
+    sigma_residual: float  # pass-to-pass scatter within a full-weight corner, from the model
     covariates: list[str]  # covariates the model adjusted for
     dropped_covariates: list[str]  # left out: too tangled with the arm or each other (ADR 0022)
+    corner_weights: dict[int, float]  # corner number -> how much it counted, 1 = fully (ADR 0023)
 
 
 def _clusters(observations: Sequence[Observation]) -> list[list[IntArray]]:
@@ -65,18 +71,29 @@ def _resample(clusters: list[list[IntArray]], rng: np.random.Generator) -> IntAr
     return np.concatenate(picked)
 
 
+def _corner_weights(design: Design) -> FloatArray:
+    """Per corner code, from the residuals of the unweighted model, both arms together."""
+    unweighted = fit_random_intercept(design.y, design.x, design.groups)
+    residuals = design.y - design.x @ unweighted.coefficients
+    return corner_weights(corner_scales(residuals, design.groups))
+
+
 def _bootstrap_errors(
-    design: Design, clusters: list[list[IntArray]], replicates: int, seed: int
+    design: Design,
+    weights: FloatArray,
+    clusters: list[list[IntArray]],
+    replicates: int,
+    seed: int,
 ) -> FloatArray:
-    """Standard error of each arm's coefficient."""
+    """Standard error of each arm's coefficient, the corner weights held fixed."""
     rng = np.random.default_rng(seed)
     arms = len(design.arms)
     draws = []
     for _ in range(replicates):
         rows = _resample(clusters, rng)
-        groups = np.unique(design.groups[rows], return_inverse=True)[1]
+        codes, groups = np.unique(design.groups[rows], return_inverse=True)
         try:
-            fit = fit_random_intercept(design.y[rows], design.x[rows], groups)
+            fit = fit_random_intercept(design.y[rows], design.x[rows], groups, weights[codes])
         except NotEstimableError:
             continue
         draws.append(fit.coefficients[:arms])
@@ -105,9 +122,10 @@ def estimate_effects(
     Raises NotEstimableError when the passes cannot support the model.
     """
     design = build_design(observations, baseline_arm)
-    fit = fit_random_intercept(design.y, design.x, design.groups)
+    weights = _corner_weights(design)
+    fit = fit_random_intercept(design.y, design.x, design.groups, weights)
     clusters = _clusters(observations)
-    errors = _bootstrap_errors(design, clusters, replicates, seed)
+    errors = _bootstrap_errors(design, weights, clusters, replicates, seed)
     quantile = _t_quantile(level, clusters)
     effects = []
     for column, arm in enumerate(design.arms):
@@ -126,6 +144,7 @@ def estimate_effects(
                 sigma_residual=fit.sigma_residual,
                 covariates=design.covariates,
                 dropped_covariates=design.dropped,
+                corner_weights=dict(zip(design.corners, weights.tolist(), strict=True)),
             )
         )
     return effects

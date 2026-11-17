@@ -8,8 +8,10 @@ a false alarm.
 
 The model is fitted by feasible GLS (Swamy-Arora variance components, then quasi-demeaning),
 which is the GLS solution of the random-intercept mixed model and takes microseconds, so the
-bootstrap can refit it hundreds of times. tests/test_stats_model.py checks it against
-statsmodels' MixedLM. See docs/adr/0008-effect-model.md.
+bootstrap can refit it hundreds of times. tests/test_stats.py checks it against
+statsmodels' MixedLM. See docs/adr/0008-effect-model.md. The pass-to-pass variance may differ by
+corner (`corner_weights`, ADR 0023); tests/test_stats_weights.py checks that fit against
+statsmodels' WLS.
 """
 
 from dataclasses import dataclass
@@ -29,7 +31,7 @@ class NotEstimableError(ValueError):
 @dataclass(frozen=True)
 class Fit:
     coefficients: FloatArray  # one per column of x, in order
-    sigma_residual: float  # pass-to-pass scatter within a corner
+    sigma_residual: float  # pass-to-pass scatter within a corner (a full-weight one, if weighted)
     sigma_group: float  # spread of the corners' own levels
 
 
@@ -49,23 +51,24 @@ def _residual_variance(y: FloatArray, x: FloatArray, lost_degrees: int) -> tuple
     return coefficients, float(residuals @ residuals) / degrees
 
 
-def _group_variance(
-    y_means: FloatArray, x_means: FloatArray, counts: FloatArray, residual: float
-) -> float | None:
-    """Variance of the corner levels from the between-corner regression; None if not identified."""
+def _group_variance(y_means: FloatArray, x_means: FloatArray, mean_noise: float) -> float | None:
+    """Variance of the corner levels from the between-corner regression; None if not identified.
+
+    `mean_noise` is the pass-to-pass noise in a corner's mean, averaged over the corners.
+    """
     design = np.column_stack([np.ones(len(y_means)), x_means])
     if len(y_means) <= np.linalg.matrix_rank(design):
         return None
     _, between = _residual_variance(y_means, design, 0)
-    harmonic_size = len(counts) / float((1.0 / counts).sum())
-    return max(0.0, between - residual / harmonic_size)
+    return max(0.0, between - mean_noise)
 
 
-def _shrinkage(residual: float, group: float, counts: FloatArray) -> FloatArray:
+def _shrinkage(residual: FloatArray, group: float, counts: FloatArray) -> FloatArray:
     """How far each corner's passes are pulled towards the corner's own mean (0: not at all).
 
-    A channel with no scatter at all (a count that is 0 on every pass) has nothing to weigh:
-    the plain regression is exact, so the answer is 0 instead of 0 / 0.
+    `residual` is each corner's own pass-to-pass variance. A channel with no scatter at all (a
+    count that is 0 on every pass) has nothing to weigh: the plain regression is exact, so the
+    answer is 0 instead of 0 / 0.
     """
     total = residual + counts * group
     scattered = total > 0
@@ -74,22 +77,31 @@ def _shrinkage(residual: float, group: float, counts: FloatArray) -> FloatArray:
     return shrink
 
 
-def fit_random_intercept(y: FloatArray, x: FloatArray, groups: IntArray) -> Fit:
-    """Fit y = intercept + x @ b + u[group] + e. `groups` holds codes 0..G-1."""
+def fit_random_intercept(
+    y: FloatArray, x: FloatArray, groups: IntArray, corner_weights: FloatArray | None = None
+) -> Fit:
+    """Fit y = intercept + x @ b + u[group] + e. `groups` holds codes 0..G-1.
+
+    With `corner_weights` (one per group), e scatters as sigma^2 / weight in each corner and the
+    fit is the GLS solution of that model (ADR 0023); without, every corner scatters alike.
+    """
     counts = np.bincount(groups).astype(np.float64)
     if (counts == 0).any():
         raise NotEstimableError("group codes must be contiguous")
+    weights = np.ones(len(counts)) if corner_weights is None else corner_weights
+    root = np.sqrt(weights)[groups]
     y_means, x_means = _group_means(y, groups, counts), _group_means(x, groups, counts)
     within_y, within_x = y - y_means[groups], x - x_means[groups]
-    _, residual = _residual_variance(within_y, within_x, len(counts))
+    _, residual = _residual_variance(root * within_y, root[:, None] * within_x, len(counts))
 
-    group = _group_variance(y_means, x_means, counts, residual)
+    group = _group_variance(y_means, x_means, float(np.mean(residual / (weights * counts))))
     # Corner levels that are not identified are used as fixed effects (no shrinkage).
     fixed = np.ones(len(counts))
-    theta = fixed if group is None else _shrinkage(residual, group, counts)
-    weight = theta[groups]
-    design = np.column_stack([1.0 - weight, x - weight[:, None] * x_means[groups]])
-    coefficients, *_ = np.linalg.lstsq(design, y - weight * y_means[groups], rcond=None)
+    theta = fixed if group is None else _shrinkage(residual / weights, group, counts)
+    pull = theta[groups]
+    design = np.column_stack([1.0 - pull, x - pull[:, None] * x_means[groups]])
+    target = y - pull * y_means[groups]
+    coefficients, *_ = np.linalg.lstsq(root[:, None] * design, root * target, rcond=None)
     return Fit(
         coefficients=coefficients[1:],
         sigma_residual=float(np.sqrt(residual)),

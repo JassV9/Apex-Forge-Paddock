@@ -39,6 +39,9 @@ from paddock_engine.experiments.channel_effects import channel_effect, per_speed
 from paddock_engine.stats.effects import Effect
 from paddock_engine.stats.rope import EffectClass
 
+NAMED_BELOW_WEIGHT = 0.5  # corners that counted less than half are named in the reason
+NAMED_CORNERS = 3  # at most, the least-weighted first
+
 
 @dataclass(frozen=True)
 class _Judgement:
@@ -148,6 +151,23 @@ def _score_predictions(
     return hits, total, results
 
 
+def _weighting_note(primary: Effect) -> str:
+    """Which corners counted least (ADR 0023); nothing when every corner counted fully."""
+    weights = primary.corner_weights
+    if all(weight == 1.0 for weight in weights.values()):
+        return ""
+    light = sorted(
+        (corner for corner, weight in weights.items() if weight < NAMED_BELOW_WEIGHT),
+        key=lambda corner: (weights[corner], corner),
+    )
+    least = (
+        f"least weight: {', '.join(str(corner) for corner in light[:NAMED_CORNERS])}"
+        if light
+        else "none counted below half"
+    )
+    return f" Corners weighted by their own scatter (ADR 0023); {least}."
+
+
 def _notes(primary: Effect, shifted: Sequence[str]) -> str:
     """What the driver should know about how the number was reached, appended to the reason."""
     notes = ""
@@ -157,6 +177,7 @@ def _notes(primary: Effect, shifted: Sequence[str]) -> str:
             f"{', '.join(primary.dropped_covariates)}: too entangled with which setup was on the "
             "car (see ADR 0022)."
         )
+    notes += _weighting_note(primary)
     if shifted:
         notes += f" Driver inputs shifted ({', '.join(shifted)}): part of this may be the driver."
     return notes

@@ -33,7 +33,10 @@ the time.
 components, then ordinary least squares on quasi-demeaned data
 (`engine/paddock_engine/stats/model.py`). This is the GLS solution of the mixed model and
 takes microseconds. A test checks it against statsmodels' `MixedLM` (REML): the coefficients
-agree to five decimals. statsmodels is a test dependency only.
+agree to five decimals. statsmodels is a test dependency only. Amended by
+[ADR 0023](0023-corners-weighted-by-their-own-scatter.md): the pass-to-pass variance may differ
+by corner, and each corner is weighted by the inverse of its own residual variance, between a
+floor (up to 1.5 times the typical corner counts fully) and a cap (no corner below a tenth).
 
 **Covariates.** Fuel, tyre temperature and time in session enter when every pass has them
 and they vary within corners. Amended by [ADR 0022](0022-covariates-the-arm-can-be-told-from.md):

@@ -4,6 +4,17 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Engine (ADR 0023): each corner now counts by its own scatter. The effect model is fitted by
+  weighted least squares, each corner weighted by the inverse of its residual variance in the
+  experiment's own passes (unweighted full model, both arms pooled). A corner up to 1.5 times
+  the typical (median) corner counts fully, and none counts less than a tenth. The weights are
+  held fixed in the bootstrap and apply to every channel and speed class. Each `Effect` carries
+  `corner_weights`, and the verdict's reason names the least-weighted corners ("Corners
+  weighted by their own scatter (ADR 0023); least weight: 7, 14, 1."). No contract change.
+  Replayed offline on the real rows, the Formula Hybrid 2026 corner-time intervals of
+  experiments 7 to 10 narrow from +-28 to +-45 ms to +-19 to +-32 ms (still inconclusive), and
+  Ferrari experiment 5's from +-4.3 to +-3.4 ms. Past verdicts are not re-judged. Unverified in
+  game.
 - Fix, agent: free AI laps (Calibrate, Let the AI drive laps) drove the block of a plan open
   for a human, loading its setup, because they used block 0 only when the car had no active plan
   block. Seen on the Formula Hybrid 2026 with an old human experiment open: the AI loaded its

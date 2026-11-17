@@ -26,6 +26,7 @@ class Design:
     y: FloatArray
     x: FloatArray  # arm indicators first (one per non-baseline arm), then covariates
     groups: IntArray  # corner codes 0..G-1
+    corners: list[int]  # the corner number of each code
     arms: list[str]  # the non-baseline arms, in column order
     covariates: list[str]  # covariates that were usable, in column order
     dropped: list[str] = field(default_factory=list)  # covariates too tangled with the rest
@@ -114,6 +115,7 @@ def build_design(observations: Sequence[Observation], baseline_arm: str) -> Desi
         y=np.array([o.value for o in observations], dtype=np.float64),
         x=np.column_stack([indicators, covariate_columns]),
         groups=groups,
+        corners=corners,
         arms=arms,
         covariates=covariates,
         dropped=dropped,

@@ -8,7 +8,9 @@
 -- Phases: off -> to_pits -> (load) -> driving -> to_pits (next block) ... -> off when the plan
 -- is complete. A car that stands still (on track, or parked by the AI's own pit stop) or takes
 -- damage is sent back to the pits to retry its block; after MAX_RETRIES the run stops and
--- says so (phase failed). `stop` hands the car back.
+-- says so (phase failed). A block whose setup is not on the car after loading or leaving the
+-- pits stops the run at once, naming what differs: its laps would count for nothing, and a
+-- reload would not keep a value the car does not hold. `stop` hands the car back.
 --
 -- Without a plan, `lap` starts a free run: the AI laps the car on the setup it has, as block
 -- 0, until it is stopped or a plan arrives. Its passes are the AI's baseline on this car.
@@ -91,15 +93,19 @@ local function inPits(s, o)
   return {}
 end
 
+local function fail(s, why)
+  s.phase = "failed"
+  s.message = "AI driver stopped: " .. why .. "."
+  return { act("autopilot_off") }
+end
+
 local function retry(s, o, why)
   -- free laps have no end: three retries without a lap in between stop them, not three ever
   if s.block == 0 and o.lapsDone ~= s.retryLap then s.retries = 0 end
   s.retryLap = o.lapsDone
   s.retries = s.retries + 1
   if s.retries > ghost.MAX_RETRIES then
-    s.phase = "failed"
-    s.message = string.format("AI driver stopped: %s %d times in %s.", why, s.retries, name(s.block))
-    return { act("autopilot_off") }
+    return fail(s, string.format("%s %d times in %s", why, s.retries, name(s.block)))
   end
   return goToPits(s, o.block, string.format("AI driver: %s, retrying %s.", why, name(o.block)))
 end
@@ -114,6 +120,7 @@ local function whileDriving(s, o)
     s.retries = 0
     return goToPits(s, o.block, "AI driver: block done, to the pits for " .. name(o.block) .. ".")
   end
+  if s.block ~= 0 and o.offCar then return fail(s, o.offCar) end
   if s.block == 0 and s.untilCalibrated and o.calibrated then
     s.phase, s.free, s.untilCalibrated = "off", false, false
     s.message = "AI calibrated on this car: the car is yours, or start an experiment."
@@ -146,7 +153,8 @@ end
 ---(physics access), block (order being driven, or nil),
 ---parked (in the pit box and still), onTrack, speedKmh, ai (car is AI controlled), fuel,
 ---damage (the largest damage zone), resets (the car's reset counter), lapsDone (laps the plan
----has counted in this block), calibrated (the AI calibration has its clean laps).
+---has counted in this block), calibrated (the AI calibration has its clean laps), offCar (why
+---the block's setup is not on the car, or nil).
 ---@return table[] actions, in order: autopilot_on/off, teleport_pits, repair, repair_body,
 ---set_fuel, load, start
 function ghost.step(s, o)
@@ -167,13 +175,11 @@ function ghost.step(s, o)
   return {}  -- loading waits for `loaded`; failed waits for `resume`
 end
 
----The result of the `load` action.
-function ghost.loaded(s, ok, message)
-  if not ok then
-    s.phase = "failed"
-    s.message = "AI driver stopped: the setup did not load (" .. tostring(message) .. ")."
-    return { act("autopilot_off") }
-  end
+---The result of the `load` action; `offCar` says why the setup read back afresh is not the
+---block's (nil when it is).
+function ghost.loaded(s, ok, message, offCar)
+  if offCar then return fail(s, offCar) end
+  if not ok then return fail(s, "the setup did not load (" .. tostring(message) .. ")") end
   s.phase, s.stuck, s.damage, s.sinceLap = "driving", 0, nil, 0
   s.resets, s.lapsDone = nil, nil  -- the teleport and the start count as resets; begin afresh
   s.message = "AI driver: driving " .. name(s.block) .. "."

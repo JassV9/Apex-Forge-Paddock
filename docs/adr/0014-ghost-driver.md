@@ -33,7 +33,9 @@ the fuel the first block started with, load the block's setup with the same read
 human load, then hand the car to the AI and keep it from making its own pit stops. The run
 plan counts the laps and tags the passes exactly as for a human. A car that stands still for
 20 s, on track or parked by the AI, or that takes more than 5 units of damage, is sent back to
-retry its block; after three retries the run stops and says why. The driver can stop it at any
+retry its block; after three retries the run stops and says why. A block whose setup is not on
+the car when read back after the load or on leaving the pits stops the run at once, naming each
+value the car has and the plan wants (added 2026-11-17). The driver can stop it at any
 moment from the window.
 
 **AI laps are their own sessions.** When the AI takes the car the agent closes the spool

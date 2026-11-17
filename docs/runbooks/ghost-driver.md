@@ -94,6 +94,7 @@ trade-off waits for you. Leave the game running; about 40 minutes per experiment
 | Free laps while a plan for a human is open on the car | The AI laps the car's own setup (block 0) and the laps count for no experiment; the plan's blocks stay for the driver |
 | Three retries in one block (in free laps: without a lap in between) | The run stops and the window says why |
 | A setup value does not take | Every change is undone and the run stops |
+| The block's setup is not on the car when read back afresh after the load, or on leaving the pits (the car moved or put back a value) | The run stops before a lap is driven: "AI driver stopped: Setup S is not on the car after leaving the pits: WING_1 reads 1, the plan wants 0." Every differing value is named with what the car has and what the plan wants. No reload: a value the car does not hold would not hold on the next try either |
 | The track gives no physics access | Nothing happens to the car; the window says so |
 
 `Documents/Assetto Corsa/paddock/agent_status.json` always says what the agent is doing (phase,

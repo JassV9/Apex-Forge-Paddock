@@ -47,7 +47,7 @@ local handlers = {
   load = function()
     if ghost.state.block == 0 then return perform(core.loaded(ghost.state, true, "")) end
     local ok = plan.loadBlock()
-    perform(core.loaded(ghost.state, ok, plan.message))
+    perform(core.loaded(ghost.state, ok, plan.message, plan.offCar()))
   end,
 }
 
@@ -82,6 +82,7 @@ function ghost.update(dt, car)
     onTrack = not car.isInPitlane, speedKmh = car.speedKmh, ai = car.isAIControlled, fuel = car.fuel,
     damage = math.max(car.damage[0], car.damage[1], car.damage[2], car.damage[3]),
     resets = car.resetCounter, lapsDone = lapsDone, calibrated = calibration.calibrated(),
+    offCar = plan.offCar(),
   })
   -- a block retried (reset by the game, stuck, damaged) is the clearest incident of all: the
   -- lap it ends is counted before the car leaves the track

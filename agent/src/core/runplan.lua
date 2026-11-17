@@ -42,6 +42,7 @@ end
 local function startBlock(state, order, pushDone)
   state.order, state.pushDone = order, pushDone or 0
   state.outLap, state.seenMid, state.onCar, state.lastPos = true, false, false, nil
+  state.offCar = nil
 end
 
 ---The block being driven, or nil when the plan is finished (or there is none).
@@ -101,12 +102,32 @@ end
 
 ---The car's setup was read (in the pits after loading a block, and on every pit exit).
 ---Passes are only tagged while the block's setup is what is on the car. A block with no laps
----to drive only loads a setup, so it is done as soon as that setup is on the car.
-function runplan.setupIs(state, current)
+---to drive only loads a setup, so it is done as soon as that setup is on the car. `when` says
+---when it was read ("after loading", "after leaving the pits"); what differed is kept for
+---`offCar`.
+function runplan.setupIs(state, current, when)
   local block = runplan.block(state)
   if not block then return end
-  state.onCar = #runplan.changes(block, current) == 0
+  local changes = runplan.changes(block, current)
+  state.onCar = #changes == 0
+  state.offCar = not state.onCar and { label = block.label, when = when, changes = changes } or nil
   if state.onCar and block.lapsTarget == 0 then advance(state) end
+end
+
+local function number(v) return string.format("%g", v) end
+
+---Why the block's setup is not on the car, naming each value that differs, or nil when it is
+---(or the setup was not read since the block began). E.g. "Setup S is not on the car after
+---leaving the pits: WING_1 reads 1, the plan wants 0".
+function runplan.offCar(state)
+  local off = state.offCar
+  if not off then return nil end
+  local parts = {}
+  for _, ch in ipairs(off.changes) do
+    parts[#parts + 1] = string.format("%s reads %s, the plan wants %s", ch.name, number(ch.from), number(ch.to))
+  end
+  local when = off.when and (" " .. off.when) or ""
+  return string.format("%s is not on the car%s: %s", off.label, when, table.concat(parts, "; "))
 end
 
 ---The car is in the pit lane, or the session restarted: the next lap is an out-lap again.

@@ -101,6 +101,8 @@ function ac.setSetupSpinnerValue(name, v)
   if not M.editable or not sp or v < sp.min or v > sp.max then return false end
   if M.reject and M.reject[name] then return true end   -- pretends to work but doesn't change
   M.setup[name] = v
+  -- a car that keeps two items equal (seen: WING_1 and WING_9 on Formula Hybrid 2026)
+  if M.linked and M.linked[name] then M.setup[M.linked[name]] = v end
   return true
 end
 function ac.isSetupAvailableToEdit() return M.editable end

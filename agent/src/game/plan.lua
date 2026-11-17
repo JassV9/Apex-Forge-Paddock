@@ -67,7 +67,8 @@ local function currentSetup()
   return setup.current()
 end
 
----Put the current block's setup on the car (setup screen in the pits only).
+---Put the current block's setup on the car (setup screen in the pits only). The whole block is
+---read back afresh after the change: a car can move one item when another is set.
 function plan.loadBlock()
   local block = runplan.block(plan.state)
   local current = currentSetup()
@@ -77,19 +78,25 @@ function plan.loadBlock()
   end
   local result = setup.apply(runplan.changes(block, current))
   plan.message = block.label .. ": " .. result.message
-  if result.ok then
-    runplan.setupIs(plan.state, setup.current())
-    remember()
+  if not result.ok then return false end
+  runplan.setupIs(plan.state, setup.current(), "after loading")
+  remember()
+  if plan.state.offCar then
+    plan.message = block.label .. ": set, but read back afresh it is not the plan's setup."
+    return false
   end
-  return result.ok
+  return true
 end
 
 ---The car left the pits: whatever is on the car now decides whether passes are tagged.
 function plan.leftPit()
   local current = currentSetup()
-  if current then runplan.setupIs(plan.state, current) end
+  if current then runplan.setupIs(plan.state, current, "after leaving the pits") end
   remember()
 end
+
+---Why the block's setup is not on the car (each differing value named), or nil.
+function plan.offCar() return runplan.offCar(plan.state) end
 
 ---The car is in the pit lane, or the session restarted.
 function plan.pit() runplan.pit(plan.state) end

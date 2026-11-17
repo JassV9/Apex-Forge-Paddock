@@ -4,6 +4,19 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Fix, agent: the AI no longer laps a block whose setup is not on the car. Seen in game (FH26,
+  experiment 13, rear wing `WING_1` 1 -> 0): Setup S was set and checked, but on leaving the
+  pits the car held a different setup, so for 40 minutes the AI drove 28 laps that were never
+  tagged or counted until the lap watchdog gave up ("no lap counted 4 times in block 2"). Now,
+  when the block's setup read back afresh after the load, or on a pit exit, differs from the
+  plan, the AI stops at once and the window and `agent_status.json` say what differs, e.g.
+  "AI driver stopped: Setup S is not on the car after leaving the pits: WING_1 reads 1, the
+  plan wants 0." The spool shows why: this car keeps `WING_9` (also labelled "Rear Wing") equal
+  to `WING_1`, so a plan that changes only one of them cannot be put on the car (first exit:
+  `WING_9` 0, plan 1; after the retry's reload: `WING_1` 1, plan 0). The load already read the
+  whole setup back afresh with the same reader as the pit exit, but a difference only left the
+  passes untagged; now it stops the AI too. A human's load says only that the setup did not
+  stay (no values, so the driver stays blind). Unverified in game.
 - Hybrid battery on every pass (ADR 0024): on a car with KERS/ERS (CSP `kersPresent`) the agent
   samples `kersCharge` and `kersInput` with the other channels and writes, per pass, an `ers`
   object with the charge at the start and end of the zone (0..1) and the mean deployment. They

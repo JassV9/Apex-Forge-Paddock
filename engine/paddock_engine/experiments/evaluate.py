@@ -148,6 +148,20 @@ def _score_predictions(
     return hits, total, results
 
 
+def _notes(primary: Effect, shifted: Sequence[str]) -> str:
+    """What the driver should know about how the number was reached, appended to the reason."""
+    notes = ""
+    if primary.dropped_covariates:
+        notes += (
+            " Not adjusted for "
+            f"{', '.join(primary.dropped_covariates)}: too entangled with which setup was on the "
+            "car (see ADR 0022)."
+        )
+    if shifted:
+        notes += f" Driver inputs shifted ({', '.join(shifted)}): part of this may be the driver."
+    return notes
+
+
 def _not_estimable(used: int, excluded: int) -> EvaluateResponse:
     return EvaluateResponse(
         decision=Decision.inconclusive,
@@ -179,12 +193,9 @@ def evaluate(request: EvaluateRequest) -> EvaluateResponse:
         used, request.predictions, test.level, {result.channel for result in results}
     )
     judgement = _judge(primary, test.better, test.channel, guardrails)
-    reason = judgement.reason
-    if shifted:
-        reason += f" Driver inputs shifted ({', '.join(shifted)}): part of this may be the driver."
     return EvaluateResponse(
         decision=judgement.decision,
-        reason=reason,
+        reason=judgement.reason + _notes(primary, shifted),
         results=results + prediction_results,
         guardrails=guardrails,
         prediction_hits=hits,

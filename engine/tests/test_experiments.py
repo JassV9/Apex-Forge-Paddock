@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
-from simulation import BASELINE, simulate_abab
+from simulation import BASELINE, simulate_abab, simulate_restarted_abab
 
 from paddock_engine.app import create_app
 from paddock_engine.contracts.evaluate_request_schema import EvaluateRequest
@@ -125,6 +125,30 @@ def test_a_shift_in_driver_inputs_is_reported_with_the_verdict() -> None:
     assert THROTTLE in verdict.reason
     assert verdict.decision is Decision.accepted  # reported, not overruled: the driver decides
     assert [r.channel for r in verdict.results if r.role is Role.driver_input] == [THROTTLE]
+
+
+def test_a_covariate_left_out_is_named_in_the_reason_and_the_interval_stays_narrow() -> None:
+    """Experiment 6 came back +-450 ms wide because fuel and time were both in the model."""
+    rows = simulate_restarted_abab(np.random.default_rng(2), effect=0.0)
+    passes = [
+        {
+            "corner": row.corner,
+            "arm": "baseline" if row.arm == BASELINE else "variant",
+            "block": row.block + 1,
+            "lap": row.lap,
+            "metrics": {TIME: row.value},
+            "covariates": dict(row.covariates),
+        }
+        for row in rows
+    ]
+
+    verdict = judge(passes)
+
+    (primary,) = [r for r in verdict.results if r.role is Role.primary]
+    assert primary.ci_high - primary.ci_low < 0.03
+    assert verdict.decision is Decision.rejected  # inside the 5 ms band: nothing to gain
+    assert "Not adjusted for fuel_l" in verdict.reason
+    assert "ADR 0022" in verdict.reason
 
 
 def test_steady_driver_inputs_are_not_called_adaptation() -> None:

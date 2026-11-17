@@ -42,6 +42,7 @@ class Effect:
     corners: int
     sigma_residual: float  # pass-to-pass scatter within a corner, from the model
     covariates: list[str]  # covariates the model adjusted for
+    dropped_covariates: list[str]  # left out: too tangled with the arm or each other (ADR 0022)
 
 
 def _clusters(observations: Sequence[Observation]) -> list[list[IntArray]]:
@@ -124,6 +125,7 @@ def estimate_effects(
                 corners=int(design.groups.max()) + 1,
                 sigma_residual=fit.sigma_residual,
                 covariates=design.covariates,
+                dropped_covariates=design.dropped,
             )
         )
     return effects

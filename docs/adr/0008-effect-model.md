@@ -35,9 +35,12 @@ components, then ordinary least squares on quasi-demeaned data
 takes microseconds. A test checks it against statsmodels' `MixedLM` (REML): the coefficients
 agree to five decimals. statsmodels is a test dependency only.
 
-**Covariates.** Fuel, tyre temperature and time in session enter when every pass has them,
-they vary within corners, and they are not a near copy of another covariate (fuel and time are
-almost collinear; one is kept). The effect row records which were used.
+**Covariates.** Fuel, tyre temperature and time in session enter when every pass has them
+and they vary within corners. Amended by [ADR 0022](0022-covariates-the-arm-can-be-told-from.md):
+a covariate is left out while any column of the design (arms and covariates) has a variance
+inflation factor above 10, which replaces the first version's "not a near copy of another
+covariate" (correlation above 0.98) after a restarted experiment showed that rule was too
+weak. The effect row records which were used and which were left out.
 
 **Interval.** Block bootstrap over laps within run blocks, with two corrections:
 

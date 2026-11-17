@@ -12,9 +12,32 @@ import (
 // lapsPerBlockCode keeps laps of different blocks apart in the engine's lap numbers.
 const lapsPerBlockCode = 1000
 
+// lapKey identifies a lap that was driven: a block continued in a new session (the game was
+// restarted) has more than one lap 1, and passes of different laps do not share their errors.
+type lapKey struct{ block, session, lap int }
+
+// lapCodes numbers the laps of each block 1, 2, ... in the order the passes arrive.
+type lapCodes struct {
+	codes    map[lapKey]int
+	perBlock map[int]int
+}
+
+func newLapCodes() *lapCodes {
+	return &lapCodes{codes: map[lapKey]int{}, perBlock: map[int]int{}}
+}
+
+func (l *lapCodes) of(block, session, lap int) int {
+	key := lapKey{block, session, lap}
+	if _, known := l.codes[key]; !known {
+		l.perBlock[block]++
+		l.codes[key] = block*lapsPerBlockCode + l.perBlock[block]
+	}
+	return l.codes[key]
+}
+
 // Push laps only: lap 0 of a block is the out-lap, on cold tyres, and is never compared.
 const blockPassesSQL = `
-SELECT c.number, a.is_baseline, b."order", p.block_lap, p.features->>'speed_class',
+SELECT c.number, a.is_baseline, b."order", p.session_id, p.block_lap, p.features->>'speed_class',
        p.features->'metrics', p.fuel_l,
        (SELECT avg(core) FROM unnest(p.tyre_core_c) AS core),
        EXTRACT(EPOCH FROM p.t_start - s.started_at)::float8
@@ -30,15 +53,16 @@ ORDER BY p.t_start, p.id`
 // the engine to compute their features.
 func blockPasses(ctx context.Context, q querier, id int64) ([]contracts.EvaluatePass, int, error) {
 	pending := 0
+	laps := newLapCodes()
 	passes, err := queryAll(ctx, q, blockPassesSQL, func(rows *sql.Rows) (contracts.EvaluatePass, error) {
 		pass := contracts.EvaluatePass{Covariates: contracts.EvaluatePassCovariates{}}
 		var baseline bool
-		var lap int
+		var session, lap int
 		var speedClass sql.NullString
 		var metrics []byte
 		var fuel, tyreCore sql.NullFloat64
 		var elapsed float64
-		err := rows.Scan(&pass.Corner, &baseline, &pass.Block, &lap, &speedClass, &metrics,
+		err := rows.Scan(&pass.Corner, &baseline, &pass.Block, &session, &lap, &speedClass, &metrics,
 			&fuel, &tyreCore, &elapsed)
 		if err != nil {
 			return pass, err
@@ -51,7 +75,7 @@ func blockPasses(ctx context.Context, q querier, id int64) ([]contracts.Evaluate
 		if baseline {
 			pass.Arm = contracts.EvaluatePassArmBaseline
 		}
-		lapCode := pass.Block*lapsPerBlockCode + lap
+		lapCode := laps.of(pass.Block, session, lap)
 		pass.Lap = &lapCode
 		if speedClass.Valid {
 			class := contracts.EvaluatePassSpeedClass(speedClass.String)

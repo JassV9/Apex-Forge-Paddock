@@ -4,6 +4,15 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Fix, engine and core (ADR 0022): AI experiment 6 was judged inconclusive with corner time
+  +-450 ms because the game was restarted mid-experiment. A new session resets the clock and
+  the tank, so time in session and fuel (correlated 0.94, under the old 0.98 limit) were both
+  entangled with the arm, and the bootstrap fit swung wildly (the passes themselves were clean,
+  no outliers). A covariate is now left out while any design column has a variance inflation
+  above 10; the verdict's reason names what was left out. A replay of experiment 6's rows gives
+  +4.6 ms [+0.2, +9.1], inconclusive. Core also numbers a block's laps per session, so a lap
+  repeated after a restart is no longer merged with the interrupted one. Past verdicts are not
+  re-judged. Unverified in game.
 - Base setup from the car's own measurements (ADR 0018): engine `POST /base-setup` takes each
   change measured faster on corner time (interval wholly below zero, even inside the 5 ms
   band), one per item, never a prior, a non-linear row, a guardrail measured worse or a

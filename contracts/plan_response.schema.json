@@ -12,7 +12,11 @@
     "blocks",
     "passes_per_arm",
     "mde_detect",
-    "mde_decide"
+    "mde_decide",
+    "sigma_lap",
+    "sigma_lap_source",
+    "mde_target",
+    "target_met"
   ],
   "properties": {
     "sigma": {
@@ -81,6 +85,29 @@
       "description": "Smallest effect that also clears the equivalence band with 80 % power: what a decision needs.",
       "type": "number",
       "minimum": 0
+    },
+    "sigma_lap": {
+      "description": "Scatter of whole laps: the error a lap shares across all its corners, in the primary channel's unit.",
+      "type": "number",
+      "minimum": 0
+    },
+    "sigma_lap_source": {
+      "description": "planned: from push laps of earlier run plans on the baseline. free: from all its laps (fewer than six planned ones). none: too few laps to tell, assumed 0.",
+      "type": "string",
+      "enum": [
+        "planned",
+        "free",
+        "none"
+      ]
+    },
+    "mde_target": {
+      "description": "The decision effect the plan was sized for, a whole number of equivalence bands: four, or the fewest that cover what four blocks decide on pass scatter alone.",
+      "type": "number",
+      "minimum": 0
+    },
+    "target_met": {
+      "description": "false: even the longest plan allowed decides only mde_decide, more than mde_target.",
+      "type": "boolean"
     }
   }
 }

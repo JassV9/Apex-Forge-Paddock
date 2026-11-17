@@ -20,6 +20,15 @@ class PlanPass(BaseModel):
     )
     corner: int = Field(..., ge=1)
     value: float = Field(..., description="Value of the primary channel.")
+    lap: int | None = Field(
+        None,
+        description="Code of the lap the pass was driven on, distinct per lap; passes of one lap share its error. Absent on out-laps and when the game lap is not known.",
+        ge=1,
+    )
+    planned: bool | None = Field(
+        None,
+        description="The pass was on a push lap of a run plan's block, not on free or calibration laps.",
+    )
 
 
 class Better(StrEnum):

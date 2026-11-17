@@ -124,7 +124,8 @@ experiment 7, and from +-0.70 to +-0.21 degrees on experiment 10.
 
 - **Noise shared within a lap.** On the FH26, the mean residual of a lap ranges from about -35 to
   +31 ms over the 14 corners. That error is common to every corner, so no corner weighting can
-  remove it, and it is now most of what is left of the FH26 interval.
+  remove it, and it is now most of what is left of the FH26 interval. The planner counts it since
+  [ADR 0025](0025-finished-laps-and-lap-noise.md).
 - Per-speed-class effects with one or two corners (for example "slow" on the FH26, 11 passes)
   are as wide as before (+-3.4 s): with one corner there is nothing to weigh.
 - A corner whose scatter is changed by the setup itself counts less for it. That is honest about

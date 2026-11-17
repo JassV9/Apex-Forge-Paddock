@@ -22,7 +22,7 @@ and starts the best-ranked experiment with the AI driving. Core's background loo
 | Newest experiment | What the program does |
 | --- | --- |
 | running, laps still missing | waits; its message says block and lap |
-| running, every block driven | asks the engine for the verdict (`evaluate`) |
+| running, every block driven | asks the engine for the verdict (`evaluate`); a lap counts once it is finished ([ADR 0025](0025-finished-laps-and-lap-noise.md)) |
 | inconclusive, whole interval on the better side, not extended yet | extends it once |
 | inconclusive otherwise | keeps the baseline (`revert`) |
 | rejected | puts the baseline back (`revert`) |
@@ -67,7 +67,9 @@ started on an uncalibrated car will have its laps rejected by the agent's watchd
 
 - A car can be trained unattended: about 40 minutes per experiment on a 2:15 lap.
 - Programs only run while core runs; a program whose experiment the agent cannot drive (game
-  closed, car stuck three times) waits on that experiment until the driver aborts it.
+  closed, car stuck three times) waits on that experiment until the driver aborts it. Amended by
+  [ADR 0025](0025-finished-laps-and-lap-noise.md): when that happens on the last lap of the last
+  block, the lap counts after 15 minutes without a pass and the program judges what was driven.
 
 ## Not verified
 

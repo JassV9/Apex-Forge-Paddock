@@ -135,6 +135,12 @@ class SigmaSource(StrEnum):
     assumed = "assumed"
 
 
+class SigmaLapSource(StrEnum):
+    planned = "planned"
+    free = "free"
+    none = "none"
+
+
 class PlanSummary(BaseModel):
     """
     What the plan can answer, computed before driving.
@@ -148,6 +154,10 @@ class PlanSummary(BaseModel):
     passes_per_arm: int = Field(..., ge=1)
     mde_detect: float = Field(..., ge=0.0)
     mde_decide: float = Field(..., ge=0.0)
+    sigma_lap: float | None = Field(None, ge=0.0)
+    sigma_lap_source: SigmaLapSource | None = None
+    mde_target: float | None = Field(None, ge=0.0)
+    target_met: bool | None = None
 
 
 class ExperimentBlock(BaseModel):
@@ -162,7 +172,9 @@ class ExperimentBlock(BaseModel):
     label: str = Field(..., description="Code name of the setup to load.")
     laps_target: int = Field(..., ge=0)
     laps_done: int = Field(
-        ..., description="Push laps driven in this block (the out-lap does not count).", ge=0
+        ...,
+        description="Push laps finished in this block: the last one counts once it reached every corner, the next block started or nothing arrived for 15 minutes (the out-lap does not count).",
+        ge=0,
     )
     passes: int = Field(..., description="Corner passes recorded in this block.", ge=0)
 

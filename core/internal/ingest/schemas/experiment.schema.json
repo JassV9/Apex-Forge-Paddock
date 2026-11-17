@@ -321,6 +321,25 @@
         "mde_decide": {
           "type": "number",
           "minimum": 0
+        },
+        "sigma_lap": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sigma_lap_source": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "free",
+            "none"
+          ]
+        },
+        "mde_target": {
+          "type": "number",
+          "minimum": 0
+        },
+        "target_met": {
+          "type": "boolean"
         }
       }
     },
@@ -350,7 +369,7 @@
           "minimum": 0
         },
         "laps_done": {
-          "description": "Push laps driven in this block (the out-lap does not count).",
+          "description": "Push laps finished in this block: the last one counts once it reached every corner, the next block started or nothing arrived for 15 minutes (the out-lap does not count).",
           "type": "integer",
           "minimum": 0
         },

@@ -1166,6 +1166,11 @@ export interface components {
       passes_per_arm: number;
       mde_detect: number;
       mde_decide: number;
+      sigma_lap?: number;
+      /** @enum {string} */
+      sigma_lap_source?: "planned" | "free" | "none";
+      mde_target?: number;
+      target_met?: boolean;
     };
     /**
      * ExperimentBlock
@@ -1176,7 +1181,7 @@ export interface components {
       /** @description Code name of the setup to load. */
       label: string;
       laps_target: number;
-      /** @description Push laps driven in this block (the out-lap does not count). */
+      /** @description Push laps finished in this block: the last one counts once it reached every corner, the next block started or nothing arrived for 15 minutes (the out-lap does not count). */
       laps_done: number;
       /** @description Corner passes recorded in this block. */
       passes: number;

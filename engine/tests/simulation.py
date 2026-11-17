@@ -23,8 +23,10 @@ def simulate_abab(
     sigma: float | Sequence[float] = SIGMA_S,
     lap_sigma: float = 0.0,
     drift_per_lap: float = 0.0,
+    blocks: int = 4,
 ) -> list[Observation]:
-    """Four blocks A, B, A, B. With 3 laps per block each arm has 6 passes per corner.
+    """Blocks A, B, A, B (more pairs with `blocks`). With 3 laps per block and four blocks each
+    arm has 6 passes per corner.
 
     `sigma` is one scatter for every corner or one per corner; `lap_sigma` is noise shared by
     all passes of a lap; `drift_per_lap` is a steady change over the session (track rubbering
@@ -34,7 +36,7 @@ def simulate_abab(
     levels = rng.uniform(3.0, 11.0, corners)
     observations = []
     lap = 0
-    for block, arm in enumerate([BASELINE, VARIANT, BASELINE, VARIANT]):
+    for block, arm in enumerate([BASELINE, VARIANT] * (blocks // 2)):
         for _ in range(laps_per_block):
             lap += 1
             lap_error = rng.normal(0.0, lap_sigma) if lap_sigma > 0 else 0.0

@@ -71,7 +71,10 @@ corner for corner time): positive, negative, negligible or inconclusive
 (`2.8 x sigma x sqrt(2 / (n x k))`, 14 ms at n = 6, k = 10) answers the first. Clearing the
 equivalence band as well needs a larger effect or more laps: at this budget a 20 ms effect is
 decided in about 7 experiments out of 10. The planner has to show both numbers, and an
-experiment that detects but does not decide is extended or reverted, never accepted.
+experiment that detects but does not decide is extended or reverted, never accepted. Amended by
+[ADR 0025](0025-finished-laps-and-lap-noise.md): both formulas take the noise a lap shares
+across its corners into account, and the planner adds block pairs (up to eight blocks) until a
+target of four bands is decided, or says it cannot be.
 
 ## Consequences
 

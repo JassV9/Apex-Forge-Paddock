@@ -2267,7 +2267,9 @@ type ExperimentBlock struct {
 	// Code name of the setup to load.
 	Label string `json:"label"`
 
-	// Push laps driven in this block (the out-lap does not count).
+	// Push laps finished in this block: the last one counts once it reached every
+	// corner, the next block started or nothing arrived for 15 minutes (the out-lap
+	// does not count).
 	LapsDone int `json:"laps_done"`
 
 	// LapsTarget corresponds to the JSON schema field "laps_target".
@@ -4958,6 +4960,14 @@ type PlanPass struct {
 	// Corner corresponds to the JSON schema field "corner".
 	Corner int `json:"corner"`
 
+	// Code of the lap the pass was driven on, distinct per lap; passes of one lap
+	// share its error. Absent on out-laps and when the game lap is not known.
+	Lap *int `json:"lap,omitempty,omitzero"`
+
+	// The pass was on a push lap of a run plan's block, not on free or calibration
+	// laps.
+	Planned *bool `json:"planned,omitempty,omitzero"`
+
 	// Value of the primary channel.
 	Value float64 `json:"value"`
 }
@@ -4981,6 +4991,9 @@ func (j *PlanPass) UnmarshalJSON(value []byte) error {
 	}
 	if 1 > plain.Corner {
 		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if plain.Lap != nil && 1 > *plain.Lap {
+		return fmt.Errorf("field %s: must be >= %v", "lap", 1)
 	}
 	*j = PlanPass(plain)
 	return nil
@@ -5051,15 +5064,32 @@ type PlanResponse struct {
 	// 80 % power.
 	MdeDetect float64 `json:"mde_detect"`
 
+	// The decision effect the plan was sized for, a whole number of equivalence
+	// bands: four, or the fewest that cover what four blocks decide on pass scatter
+	// alone.
+	MdeTarget float64 `json:"mde_target"`
+
 	// Passes per arm in each corner if the plan is driven fully.
 	PassesPerArm int `json:"passes_per_arm"`
 
 	// Pass-to-pass scatter of the primary channel per corner.
 	Sigma float64 `json:"sigma"`
 
+	// Scatter of whole laps: the error a lap shares across all its corners, in the
+	// primary channel's unit.
+	SigmaLap float64 `json:"sigma_lap"`
+
+	// planned: from push laps of earlier run plans on the baseline. free: from all
+	// its laps (fewer than six planned ones). none: too few laps to tell, assumed 0.
+	SigmaLapSource PlanResponseSigmaLapSource `json:"sigma_lap_source"`
+
 	// measured: from the baseline passes. assumed: no usable passes, a default was
 	// used.
 	SigmaSource PlanResponseSigmaSource `json:"sigma_source"`
+
+	// false: even the longest plan allowed decides only mde_decide, more than
+	// mde_target.
+	TargetMet bool `json:"target_met"`
 }
 
 type PlanResponseBlocksElemArm string
@@ -5089,6 +5119,38 @@ func (j *PlanResponseBlocksElemArm) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_PlanResponseBlocksElemArm, v)
 	}
 	*j = PlanResponseBlocksElemArm(v)
+	return nil
+}
+
+type PlanResponseSigmaLapSource string
+
+const PlanResponseSigmaLapSourceFree PlanResponseSigmaLapSource = "free"
+const PlanResponseSigmaLapSourceNone PlanResponseSigmaLapSource = "none"
+const PlanResponseSigmaLapSourcePlanned PlanResponseSigmaLapSource = "planned"
+
+var enumValues_PlanResponseSigmaLapSource = []interface{}{
+	"planned",
+	"free",
+	"none",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PlanResponseSigmaLapSource) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_PlanResponseSigmaLapSource {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_PlanResponseSigmaLapSource, v)
+	}
+	*j = PlanResponseSigmaLapSource(v)
 	return nil
 }
 
@@ -5140,14 +5202,26 @@ func (j *PlanResponse) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["mde_detect"]; raw != nil && !ok {
 		return fmt.Errorf("field mde_detect in PlanResponse: required")
 	}
+	if _, ok := raw["mde_target"]; raw != nil && !ok {
+		return fmt.Errorf("field mde_target in PlanResponse: required")
+	}
 	if _, ok := raw["passes_per_arm"]; raw != nil && !ok {
 		return fmt.Errorf("field passes_per_arm in PlanResponse: required")
 	}
 	if _, ok := raw["sigma"]; raw != nil && !ok {
 		return fmt.Errorf("field sigma in PlanResponse: required")
 	}
+	if _, ok := raw["sigma_lap"]; raw != nil && !ok {
+		return fmt.Errorf("field sigma_lap in PlanResponse: required")
+	}
+	if _, ok := raw["sigma_lap_source"]; raw != nil && !ok {
+		return fmt.Errorf("field sigma_lap_source in PlanResponse: required")
+	}
 	if _, ok := raw["sigma_source"]; raw != nil && !ok {
 		return fmt.Errorf("field sigma_source in PlanResponse: required")
+	}
+	if _, ok := raw["target_met"]; raw != nil && !ok {
+		return fmt.Errorf("field target_met in PlanResponse: required")
 	}
 	type Plain PlanResponse
 	var plain Plain
@@ -5160,11 +5234,17 @@ func (j *PlanResponse) UnmarshalJSON(value []byte) error {
 	if 0 > plain.MdeDetect {
 		return fmt.Errorf("field %s: must be >= %v", "mde_detect", 0)
 	}
+	if 0 > plain.MdeTarget {
+		return fmt.Errorf("field %s: must be >= %v", "mde_target", 0)
+	}
 	if 1 > plain.PassesPerArm {
 		return fmt.Errorf("field %s: must be >= %v", "passes_per_arm", 1)
 	}
 	if 0 > plain.Sigma {
 		return fmt.Errorf("field %s: must be >= %v", "sigma", 0)
+	}
+	if 0 > plain.SigmaLap {
+		return fmt.Errorf("field %s: must be >= %v", "sigma_lap", 0)
 	}
 	*j = PlanResponse(plain)
 	return nil
@@ -5178,14 +5258,58 @@ type PlanSummary struct {
 	// MdeDetect corresponds to the JSON schema field "mde_detect".
 	MdeDetect float64 `json:"mde_detect"`
 
+	// MdeTarget corresponds to the JSON schema field "mde_target".
+	MdeTarget *float64 `json:"mde_target,omitempty,omitzero"`
+
 	// PassesPerArm corresponds to the JSON schema field "passes_per_arm".
 	PassesPerArm int `json:"passes_per_arm"`
 
 	// Sigma corresponds to the JSON schema field "sigma".
 	Sigma float64 `json:"sigma"`
 
+	// SigmaLap corresponds to the JSON schema field "sigma_lap".
+	SigmaLap *float64 `json:"sigma_lap,omitempty,omitzero"`
+
+	// SigmaLapSource corresponds to the JSON schema field "sigma_lap_source".
+	SigmaLapSource *PlanSummarySigmaLapSource `json:"sigma_lap_source,omitempty,omitzero"`
+
 	// SigmaSource corresponds to the JSON schema field "sigma_source".
 	SigmaSource PlanSummarySigmaSource `json:"sigma_source"`
+
+	// TargetMet corresponds to the JSON schema field "target_met".
+	TargetMet *bool `json:"target_met,omitempty,omitzero"`
+}
+
+type PlanSummarySigmaLapSource string
+
+const PlanSummarySigmaLapSourceFree PlanSummarySigmaLapSource = "free"
+const PlanSummarySigmaLapSourceNone PlanSummarySigmaLapSource = "none"
+const PlanSummarySigmaLapSourcePlanned PlanSummarySigmaLapSource = "planned"
+
+var enumValues_PlanSummarySigmaLapSource = []interface{}{
+	"planned",
+	"free",
+	"none",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PlanSummarySigmaLapSource) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_PlanSummarySigmaLapSource {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_PlanSummarySigmaLapSource, v)
+	}
+	*j = PlanSummarySigmaLapSource(v)
+	return nil
 }
 
 type PlanSummarySigmaSource string
@@ -5250,11 +5374,17 @@ func (j *PlanSummary) UnmarshalJSON(value []byte) error {
 	if 0 > plain.MdeDetect {
 		return fmt.Errorf("field %s: must be >= %v", "mde_detect", 0)
 	}
+	if plain.MdeTarget != nil && 0 > *plain.MdeTarget {
+		return fmt.Errorf("field %s: must be >= %v", "mde_target", 0)
+	}
 	if 1 > plain.PassesPerArm {
 		return fmt.Errorf("field %s: must be >= %v", "passes_per_arm", 1)
 	}
 	if 0 > plain.Sigma {
 		return fmt.Errorf("field %s: must be >= %v", "sigma", 0)
+	}
+	if plain.SigmaLap != nil && 0 > *plain.SigmaLap {
+		return fmt.Errorf("field %s: must be >= %v", "sigma_lap", 0)
 	}
 	*j = PlanSummary(plain)
 	return nil

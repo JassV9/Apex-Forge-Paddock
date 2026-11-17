@@ -49,6 +49,22 @@ export function SetupsSection({ experiment }: { experiment: Experiment }) {
   );
 }
 
+type Plan = NonNullable<Experiment["plan"]>;
+
+/** Whole-lap scatter and a target the plan cannot reach (ADR 0025); plans made before say nothing. */
+function lapNote(plan: Plan): string {
+  if (plan.sigma_lap_source === undefined) return "";
+  const laps =
+    plan.sigma_lap_source === "none" || plan.sigma_lap === undefined
+      ? " Whole laps: not measured."
+      : ` Whole laps scatter ${plan.sigma_lap.toFixed(3)} (${plan.sigma_lap_source} laps).`;
+  const short =
+    plan.target_met === false && plan.mde_target !== undefined
+      ? ` Short of the ${plan.mde_target.toFixed(3)} it was sized for: this is the longest plan.`
+      : "";
+  return laps + short;
+}
+
 function PlanSummary({ experiment }: { experiment: Experiment }) {
   const plan = experiment.plan;
   if (plan === undefined) return <p>Not planned yet.</p>;
@@ -56,7 +72,7 @@ function PlanSummary({ experiment }: { experiment: Experiment }) {
     <p>
       Scatter {plan.sigma.toFixed(3)} ({plan.sigma_source}), {plan.passes_per_arm} passes per setup
       and corner. Detects effects of {plan.mde_detect.toFixed(3)} or more; decides effects of{" "}
-      {plan.mde_decide.toFixed(3)} or more.
+      {plan.mde_decide.toFixed(3)} or more.{lapNote(plan)}
     </p>
   );
 }

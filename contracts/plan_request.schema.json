@@ -49,6 +49,15 @@
           "value": {
             "description": "Value of the primary channel.",
             "type": "number"
+          },
+          "lap": {
+            "description": "Code of the lap the pass was driven on, distinct per lap; passes of one lap share its error. Absent on out-laps and when the game lap is not known.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "planned": {
+            "description": "The pass was on a push lap of a run plan's block, not on free or calibration laps.",
+            "type": "boolean"
           }
         }
       }

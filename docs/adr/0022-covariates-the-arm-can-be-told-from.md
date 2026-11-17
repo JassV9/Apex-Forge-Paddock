@@ -91,5 +91,6 @@ well as by lap (`core/internal/experiments/verdict.go`).
   not track the arm. Needs a change in the agent and a run in the game; not done.
 - **A lap counts as driven when its first pass arrives** (`laps_done` is the highest
   `block_lap`), so core judged experiment 6 about four corners into the last lap (203 of 208
-  passes). That lap is incomplete for the design, though not what widened the interval.
+  passes). That lap is incomplete for the design, though not what widened the interval. Fixed
+  in [ADR 0025](0025-finished-laps-and-lap-noise.md): a lap counts once it is finished.
 - Everything above is unverified in the game; the replay uses rows the game produced.

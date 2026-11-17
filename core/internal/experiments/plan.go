@@ -22,28 +22,79 @@ func planRequest(ctx context.Context, q querier, exp record, lapsPerBlock int) (
 		return request, fmt.Errorf("read corners of track %d: %w", exp.trackID, err)
 	}
 	request.Corners = corners
-	request.BaselinePasses, err = queryAll(ctx, q,
-		`SELECT c.number, (p.features->'metrics'->>$4)::float8
-		 FROM corner_pass p
-		 JOIN corner c ON c.id = p.corner_id
-		 JOIN session s ON s.id = p.session_id
-		 WHERE s.car_id = $1 AND s.track_id = $2 AND p.setup_version_id = $3 AND p.valid
-		   AND p.features->'metrics'->>$4 IS NOT NULL`,
-		func(rows *sql.Rows) (contracts.PlanPass, error) {
-			var pass contracts.PlanPass
-			return pass, rows.Scan(&pass.Corner, &pass.Value)
-		}, exp.carID, exp.trackID, exp.baselineVersion, exp.test.Channel)
+	request.BaselinePasses, err = baselinePasses(ctx, q, exp)
 	if err != nil {
 		return request, fmt.Errorf("read baseline passes of experiment %d: %w", exp.id, err)
 	}
 	return request, nil
 }
 
+// Every valid pass on the baseline setup, with the lap it was driven on: session, game lap and
+// block tell laps apart. An out-lap (block lap 0) is driven on cold tyres and gets no lap.
+const baselinePassesSQL = `
+SELECT c.number, (p.features->'metrics'->>$4)::float8, p.session_id, p.lap_in_session,
+       COALESCE(p.block_id, 0), p.block_lap
+FROM corner_pass p
+JOIN corner c ON c.id = p.corner_id
+JOIN session s ON s.id = p.session_id
+WHERE s.car_id = $1 AND s.track_id = $2 AND p.setup_version_id = $3 AND p.valid
+  AND p.features->'metrics'->>$4 IS NOT NULL
+ORDER BY p.t_start, p.id`
+
+// baselineLap identifies one lap of the baseline's passes.
+type baselineLap struct{ session, gameLap, block int64 }
+
+func baselinePasses(ctx context.Context, q querier, exp record) ([]contracts.PlanPass, error) {
+	codes := map[baselineLap]int{}
+	return queryAll(ctx, q, baselinePassesSQL, func(rows *sql.Rows) (contracts.PlanPass, error) {
+		var pass contracts.PlanPass
+		var key baselineLap
+		var gameLap, blockLap sql.NullInt64
+		if err := rows.Scan(&pass.Corner, &pass.Value, &key.session, &gameLap, &key.block, &blockLap); err != nil {
+			return pass, err
+		}
+		if !gameLap.Valid || (key.block != 0 && blockLap.Int64 < 1) {
+			return pass, nil
+		}
+		key.gameLap = gameLap.Int64
+		if _, known := codes[key]; !known {
+			codes[key] = len(codes) + 1
+		}
+		code, planned := codes[key], key.block != 0
+		pass.Lap, pass.Planned = &code, &planned
+		return pass, nil
+	}, exp.carID, exp.trackID, exp.baselineVersion, exp.test.Channel)
+}
+
+// planReason is the ledger's line for a new plan: its length, what it decides, and when even
+// the longest plan allowed falls short of what it was sized for (ADR 0025).
+func planReason(plan contracts.PlanResponse, channel string) string {
+	laps := 0
+	if len(plan.Blocks) > 0 {
+		laps = plan.Blocks[0].LapsTarget
+	}
+	reason := fmt.Sprintf("%d blocks of %d laps; decides effects of %.3g or more on %s (scatter %s",
+		len(plan.Blocks), laps, plan.MdeDecide, channel, plan.SigmaSource)
+	if plan.SigmaLapSource == contracts.PlanResponseSigmaLapSourceNone {
+		reason += "; lap scatter not measured)."
+	} else {
+		reason += fmt.Sprintf("; whole laps scatter %.3g, from %s laps).", plan.SigmaLap, plan.SigmaLapSource)
+	}
+	if !plan.TargetMet {
+		reason += fmt.Sprintf(" Short of the %.3g it was sized for: %d blocks is the longest plan.",
+			plan.MdeTarget, len(plan.Blocks))
+	}
+	return reason
+}
+
 // savePlan stores the engine's run plan: its blocks and what it can answer.
 func savePlan(ctx context.Context, tx *sql.Tx, id int64, plan contracts.PlanResponse) error {
+	lapSource := contracts.PlanSummarySigmaLapSource(plan.SigmaLapSource)
 	summary, err := json.Marshal(contracts.PlanSummary{
 		Sigma: plan.Sigma, SigmaSource: contracts.PlanSummarySigmaSource(plan.SigmaSource),
 		PassesPerArm: plan.PassesPerArm, MdeDetect: plan.MdeDetect, MdeDecide: plan.MdeDecide,
+		SigmaLap: &plan.SigmaLap, SigmaLapSource: &lapSource, MdeTarget: &plan.MdeTarget,
+		TargetMet: &plan.TargetMet,
 	})
 	if err != nil {
 		return fmt.Errorf("encode plan summary: %w", err)

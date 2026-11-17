@@ -40,7 +40,7 @@ const blockPassesSQL = `
 SELECT c.number, a.is_baseline, b."order", p.session_id, p.block_lap, p.features->>'speed_class',
        p.features->'metrics', p.fuel_l,
        (SELECT avg(core) FROM unnest(p.tyre_core_c) AS core),
-       EXTRACT(EPOCH FROM p.t_start - s.started_at)::float8
+       EXTRACT(EPOCH FROM p.t_start - s.started_at)::float8, p.ers_charge_start
 FROM corner_pass p
 JOIN run_block b ON b.id = p.block_id
 JOIN experiment_arm a ON a.id = b.arm_id
@@ -60,10 +60,10 @@ func blockPasses(ctx context.Context, q querier, id int64) ([]contracts.Evaluate
 		var session, lap int
 		var speedClass sql.NullString
 		var metrics []byte
-		var fuel, tyreCore sql.NullFloat64
+		var fuel, tyreCore, ersStart sql.NullFloat64
 		var elapsed float64
 		err := rows.Scan(&pass.Corner, &baseline, &pass.Block, &session, &lap, &speedClass, &metrics,
-			&fuel, &tyreCore, &elapsed)
+			&fuel, &tyreCore, &elapsed, &ersStart)
 		if err != nil {
 			return pass, err
 		}
@@ -81,7 +81,7 @@ func blockPasses(ctx context.Context, q querier, id int64) ([]contracts.Evaluate
 			class := contracts.EvaluatePassSpeedClass(speedClass.String)
 			pass.SpeedClass = &class
 		}
-		addCovariates(pass.Covariates, fuel, tyreCore, elapsed)
+		addCovariates(pass.Covariates, fuel, tyreCore, ersStart, elapsed)
 		return pass, json.Unmarshal(metrics, &pass.Metrics)
 	}, id)
 	if err != nil {
@@ -91,14 +91,18 @@ func blockPasses(ctx context.Context, q querier, id int64) ([]contracts.Evaluate
 }
 
 // addCovariates fills in the conditions the engine adjusts for. One that was not recorded is
-// left out; the engine only uses covariates every pass has.
-func addCovariates(covariates contracts.EvaluatePassCovariates, fuel, tyreCore sql.NullFloat64, elapsed float64) {
+// left out; the engine only uses covariates every pass has. A car without a hybrid battery has
+// no battery charge (docs/adr/0024-ers-state-per-pass.md).
+func addCovariates(covariates contracts.EvaluatePassCovariates, fuel, tyreCore, ersStart sql.NullFloat64, elapsed float64) {
 	covariates["time_in_session_s"] = elapsed
 	if fuel.Valid {
 		covariates["fuel_l"] = fuel.Float64
 	}
 	if tyreCore.Valid {
 		covariates["tyre_core_c"] = tyreCore.Float64
+	}
+	if ersStart.Valid {
+		covariates["ers_charge_start"] = ersStart.Float64
 	}
 }
 

@@ -9,8 +9,8 @@ local corners = require("core.corners")
 local recorder = {}
 recorder.__index = recorder
 
--- sample fields copied into column buffers
-recorder.FIELDS = channels.names
+-- sample fields copied into column buffers: the spool columns and the summarised fields
+recorder.FIELDS = channels.recorded
 
 local MAX_SAMPLES = 2400   -- 40 s at 60 Hz, far more than any corner zone
 local MIN_DT = 0.9 / 60    -- record at most ~60 samples per second (0.9: frame-time jitter)

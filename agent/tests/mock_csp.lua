@@ -42,6 +42,8 @@ M.car = {
   wheelsOutside = 0, rideHeight = { [0] = 0.02, 0.04 }, isInPitlane = false, isInPit = false,
   isAIControlled = false, resetCounter = 0, tractionType = 0, compoundIndex = 0,
   fuel = 42.5, lapCount = 0, damage = { [0] = 0, 0, 0, 0, 0 },
+  -- KERS/ERS as ac.StateCar names them; a test sets kersPresent for a hybrid car
+  kersPresent = false, kersCharge = 0, kersInput = 0,
 }
 M.sim = {
   trackLengthM = M.L, isPaused = false, isReplayActive = false, raceSessionType = 2,

@@ -35,6 +35,11 @@ local function apply(s)
   end
   c.wheelsOutside = s.out
   c.rideHeight[0], c.rideHeight[1] = s.rh_f, s.rh_r
+  if c.kersPresent then
+    -- a hybrid deploys on full throttle and harvests under braking
+    c.kersInput = s.gas >= 0.99 and 1 or 0
+    c.kersCharge = math.clamp(c.kersCharge + (s.brake * 0.02 - c.kersInput * 0.01) * DT, 0, 1)
+  end
 end
 
 local function frame()

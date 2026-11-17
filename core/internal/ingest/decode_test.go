@@ -109,6 +109,17 @@ func TestDecodeRejects(t *testing.T) {
 			wantReason: ReasonSchema,
 		},
 		{
+			name:       "battery without its deployment",
+			line:       strings.Replace(pass, `"seq":1,`, `"seq":1,"ers":{"charge_start":0.8,"charge_end":0.7},`, 1),
+			wantReason: ReasonSchema,
+		},
+		{
+			name: "battery field outside the contract",
+			line: strings.Replace(pass, `"seq":1,`,
+				`"seq":1,"ers":{"charge_start":0.8,"charge_end":0.7,"deploy_mean":0.2,"mode":3},`, 1),
+			wantReason: ReasonSchema,
+		},
+		{
 			name:       "column length differs from n",
 			line:       shortenColumn(t, pass, "rh_r"),
 			wantReason: ReasonColumnLength,

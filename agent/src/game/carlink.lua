@@ -13,6 +13,7 @@ local sample = {
   sr_fl = 0, sr_fr = 0, sr_rl = 0, sr_rr = 0,
   load_fl = 0, load_fr = 0, load_rl = 0, load_rr = 0,
   out = 0, rh_f = 0, rh_r = 0,
+  kers_charge = 0, kers_input = 0,
 }
 carlink.sample = sample
 
@@ -34,7 +35,15 @@ function carlink.read(car, trackLength, t)
   s.load_fl, s.load_fr, s.load_rl, s.load_rr = fl.load, fr.load, rl.load, rr.load
   s.out = car.wheelsOutside
   s.rh_f, s.rh_r = car.rideHeight[0], car.rideHeight[1]
+  -- KERS/ERS battery charge and deployment input, both 0..1 (docs/adr/0024-ers-state-per-pass.md)
+  s.kers_charge, s.kers_input = car.kersCharge or 0, car.kersInput or 0
   return s
+end
+
+---True when the car has a KERS/ERS battery: only then does a pass line carry its state.
+---@param car ac.StateCar
+function carlink.hasErs(car)
+  return car.kersPresent == true
 end
 
 local function perWheel(car, field)

@@ -168,7 +168,7 @@ local function encode(raw, car)
     sessionId = agent.sessionId, seq = agent.passes,
     startMs = nowMs() - (raw.tOut - raw.tIn) * 1000,
     lap = car.lapCount, setupHash = agent.setupHash, block = countsForPlan() and plan.tag() or nil,
-    conditions = carlink.conditions(car, ac.getSim()),
+    conditions = carlink.conditions(car, ac.getSim()), ers = carlink.hasErs(car),
   })
 end
 

@@ -4,6 +4,15 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Hybrid battery on every pass (ADR 0024): on a car with KERS/ERS (CSP `kersPresent`) the agent
+  samples `kersCharge` and `kersInput` with the other channels and writes, per pass, an `ers`
+  object with the charge at the start and end of the zone (0..1) and the mean deployment. They
+  are not written per frame, and a car without a battery writes nothing new. Core stores them on
+  `corner_pass` (migration 00010) and sends the start charge to the engine as covariate
+  `ers_charge_start`, under the variance inflation rule of ADR 0022; deployment is recorded but
+  not adjusted for, since it is partly the setup's doing. Simulated with lap-wide noise driven by
+  the battery, the interval narrows from +-18.8 to +-5.6 ms. Makes the hypothesis that the
+  battery causes the Formula Hybrid 2026's lap swings testable. Unverified in game.
 - Engine (ADR 0023): each corner now counts by its own scatter. The effect model is fitted by
   weighted least squares, each corner weighted by the inverse of its residual variance in the
   experiment's own passes (unweighted full model, both arms pooled). A corner up to 1.5 times

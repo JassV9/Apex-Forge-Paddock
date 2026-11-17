@@ -59,6 +59,43 @@ def simulate_abab(
     return observations
 
 
+SECONDS_PER_BATTERY_UNIT = 0.1  # a full battery against an empty one, per corner pass
+BATTERY_USED_PER_CORNER = 0.03
+
+
+def simulate_battery_abab(
+    rng: np.random.Generator, effect: float, corners: int = 12, sigma: float = 0.012
+) -> list[Observation]:
+    """A-B-A-B on a hybrid whose battery starts every lap at a random charge (0.3 to 0.9).
+
+    Every pass of a lap is slower by SECONDS_PER_BATTERY_UNIT x (0.6 - charge): the noise is
+    shared by the lap and driven by the battery, not by the setup (about the lap-shared scatter
+    ADR 0023 found on the FH26). The charge at the start of a pass falls through the lap; only
+    its lap-to-lap part varies within a corner. There is no other covariate, so what the battery
+    adds is all that is measured.
+    """
+    levels = rng.uniform(3.0, 11.0, corners)
+    observations = []
+    lap = 0
+    for block, arm in enumerate([BASELINE, VARIANT, BASELINE, VARIANT]):
+        for _ in range(3):
+            lap += 1
+            lap_charge = rng.uniform(0.3, 0.9)
+            for corner in range(corners):
+                charge = lap_charge - BATTERY_USED_PER_CORNER * corner + rng.normal(0.0, 0.005)
+                value = (
+                    levels[corner]
+                    + (effect if arm == VARIANT else 0.0)
+                    + SECONDS_PER_BATTERY_UNIT * (0.6 - charge)
+                    + rng.normal(0.0, sigma)
+                )
+                covariates = {"ers_charge_start": charge}
+                observations.append(
+                    Observation(corner + 1, arm, float(value), block, lap, covariates)
+                )
+    return observations
+
+
 # (start time in the session s, fuel at the start l) of each block of a restarted experiment:
 # experiment 6 on the Ferrari 488 GT3 was driven over three game sessions, and a new session
 # resets the clock and refuels, so the variant blocks sat early in a session on a heavy tank.

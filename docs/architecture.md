@@ -91,7 +91,9 @@ Rules that hold everywhere:
    A restart, teleport, pit visit, replay or AI control drops the pass in progress.
 2. A finished pass is encoded to one JSON line **one column per frame**
    (`core/spool_lines.lua`), with the conditions at that moment: fuel, tyre temperatures,
-   pressures, wear, track grip, air and road temperature, wall clock, lap, setup hash.
+   pressures, wear, track grip, air and road temperature, wall clock, lap, setup hash; on a
+   car with KERS/ERS also the battery charge at the start and end of the pass and the mean
+   deployment ([ADR 0024](adr/0024-ers-state-per-pass.md)).
 3. `core/spool.lua` queues lines; the shell writes every waiting line as a new chunk file, at
    most five times per second.
 4. `core/internal/ingest` scans the spool every second, validates each line against the
@@ -292,6 +294,7 @@ The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/00
 | Human keeps the car: `ghost.hold` at agent start-up with an AI plan open, AI-plan laps counted only while the AI drives, Drive panel notices ([ADR 0021](adr/0021-human-keeps-the-car.md)) | Tested offline (agent pytest on the mocked CSP API, Vitest, Go ingest); **unverified in game** |
 | Covariates left out while entangled with the arm (variance inflation > 10), named in the verdict reason ([ADR 0022](adr/0022-covariates-the-arm-can-be-told-from.md)) | Tested (pytest incl. hypothesis, replay of experiment 6's real rows offline); unverified in game |
 | Corners weighted by their own scatter (inverse residual variance, floor 1.5x typical, cap 10:1), named in the verdict reason ([ADR 0023](adr/0023-corners-weighted-by-their-own-scatter.md)) | Tested (pytest incl. hypothesis, coverage simulations, replay of experiments 5 to 10's real rows offline); unverified in game |
+| Hybrid battery per pass: `ers` on the pass line (CSP `kersCharge`, `kersInput`, only with `kersPresent`), `corner_pass.ers_*` (migration 00010), the start charge sent as covariate `ers_charge_start` ([ADR 0024](adr/0024-ers-state-per-pass.md)) | Tested offline (agent pytest on the mocked CSP API, Go ingest against PostgreSQL, pytest simulation); **unverified in game** |
 | AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |

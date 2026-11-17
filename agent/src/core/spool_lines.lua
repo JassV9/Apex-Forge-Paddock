@@ -118,6 +118,17 @@ local function conditionsJson(c)
   })
 end
 
+-- Battery charge when the pass started and ended, and the mean deployment over its samples.
+local function ersJson(raw)
+  local charge, input, n = raw.cols.kers_charge, raw.cols.kers_input, raw.n
+  local sum = 0
+  for i = 1, n do sum = sum + input[i] end
+  return concat({
+    ',"ers":{"charge_start":', num(charge[1], 4), ',"charge_end":', num(charge[n], 4),
+    ',"deploy_mean":', num(sum / n, 4), "}",
+  })
+end
+
 local function headJson(raw, meta)
   local parts = {
     '{"kind":"pass","v":1,"session_id":', quote(meta.sessionId), ',"seq":', int(meta.seq),
@@ -139,6 +150,7 @@ local function headJson(raw, meta)
     })
   end
   if meta.conditions then parts[#parts + 1] = conditionsJson(meta.conditions) end
+  if meta.ers then parts[#parts + 1] = ersJson(raw) end
   return concat(parts)
 end
 
@@ -156,7 +168,7 @@ end
 
 ---Start encoding a finished pass. Call lines.step until it returns the line.
 ---@param raw table finished pass from recorder:feed (corner, n, cols, tIn, tOut)
----@param meta table sessionId, seq, startMs, lap?, setupHash?, block?, conditions?
+---@param meta table sessionId, seq, startMs, lap?, setupHash?, block?, conditions?, ers? (true: the car has a battery)
 function lines.beginPass(raw, meta)
   return { raw = raw, head = headJson(raw, meta), encoded = {}, done = 0 }
 end

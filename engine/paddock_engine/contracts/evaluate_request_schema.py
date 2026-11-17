@@ -110,7 +110,8 @@ class EvaluatePass(BaseModel):
         ..., description="Metric id to value; null when it could not be measured on this pass."
     )
     covariates: dict[str, float] = Field(
-        ..., description="Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s."
+        ...,
+        description="Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and ers_charge_start on a car with a hybrid battery.",
     )
 
 

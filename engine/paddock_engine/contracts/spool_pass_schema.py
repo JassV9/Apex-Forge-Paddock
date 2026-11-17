@@ -62,6 +62,23 @@ class PassConditions(BaseModel):
     road_c: float = Field(..., description="Road temperature, degrees C.")
 
 
+class PassErs(BaseModel):
+    """
+    The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput); only on a car with KERS/ERS.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    charge_start: float = Field(
+        ..., description="Battery charge when the car entered the zone, 0..1."
+    )
+    charge_end: float = Field(..., description="Battery charge when the car left the zone, 0..1.")
+    deploy_mean: float = Field(
+        ..., description="Mean deployment input over the pass's samples, 0..1."
+    )
+
+
 class SampleColumns(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -192,6 +209,11 @@ class SpoolPass(BaseModel):
         None,
         description="State of the car and track when the pass ended. FL, FR, RL, RR order.",
         title="PassConditions",
+    )
+    ers: PassErs | None = Field(
+        None,
+        description="The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput); only on a car with KERS/ERS.",
+        title="PassErs",
     )
     samples: PassSamples | None = Field(
         None,

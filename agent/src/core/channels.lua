@@ -26,4 +26,16 @@ channels.list = {
 channels.names = {}
 for i, channel in ipairs(channels.list) do channels.names[i] = channel[1] end
 
+-- Sampled with the pass but not written per frame: the pass line carries only their value at
+-- the start and the end of the pass and their mean (the "ers" object of the contract).
+channels.summarised = {
+  "kers_charge",  -- battery charge, 0..1
+  "kers_input",   -- deployment, 0..1
+}
+
+-- every field the recorder keeps per frame
+channels.recorded = {}
+for i, name in ipairs(channels.names) do channels.recorded[i] = name end
+for _, name in ipairs(channels.summarised) do channels.recorded[#channels.recorded + 1] = name end
+
 return channels

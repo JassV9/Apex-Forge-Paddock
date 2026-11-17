@@ -161,6 +161,31 @@
         }
       }
     },
+    "ers": {
+      "title": "PassErs",
+      "description": "The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput); only on a car with KERS/ERS.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "charge_start",
+        "charge_end",
+        "deploy_mean"
+      ],
+      "properties": {
+        "charge_start": {
+          "description": "Battery charge when the car entered the zone, 0..1.",
+          "type": "number"
+        },
+        "charge_end": {
+          "description": "Battery charge when the car left the zone, 0..1.",
+          "type": "number"
+        },
+        "deploy_mean": {
+          "description": "Mean deployment input over the pass's samples, 0..1.",
+          "type": "number"
+        }
+      }
+    },
     "samples": {
       "title": "PassSamples",
       "description": "Raw channels at up to 60 Hz as column arrays of equal length n.",

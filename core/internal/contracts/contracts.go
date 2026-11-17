@@ -1696,7 +1696,8 @@ type EvaluatePass struct {
 	// Corner corresponds to the JSON schema field "corner".
 	Corner int `json:"corner"`
 
-	// Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s.
+	// Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and
+	// ers_charge_start on a car with a hybrid battery.
 	Covariates EvaluatePassCovariates `json:"covariates"`
 
 	// Lap within the session; passes of one lap share their errors.
@@ -1739,7 +1740,8 @@ func (j *EvaluatePassArm) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-// Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s.
+// Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and
+// ers_charge_start on a car with a hybrid battery.
 type EvaluatePassCovariates map[string]float64
 
 // Metric id to value; null when it could not be measured on this pass.
@@ -4471,6 +4473,43 @@ func (j *PassConditions) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s length: must be <= %d", "tyre_wear", 4)
 	}
 	*j = PassConditions(plain)
+	return nil
+}
+
+// The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput);
+// only on a car with KERS/ERS.
+type PassErs struct {
+	// Battery charge when the car left the zone, 0..1.
+	ChargeEnd float64 `json:"charge_end"`
+
+	// Battery charge when the car entered the zone, 0..1.
+	ChargeStart float64 `json:"charge_start"`
+
+	// Mean deployment input over the pass's samples, 0..1.
+	DeployMean float64 `json:"deploy_mean"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassErs) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["charge_end"]; raw != nil && !ok {
+		return fmt.Errorf("field charge_end in PassErs: required")
+	}
+	if _, ok := raw["charge_start"]; raw != nil && !ok {
+		return fmt.Errorf("field charge_start in PassErs: required")
+	}
+	if _, ok := raw["deploy_mean"]; raw != nil && !ok {
+		return fmt.Errorf("field deploy_mean in PassErs: required")
+	}
+	type Plain PassErs
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = PassErs(plain)
 	return nil
 }
 
@@ -7328,6 +7367,10 @@ type SpoolPass struct {
 
 	// Time from zone start to zone end.
 	DurationS float64 `json:"duration_s"`
+
+	// The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput);
+	// only on a car with KERS/ERS.
+	Ers *PassErs `json:"ers,omitempty,omitzero"`
 
 	// Kind corresponds to the JSON schema field "kind".
 	Kind SpoolPassKind `json:"kind"`

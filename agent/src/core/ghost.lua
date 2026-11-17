@@ -12,6 +12,10 @@
 --
 -- Without a plan, `lap` starts a free run: the AI laps the car on the setup it has, as block
 -- 0, until it is stopped or a plan arrives. Its passes are the AI's baseline on this car.
+--
+-- A game that starts with an experiment for the AI open on the car is the driver's, not the
+-- AI's (docs/adr/0021-human-keeps-the-car.md): `hold` keeps the AI from taking the car, for
+-- that experiment and for any that follows, until `resume`, `lap` or `calibrate`.
 
 local ghost = {
   STUCK_KMH = 15,     -- slower than this on track counts as stuck
@@ -27,7 +31,7 @@ local ghost = {
 
 function ghost.new()
   return { phase = "off", block = nil, timer = 0, stuck = 0, retries = 0, fuel = nil,
-    halted = false, override = false, free = false, message = "" }
+    halted = false, override = false, free = false, held = false, message = "" }
 end
 
 local function act(name, extra)
@@ -53,8 +57,19 @@ local function wanted(s, o)
   return (o.driverAi or s.override or s.free) and o.block ~= nil and not s.halted
 end
 
+-- the AI is wanted but the driver has the car: say so once per experiment, do nothing
+local function holdBack(s, o)
+  if s.heldFor ~= o.planId then
+    s.heldFor = o.planId
+    s.message = string.format("Experiment %s is for the AI to drive. You have the car: the AI does not"
+      .. " start by itself and your laps are not counted in it.", tostring(o.planId))
+  end
+  return {}
+end
+
 local function fromOff(s, o)
   if not wanted(s, o) then return {} end
+  if s.held then return holdBack(s, o) end
   if not o.allowed then
     s.message = "The AI cannot drive here: this track does not give apps physics access."
     return {}
@@ -173,15 +188,19 @@ function ghost.stop(s)
   return { act("autopilot_off") }
 end
 
+---Keep the AI from taking the car by itself: the game started with an AI experiment open, so
+---the person at the wheel decides when the AI drives.
+function ghost.hold(s) s.held = true end
+
 ---Let the AI drive (again), also a plan that asked for a human driver.
 function ghost.resume(s)
-  s.halted, s.override, s.retries = false, true, 0
+  s.halted, s.override, s.held, s.retries = false, true, false, 0
   if s.phase == "failed" then s.phase = "off" end
 end
 
 ---Let the AI lap the car on its current setup until stopped (when there is no plan).
 function ghost.lap(s)
-  s.free, s.halted, s.retries, s.untilCalibrated = true, false, 0, false
+  s.free, s.halted, s.held, s.retries, s.untilCalibrated = true, false, false, 0, false
   if s.phase == "failed" then s.phase = "off" end
 end
 

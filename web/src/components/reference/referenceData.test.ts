@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CornerReference, FeatureDifference } from "../../api/client";
 import { cotaReference } from "../../test-reference";
-import { byTimeLost, differenceText, matchNote, metricLabel } from "./referenceData";
+import { byTimeLost, differenceText, matchNote, metricLabel, noAiNote } from "./referenceData";
 
 const [t2, t1] = cotaReference.corners as [CornerReference, CornerReference];
 const none: CornerReference = {
@@ -24,6 +24,18 @@ describe("referenceData", () => {
     const [brake] = t1.differences as [FeatureDifference];
     expect(differenceText(brake)).toBe("Brake point (m before apex): 120 vs AI 100 (2 / 9 passes)");
     expect(metricLabel("something_new")).toBe("something_new");
+  });
+
+  it.each([
+    ["layout_f1", 0, "original layout (layout_f1)"],
+    ["", 0, "original layout."],
+    ["layout_f1_paddock", 0, "has not driven this car on this layout"],
+    ["layout_f1", 5, ""],
+    ["layout_f1_paddock", 5, ""],
+  ])("explains no AI to compare with on layout %j with %j AI passes", (layout, passes, words) => {
+    const note = noAiNote(layout, passes);
+    if (words === "") expect(note).toBe("");
+    else expect(note).toContain(words);
   });
 
   it("says when the AI drove another setup, and why there is no reference", () => {

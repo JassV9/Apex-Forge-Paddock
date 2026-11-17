@@ -86,9 +86,23 @@ function agent.init()
     end)
   end
   plan.poll(agent.t)
+  agent.keepCarFromAi()
   agent.ready = true
   agent.status = string.format("recording %d corners", #agent.map.list)
 end
+
+---A game that starts with an experiment for the AI open on the car is the driver's: the AI
+---takes the car only when asked (docs/adr/0021-human-keeps-the-car.md). A car already under
+---AI control means the agent was reloaded mid-run; that run goes on.
+function agent.keepCarFromAi()
+  if plan.blockOrder() ~= nil and plan.driver() == "ai" and not ac.getCar(0).isAIControlled then
+    ghost.hold()
+  end
+end
+
+-- An experiment for the AI counts only the AI's laps: a person's laps on its setup would put
+-- another driver into its blocks.
+local function countsForPlan() return plan.driver() ~= "ai" or ghost.active() end
 
 ---Begin a spool session. A human's laps and the AI's laps never share a session, so the
 ---driver of every pass is known (source "human" or "ai").
@@ -134,7 +148,7 @@ local function writeStatus()
     session_id = agent.sessionId, source = agent.source, passes = agent.passes,
     plan = plan.status(), plan_message = plan.message, ghost = ghost.phase(),
     ghost_message = ghost.message(), ghost_allowed = ghost.allowed(),
-    calibration = ghost.calibration(),
+    calibration = ghost.calibration(), ghost_held = ghost.held(),
   })
   if text == lastStatus then return end
   lastStatus, lastWriteAt = text, os.preciseClock()
@@ -150,7 +164,7 @@ local function encode(raw, car)
   agent.job = lines.beginPass(raw, {
     sessionId = agent.sessionId, seq = agent.passes,
     startMs = nowMs() - (raw.tOut - raw.tIn) * 1000,
-    lap = car.lapCount, setupHash = agent.setupHash, block = plan.tag(),
+    lap = car.lapCount, setupHash = agent.setupHash, block = countsForPlan() and plan.tag() or nil,
     conditions = carlink.conditions(car, ac.getSim()),
   })
 end
@@ -196,7 +210,7 @@ function agent.update(dt)
   local source = ghost.active() and "ai" or "human"
   if source ~= agent.source then agent.startSession(source) end
   local driving = (not inPit) and (not car.isAIControlled or ghost.active())
-  if driving then plan.position(car.splinePosition) end
+  if driving and countsForPlan() then plan.position(car.splinePosition) end
   local raw = agent.rec:feed(carlink.read(car, agent.trackLength, agent.t), driving)
   if raw then encode(raw, car) end
   stepEncoding()

@@ -34,17 +34,38 @@ real change of bindings has not happened yet.
    default `3_clear`, with the Optimum track; `template` keeps the preset's), `--port`
    (default 8090).
 3. Open http://localhost:5173. In the **Drive** panel at the top of the session rail, pick the
-   car and the track. A layout marked "AI can drive" is a Paddock test copy; on an original the
-   panel shows the command that makes one.
-4. Press **Start driving**. The launcher backs up `controls.ini`, writes
-   `Documents/Assetto Corsa/paddock/launch/paddock.cmpreset` and asks CM to start Practice in
-   the pits, clear, on an optimum track. If CM cannot start, it says so in its own window.
-   Drive the "(Paddock test)" layout: your corners are compared with the AI's only on the
-   same layout and setup ([ADR 0019](../adr/0019-ai-reference-driver.md)).
-5. Drive. The agent records every corner pass; core ingests them as you go.
+   car and the track. A layout marked "compared with the AI" is a Paddock test copy. On an
+   original layout the panel says your laps are recorded but not compared with the AI, offers
+   **Use the test copy** (or shows the command that makes one), and under the pickers lists
+   what is open on the car (below).
+4. Press **Start driving**. You drive: the launcher sends no AI command. It backs up
+   `controls.ini`, writes `Documents/Assetto Corsa/paddock/launch/paddock.cmpreset` and asks CM
+   to start Practice in the pits, clear, on an optimum track. If CM cannot start, it says so in
+   its own window. Drive the "(Paddock test)" layout: your corners are compared with the AI's
+   only on the same layout and setup ([ADR 0019](../adr/0019-ai-reference-driver.md)).
+5. Drive. The agent records every corner pass; core ingests them as you go. The **Paddock
+   Hotlap** window shows each corner against your best and the AI's; on the original layout it
+   says there are no AI times and why.
 6. Leave the game. Within a few seconds the panel says whether the wheel bindings were
    unchanged or restored.
-7. Open the new session in the rail for its telemetry.
+7. Open the new session in the rail: telemetry, and **Against the AI** for the corners where
+   you lose time the AI does not. A session on the original layout says it has nothing to be
+   compared with and which layout to drive instead.
+8. **Experiments > Build a base setup** (it proposes that you drive). Open the experiment it
+   made, press Plan and Start, then in the game stop in the pits: the Paddock window names each
+   block, its Load button puts the setup on the car, and you drive the laps it asks for. Press
+   Evaluate when they are in.
+
+### When an AI experiment or training program is still open on the car
+
+The Drive panel names it before you start. A game that starts with an AI experiment open is
+yours ([ADR 0021](../adr/0021-human-keeps-the-car.md)): the agent does not teleport the car,
+load setups or hand it to the AI, and your laps are not counted in that experiment. The
+window's Run tab says "Experiment N is for the AI to drive". To hand the car over press **Let
+the AI drive this plan** there; to drop the experiment, abort it under Experiments (and press
+**Stop training** if a program is open, or it will queue the next experiment, which also waits
+for you). This needs the agent reinstalled (`python tools/install_agent.py`). **Unverified in
+game.**
 
 ### When something is off
 

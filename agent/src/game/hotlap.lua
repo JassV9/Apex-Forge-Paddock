@@ -22,7 +22,9 @@ end
 
 local function lastPass(now)
   local alpha, last = hud.state:alpha(now), hud.state.last
-  if alpha <= 0 then return ui.textColored("Drive a corner.", ink(GREY, 1)) end
+  if alpha <= 0 then
+    return ui.textColored("Drive a corner: its time and the gap to the AI show here.", ink(GREY, 1))
+  end
   ui.pushFont(ui.Font.Title)
   ui.textColored(string.format("%s  %s", last.name, hotlap.seconds(last.time)), ink(WHITE, alpha))
   ui.popFont()

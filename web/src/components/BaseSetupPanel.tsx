@@ -46,7 +46,8 @@ function DriverChoice(props: { driver: BaseSetupDriver; onChange: (d: BaseSetupD
 
 /** "Build a base setup": every change this car measured as faster, judged together. */
 export function BaseSetupPanel({ session, readOnly, build = buildBaseSetup }: BaseSetupPanelProps) {
-  const [driver, setDriver] = useState<BaseSetupDriver>("ai");
+  // the person whose session it is drives their own base setup; the AI's session, the AI
+  const [driver, setDriver] = useState<BaseSetupDriver>(session.source === "ai" ? "ai" : "human");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const start = () => {
     setOutcome({ kind: "working" });
@@ -65,9 +66,9 @@ export function BaseSetupPanel({ session, readOnly, build = buildBaseSetup }: Ba
         <h3>Base setup · {session.car_name}</h3>
       </div>
       <p className="note">
-        Takes each change this car measured as faster on corner time, one per item, and proposes
-        them together as one experiment against the current setup. Nothing is borrowed from other
-        cars and no language model is asked.
+        Takes each change this car measured as faster on corner time (in the AI's one-item
+        experiments, or yours), one per item, and proposes them together as one experiment against
+        the current setup. Nothing is borrowed from other cars and no language model is asked.
       </p>
       {readOnly ? (
         <p className="empty">Base setups cannot be built in the read-only demo.</p>
@@ -83,7 +84,9 @@ export function BaseSetupPanel({ session, readOnly, build = buildBaseSetup }: Ba
       {outcome.kind === "failed" && (
         <p role="alert">The base setup could not be built. {outcome.message}</p>
       )}
-      {outcome.kind === "done" && <BaseSetupResult sessionId={session.id} reply={outcome.reply} />}
+      {outcome.kind === "done" && (
+        <BaseSetupResult sessionId={session.id} reply={outcome.reply} driver={driver} />
+      )}
     </section>
   );
 }

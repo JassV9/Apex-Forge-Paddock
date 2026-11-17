@@ -4,7 +4,7 @@ import type { CornerReference, SessionReference } from "../../api/client";
 import { seconds, signedSeconds } from "../../format";
 import { useLoaded } from "../../hooks/useLoaded";
 import { telemetryHref } from "../../hooks/useRoute";
-import { byTimeLost, CLASS_LABEL, differenceText, matchNote } from "./referenceData";
+import { byTimeLost, CLASS_LABEL, differenceText, matchNote, noAiNote } from "./referenceData";
 
 export type ReferenceLoader = (sessionId: number, setupHash?: string) => Promise<SessionReference>;
 
@@ -103,15 +103,21 @@ export function ReferencePanel({ sessionId, load }: { sessionId: number; load: R
   if (reference.kind === "loading") return <p className="empty">Loading the comparison…</p>;
   if (reference.kind === "failed") return <p role="alert">The comparison could not be loaded.</p>;
   const data = reference.value;
+  const noAi = noAiNote(data.layout, data.ai_passes);
   return (
     <section className="panel-reference card" aria-label="Against the AI">
       <h3>Against the AI</h3>
       <p className="note">
         The AI drives the same car on the same setup, repeatably, below its own grip limit: a corner
         where you are slower than the AI by more than its spread is one to practise; one where you
-        match it or beat it is what the car and setup allow, as far as the AI shows.{" "}
-        {String(data.ai_passes)} AI passes on this car and track.
+        match it or beat it is what the car and setup allow, as far as the AI shows.
+        {noAi === "" && ` ${String(data.ai_passes)} AI passes on this car and track.`}
       </p>
+      {noAi !== "" && (
+        <p role="note" className="reference-no-ai">
+          {noAi}
+        </p>
+      )}
       <SetupChooser data={data} onPick={setSetupHash} />
       {data.corners.length === 0 ? (
         <p className="empty">This session has no valid corner pass on this setup.</p>

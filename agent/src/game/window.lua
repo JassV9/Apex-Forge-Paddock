@@ -17,16 +17,32 @@ local STATE_COLOR = { running = GREEN, evaluating = AMBER, inconclusive = AMBER,
 local function recording(agent)
   ui.textColored(agent.ready and "REC" or "OFF", agent.ready and RED or GREY)
   ui.sameLine()
-  ui.text(string.format("%s  |  %d passes  |  %s", agent.status, agent.passes,
-    agent.source == "ai" and "AI driving" or "you driving"))
+  ui.text(string.format("%s  |  %d corner passes  |  %s", agent.status, agent.passes,
+    agent.source == "ai" and "the AI is driving" or "you are driving"))
+end
+
+-- an experiment for the AI to drive, while the AI does not have the car (see ghost.hold)
+local function waitsForAi()
+  return plan.blockOrder() ~= nil and plan.driver() == "ai" and not ghost.active()
+end
+
+local function planText()
+  if waitsForAi() then
+    return string.format("Experiment %d is for the AI to drive. Your laps are not counted in it.",
+      plan.experimentId())
+  end
+  if not plan.experimentId() then
+    return "No experiment is waiting for this car. Drive: every corner you take is recorded."
+  end
+  return plan.status()
 end
 
 local function block()
   ui.header("Run plan")
-  ui.textWrapped(plan.status())
+  ui.textWrapped(planText())
   local done, target = plan.progress()
   if target and target > 0 then ui.progressBar(done / target, vec2(-1, 0), done .. " of " .. target .. " push laps") end
-  if plan.canLoad() and ui.button("Load " .. plan.label()) then plan.loadBlock() end
+  if not waitsForAi() and plan.canLoad() and ui.button("Load " .. plan.label()) then plan.loadBlock() end
   if plan.message ~= "" then ui.textColored(plan.message, GREY) end
 end
 
@@ -35,7 +51,9 @@ local function aiDriver()
   if ghost.message() ~= "" then ui.textWrapped(ghost.message()) end
   if ghost.allowed() then ui.textColored(ghost.calibration(), GREY) end
   if not ghost.allowed() then
-    ui.textColored("Not on this track: it gives apps no physics access (see tools/prepare_test_layout.py).", GREY)
+    ui.textColored("The AI cannot drive this layout: it gives apps no physics access. It drives only the"
+      .. " \"(Paddock test)\" copy of a layout (tools/prepare_test_layout.py), and only laps on that copy"
+      .. " are compared with the AI's.", GREY)
   elseif ghost.active() then
     if ui.button("Stop the AI driver") then ghost.stop() end
   elseif plan.blockOrder() then

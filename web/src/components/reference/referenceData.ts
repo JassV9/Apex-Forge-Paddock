@@ -48,3 +48,16 @@ export function matchNote(corner: CornerReference): string {
   const items = corner.setup_changes ?? 0;
   return `AI on the nearest setup: ${String(items)} item${items === 1 ? "" : "s"} differ`;
 }
+
+/** The suffix of the layout copy the AI drives (tools/prepare_test_layout.py). */
+const TEST_COPY_SUFFIX = "_paddock";
+
+/** Why a session has no AI to be compared with, or "" when the AI has driven its layout. */
+export function noAiNote(layout: string, aiPasses: number): string {
+  if (aiPasses > 0) return "";
+  if (!layout.endsWith(TEST_COPY_SUFFIX)) {
+    const name = layout === "" ? "" : ` (${layout})`;
+    return `You drove the original layout${name}. The AI drives only the "(Paddock test)" copy of a layout, so it has no passes here to be compared with. Drive the test copy: the Drive panel marks it "compared with the AI".`;
+  }
+  return "The AI has not driven this car on this layout yet. In the game's Paddock window, calibrate the AI and let it drive laps; then this table fills in.";
+}

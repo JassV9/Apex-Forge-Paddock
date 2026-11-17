@@ -24,8 +24,8 @@ function ProposePanel({ session, prefill }: { session: SessionSummary; prefill?:
         </a>
       </div>
       <p className="note">
-        Starts from this session's car, track and setup. The in-game app will take this over; until
-        then it is here.
+        Starts from this session's car, track and setup. The Setups tab of the game's Paddock window
+        proposes and starts the same experiments from the game.
       </p>
       <ProposeForm
         key={window.location.hash}

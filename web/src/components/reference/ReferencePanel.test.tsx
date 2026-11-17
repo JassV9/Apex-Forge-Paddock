@@ -23,6 +23,25 @@ describe("ReferencePanel", () => {
     expect(screen.getByText(/40 AI passes on this car and track/)).toBeVisible();
   });
 
+  it("says plainly why there is nothing to compare with on the original layout", async () => {
+    const original = { ...cotaReference, layout: "layout_f1_2026", ai_passes: 0 };
+    render(<ReferencePanel sessionId={2} load={() => Promise.resolve(original)} />);
+
+    const note = await screen.findByRole("note");
+    expect(note).toHaveTextContent("You drove the original layout (layout_f1_2026)");
+    expect(note).toHaveTextContent('only the "(Paddock test)" copy');
+    expect(screen.queryByText(/AI passes on this car and track/)).not.toBeInTheDocument();
+  });
+
+  it("says the AI has not driven the test copy yet, when it has not", async () => {
+    const unseen = { ...cotaReference, ai_passes: 0 };
+    render(<ReferencePanel sessionId={2} load={() => Promise.resolve(unseen)} />);
+
+    expect(await screen.findByRole("note")).toHaveTextContent(
+      "The AI has not driven this car on this layout yet",
+    );
+  });
+
   it("compares another setup of the session when it is picked", async () => {
     const load = vi.fn(() => Promise.resolve(cotaReference));
     render(<ReferencePanel sessionId={2} load={load} />);

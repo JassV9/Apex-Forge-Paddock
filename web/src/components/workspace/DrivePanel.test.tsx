@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { Experiment, TrainingProgram } from "../../api/client";
 import type { LauncherContent, LauncherStatus } from "../../api/launcher";
 import { DrivePanel } from "./DrivePanel";
+import type { OpenWorkApi } from "./useOpenWork";
 
 const content: LauncherContent = {
   ac_root: "C:/ac",
@@ -49,6 +51,17 @@ function ok(body: unknown): Reply {
   return { status: 200, body };
 }
 
+/** Core's answer to what is open on the cars: nothing unless told otherwise. */
+function core(
+  experiments: Partial<Experiment>[] = [],
+  training: Partial<TrainingProgram>[] = [],
+): OpenWorkApi {
+  return {
+    experiments: () => Promise.resolve(experiments as Experiment[]),
+    training: () => Promise.resolve(training as TrainingProgram[]),
+  };
+}
+
 describe("DrivePanel", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -63,23 +76,84 @@ describe("DrivePanel", () => {
     expect(screen.getByText("cd core && go run ./cmd/paddock-launcher")).toBeVisible();
   });
 
-  it("says where the AI can drive, and how to make a test copy", async () => {
+  it("says which layout is compared with the AI, and what an original layout costs", async () => {
     stubLauncher({ "GET /status": ok(idle), "GET /content": ok(content) });
-    render(<DrivePanel pollMs={60_000} />);
+    render(<DrivePanel openWork={core()} pollMs={60_000} />);
 
     const track = await screen.findByLabelText("Track");
     expect(
-      screen.getByRole("option", { name: "COTA F1 (Paddock test) · AI can drive" }),
+      screen.getByRole("option", { name: "COTA F1 (Paddock test) · compared with the AI" }),
     ).toBeTruthy();
 
     fireEvent.change(track, { target: { value: "fn_cota|f1_paddock" } });
-    expect(screen.getByText("AI can drive here.")).toBeVisible();
+    expect(screen.getByText(/your laps here are compared with the AI's/)).toBeVisible();
 
     fireEvent.change(track, { target: { value: "fn_cota|f1" } });
-    expect(screen.getByText("AI cannot drive here; its test copy f1_paddock can.")).toBeVisible();
+    expect(screen.getByText(/recorded, but not compared with the AI/)).toBeVisible();
+    expect(screen.getByText(/The AI drives only the test copy, f1_paddock/)).toBeVisible();
 
     fireEvent.change(track, { target: { value: "fn_cota|gp" } });
     expect(screen.getByText("python tools/prepare_test_layout.py fn_cota gp")).toBeVisible();
+  });
+
+  it("switches an original layout to its test copy with one click", async () => {
+    stubLauncher({ "GET /status": ok(idle), "GET /content": ok(content) });
+    render(<DrivePanel openWork={core()} pollMs={60_000} />);
+
+    const track = await screen.findByLabelText("Track");
+    fireEvent.change(track, { target: { value: "fn_cota|f1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Use the test copy" }));
+
+    expect(track).toHaveValue("fn_cota|f1_paddock");
+    expect(screen.queryByRole("button", { name: "Use the test copy" })).not.toBeInTheDocument();
+  });
+
+  it("says that you drive and the agent only records", async () => {
+    stubLauncher({ "GET /status": ok(idle), "GET /content": ok(content) });
+    render(<DrivePanel openWork={core()} pollMs={60_000} />);
+
+    expect(await screen.findByText(/You drive\./)).toHaveTextContent("only records your laps");
+  });
+
+  it("warns that an experiment for the AI is open on the picked car, and what happens", async () => {
+    stubLauncher({ "GET /status": ok(idle), "GET /content": ok(content) });
+    const open = core(
+      [
+        { id: 9, car_name: "Ferrari 488 GT3", driver: "ai", state: "running" },
+        { id: 8, car_name: "Ferrari 488 GT3", driver: "ai", state: "accepted" },
+        { id: 7, car_name: "Another car", driver: "ai", state: "running" },
+      ],
+      [{ id: 2, car_name: "Ferrari 488 GT3", state: "running" }],
+    );
+    render(<DrivePanel openWork={open} pollMs={60_000} />);
+
+    expect(screen.queryByRole("note", { name: "Open on this car" })).not.toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText("Car"), {
+      target: { value: "ks_ferrari_488_gt3" },
+    });
+
+    const notice = await screen.findByRole("note", { name: "Open on this car" });
+    expect(notice).toHaveTextContent("Experiment #9 is open on this car for the AI to drive");
+    expect(notice).toHaveTextContent("your laps are not counted in it");
+    expect(notice).toHaveTextContent("training program is running");
+    expect(notice).not.toHaveTextContent("#8");
+    expect(notice).not.toHaveTextContent("#7");
+  });
+
+  it("starts without a word about the AI when core has nothing open or does not answer", async () => {
+    stubLauncher({ "GET /status": ok(idle), "GET /content": ok(content) });
+    const down: OpenWorkApi = {
+      experiments: () => Promise.reject(new Error("no core")),
+      training: () => Promise.reject(new Error("no core")),
+    };
+    render(<DrivePanel openWork={down} pollMs={60_000} />);
+
+    fireEvent.change(await screen.findByLabelText("Car"), {
+      target: { value: "ks_ferrari_488_gt3" },
+    });
+
+    expect(screen.queryByRole("note", { name: "Open on this car" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start driving" })).toBeDisabled();
   });
 
   it("starts driving with the picked car and layout and shows the launcher's answer", async () => {
@@ -98,7 +172,7 @@ describe("DrivePanel", () => {
       "GET /content": ok(content),
       "POST /launch": { status: 202, body: watching },
     });
-    render(<DrivePanel pollMs={60_000} />);
+    render(<DrivePanel openWork={core()} pollMs={60_000} />);
 
     const car = await screen.findByLabelText("Car");
     const start = screen.getByRole("button", { name: "Start driving" });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BaseSetupDriver, BaseSetupReply } from "../api/baseSetup";
@@ -98,13 +98,35 @@ describe("BaseSetupPanel", () => {
     expect(screen.getByText(/Flagged non-linear/)).toBeInTheDocument();
   });
 
-  it("asks the AI to drive unless told otherwise", () => {
+  it("proposes that the person drives in their own session, and the AI in the AI's", () => {
     const build = vi.fn(() => Promise.resolve(built));
     show(build);
-
+    expect(screen.getByRole("radio", { name: "I drive" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Build a base setup" }));
+    expect(build).toHaveBeenLastCalledWith(cotaSession.id, "human");
 
-    expect(build).toHaveBeenCalledWith(cotaSession.id, "ai");
+    cleanup();
+    render(
+      <BaseSetupPanel session={{ ...cotaSession, source: "ai" }} readOnly={false} build={build} />,
+    );
+    expect(screen.getByRole("radio", { name: "AI drives" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Build a base setup" }));
+    expect(build).toHaveBeenLastCalledWith(cotaSession.id, "ai");
+  });
+
+  it("says what to do next, for the person and for the AI", async () => {
+    show(() => Promise.resolve(built));
+    fireEvent.click(screen.getByRole("button", { name: "Build a base setup" }));
+    expect(await screen.findByText(/stop in the pits/)).toHaveTextContent("Load button");
+    expect(screen.getByText(/only proposed so far/)).toHaveTextContent("press Plan and then Start");
+
+    cleanup();
+    show(() => Promise.resolve(built));
+    fireEvent.click(screen.getByRole("radio", { name: "AI drives" }));
+    fireEvent.click(screen.getByRole("button", { name: "Build a base setup" }));
+    expect(await screen.findByText(/takes the car at once/)).toHaveTextContent(
+      "Let the AI drive this plan",
+    );
   });
 
   it("explains a refusal with what the car measured", async () => {

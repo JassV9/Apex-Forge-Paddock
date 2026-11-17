@@ -7,15 +7,22 @@ import {
   layoutHint,
   layoutKey,
   layoutLabel,
+  openWorkNotes,
   parseLayoutKey,
   START_LAUNCHER,
   START_LAUNCHER_BY_HAND,
   statusLines,
 } from "./driveText";
 import { type LauncherApi, launcherClient, useLauncher } from "./useLauncher";
+import { coreOpenWork, type OpenWorkApi, useOpenWork } from "./useOpenWork";
+
+/** How often core is asked what is open on the car. */
+const OPEN_WORK_MS = 15_000;
 
 interface DrivePanelProps {
   api?: LauncherApi;
+  /** What core says is open on the car; the real client by default. */
+  openWork?: OpenWorkApi;
   pollMs?: number;
 }
 
@@ -88,14 +95,47 @@ function Pickers({
   );
 }
 
-function Hint({ content, layout }: { content: LauncherContent; layout: string }) {
+function Hint({
+  content,
+  layout,
+  onLayout,
+}: {
+  content: LauncherContent;
+  layout: string;
+  onLayout: (key: string) => void;
+}) {
   const found = findLayout(content, layout);
   if (found === undefined) return null;
   const hint = layoutHint(found.track, found.layout);
   return (
-    <p className={hint.aiCanDrive ? "drive-hint is-good" : "drive-hint is-warn"}>
-      {hint.text} {hint.command !== undefined && <code>{hint.command}</code>}
-    </p>
+    <>
+      <p className={hint.aiCanDrive ? "drive-hint is-good" : "drive-hint is-warn"}>
+        {hint.text} {hint.command !== undefined && <code>{hint.command}</code>}
+      </p>
+      {hint.testCopy !== undefined && (
+        <button
+          type="button"
+          className="quiet"
+          onClick={() => {
+            onLayout(layoutKey(found.track.id, hint.testCopy ?? ""));
+          }}
+        >
+          Use the test copy
+        </button>
+      )}
+    </>
+  );
+}
+
+/** What is open on the picked car, so that starting the game holds no surprise. */
+function OpenWorkNotice({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <div className="drive-help" role="note" aria-label="Open on this car">
+      {notes.map((note) => (
+        <p key={note}>{note}</p>
+      ))}
+    </div>
   );
 }
 
@@ -108,11 +148,13 @@ function lastPicks(status: LauncherStatus | undefined): { car: string; layout: s
 
 function Launcher({
   api,
+  openWork,
   content,
   status,
   onStatus,
 }: {
   api: LauncherApi;
+  openWork: OpenWorkApi;
   content: LauncherContent | undefined;
   status: LauncherStatus;
   onStatus: (status: LauncherStatus) => void;
@@ -122,6 +164,7 @@ function Launcher({
   const [error, setError] = useState("");
   const carName = (id: string) => content?.cars.find((c) => c.id === id)?.name ?? id;
   const blocked = blockedReason(status);
+  const work = useOpenWork(openWork, OPEN_WORK_MS);
   const ready = picks.car !== "" && picks.layout !== "" && blocked === undefined && !sending;
   const start = () => {
     const { trackId, layout } = parseLayoutKey(picks.layout);
@@ -155,12 +198,25 @@ function Launcher({
               setPicks({ ...picks, layout });
             }}
           />
-          <Hint content={content} layout={picks.layout} />
+          <Hint
+            content={content}
+            layout={picks.layout}
+            onLayout={(layout) => {
+              setPicks({ ...picks, layout });
+            }}
+          />
+          <OpenWorkNotice
+            notes={openWorkNotes(work.experiments, work.programs, carName(picks.car))}
+          />
         </>
       )}
       <button type="button" disabled={!ready} onClick={start}>
         {sending ? "Starting…" : "Start driving"}
       </button>
+      <p className="drive-hint">
+        You drive. The game opens in Practice from the pits with your own Content Manager settings,
+        clear weather and a fully gripped track; the Paddock agent only records your laps.
+      </p>
       {blocked !== undefined && <p className="drive-hint">{blocked}</p>}
       {error !== "" && <p role="alert">{error}</p>}
       <ul className="drive-status" aria-label="Launcher status">
@@ -174,7 +230,11 @@ function Launcher({
 
 /** Pick a car and a layout and start Assetto Corsa in Practice from the pits, through the
  * host launcher and Content Manager. The panel shows what the launcher says; it decides nothing. */
-export function DrivePanel({ api = launcherClient, pollMs = 3000 }: DrivePanelProps) {
+export function DrivePanel({
+  api = launcherClient,
+  openWork = coreOpenWork,
+  pollMs = 3000,
+}: DrivePanelProps) {
   const { reach, content, showStatus } = useLauncher(api, pollMs);
   return (
     // The rail closes on a click on small screens; the pickers must not close it.
@@ -189,7 +249,13 @@ export function DrivePanel({ api = launcherClient, pollMs = 3000 }: DrivePanelPr
       {reach.kind === "looking" && <p className="drive-hint">Looking for the launcher…</p>}
       {reach.kind === "unreachable" && <Unreachable />}
       {reach.kind === "ready" && (
-        <Launcher api={api} content={content} status={reach.status} onStatus={showStatus} />
+        <Launcher
+          api={api}
+          openWork={openWork}
+          content={content}
+          status={reach.status}
+          onStatus={showStatus}
+        />
       )}
     </section>
   );

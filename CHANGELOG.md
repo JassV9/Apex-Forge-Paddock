@@ -37,6 +37,17 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
   a corners table on a toggle; nothing while the AI drives. **Unverified in game.**
 - web: an "Against the AI" view of a human session, sorted by time lost; the AI's best pass
   of a corner on the same setup can be overlaid in the telemetry.
+- A person at the wheel keeps the car (ADR 0021). agent: a game that starts with an AI
+  experiment open no longer teleports the car, loads setups or hands it to the AI (`ghost.hold`,
+  released by "Let the AI drive this plan", Calibrate or free laps), and laps are never counted
+  into an experiment for the AI unless the AI drives them (a person's laps used to join its
+  blocks). The window says "Experiment N is for the AI to drive"; `agent_status.json` has
+  `ghost_held`. web: the Drive panel says "You drive", warns what is open on the picked car,
+  says plainly that an original layout is recorded but not compared and offers the test copy;
+  the "Against the AI" tab and the hotlap window say why there are no AI times; "Build a base
+  setup" proposes that you drive in your own session and says what to do next. A test shows a
+  person's session and the AI's share a track row only on the same layout. **Unverified in
+  game**; needs `tools/install_agent.py`.
 
 ## AI calibration and the first full AI experiment in the game (2026-11-16)
 

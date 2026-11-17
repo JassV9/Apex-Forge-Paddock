@@ -1,4 +1,4 @@
-import type { BaseSetup, BaseSetupChange, BaseSetupReply } from "../api/baseSetup";
+import type { BaseSetup, BaseSetupChange, BaseSetupDriver, BaseSetupReply } from "../api/baseSetup";
 import { clicksText } from "../experimentText";
 import { experimentHref } from "../hooks/useRoute";
 
@@ -67,13 +67,21 @@ function Measured({ setup }: { setup: BaseSetup }) {
   );
 }
 
+const NEXT_STEPS: Record<BaseSetupDriver, string> = {
+  human:
+    "It is only proposed so far: open it, press Plan and then Start. In the game, stop in the pits: the Paddock window names each block and its Load button puts the block's setup on the car. Drive the laps each block asks for, then press Evaluate.",
+  ai: 'It is only proposed so far: open it, press Plan and then Start. If the game is open, the AI takes the car at once and drives every block; if you started the game with this experiment already open, press "Let the AI drive this plan" in the Paddock window. Then press Evaluate.',
+};
+
 /** What core built: the changes with their evidence and the prediction, or why there are none. */
 export function BaseSetupResult({
   sessionId,
   reply,
+  driver,
 }: {
   sessionId: number;
   reply: BaseSetupReply;
+  driver: BaseSetupDriver;
 }) {
   const setup = reply.base_setup;
   if (reply.experiment_id === undefined) {
@@ -101,6 +109,7 @@ export function BaseSetupResult({
         ))}
       </ul>
       <Prediction setup={setup} />
+      <p>{NEXT_STEPS[driver]}</p>
       <LeftOut setup={setup} />
     </div>
   );

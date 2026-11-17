@@ -65,8 +65,10 @@ differed) or `restore_failed`.
 
 ## Consequences
 
-- One click in the dashboard: pick a car and a layout (test copies are marked "AI can drive
-  here", originals say how to make one) and press Start driving.
+- One click in the dashboard: pick a car and a layout (test copies are marked "compared with
+  the AI"; an original says its laps are recorded but not compared, and how to get a copy) and
+  press Start driving. A launch is a human run: it sends the agent no AI command
+  ([ADR 0021](0021-human-keeps-the-car.md)).
 - A binding the owner changes on purpose inside a game started this way is undone when the game
   exits; the changed file is kept in `controls_backup`. Rebind with the game started from CM
   directly, or restart the launcher afterwards (only launches it made are watched).

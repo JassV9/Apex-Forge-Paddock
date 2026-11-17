@@ -15,7 +15,7 @@ local link = {
 
 local nextRefresh = 0
 
-local function answered(state, setupHash)
+local function answered(state, setupHash, layout)
   return function(err, res)
     link.busy = false
     if err or not res or res.status >= 400 then
@@ -29,7 +29,7 @@ local function answered(state, setupHash)
     end
     state:setReference(setupHash, reply)
     local count = #(reply.corners or {})
-    link.message = count > 0 and "" or "The AI has not driven this setup here yet."
+    link.message = count > 0 and "" or hotlap.noReferenceText(layout)
   end
 end
 
@@ -40,7 +40,7 @@ function link.refresh(now, state, ids, setupHash)
   if setupHash == link.setupHash and now < nextRefresh then return end
   link.busy, link.setupHash, nextRefresh = true, setupHash, now + link.REFRESH_S
   local path = hotlap.referencePath(ids.car, ids.track, ids.layout, setupHash)
-  local ok = pcall(web.get, link.url .. path, nil, answered(state, setupHash))
+  local ok = pcall(web.get, link.url .. path, nil, answered(state, setupHash, ids.layout))
   if not ok then
     link.busy = false
     link.message = "No AI reference: web requests are not available."

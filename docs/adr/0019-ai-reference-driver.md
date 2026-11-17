@@ -74,6 +74,8 @@ everything is read from `session`, `corner_pass` and `setup_version`.
   (`tools/prepare_test_layout.py`), which has extended physics on. A human session on the
   original layout is a different track row and gets no reference; the owner drives the copy to
   be compared. Pairing the two is not done because extended physics may change the surface.
+  The Drive panel, the "Against the AI" tab and the hotlap window say this in plain words
+  ([ADR 0021](0021-human-keeps-the-car.md)).
 - **The hotlap best is in memory** from the moment the app loads; it is not core's best.
 - **Understeer and oversteer are not named in game.** Telling them from the driver's input needs
   the engine's front saturation and phase statistics; the display says only what one pass's

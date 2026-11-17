@@ -98,6 +98,8 @@ function ghost.calibration() return calibration.summary() end
 function ghost.allowed() return allowed() end
 function ghost.stop() perform(core.stop(ghost.state)) end
 function ghost.resume() core.resume(ghost.state) end
+function ghost.hold() core.hold(ghost.state) end
+function ghost.held() return ghost.state.held end
 function ghost.lap() core.lap(ghost.state) end
 function ghost.calibrate()
   calibration.recount()

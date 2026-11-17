@@ -120,6 +120,19 @@ local function escape(ch) return string.format("%%%02X", ch:byte()) end
 
 local function encode(text) return (tostring(text or ""):gsub("[^%w%-%._~]", escape)) end
 
+local TEST_COPY_SUFFIX = "_paddock"  -- the layout copy made by tools/prepare_test_layout.py
+
+---Why there are no AI times to show, in words. The AI drives only the "(Paddock test)" copy of
+---a layout, so on any other layout there never are any.
+---@param layout string ac.getTrackLayout()
+function hotlap.noReferenceText(layout)
+  if layout:sub(-#TEST_COPY_SUFFIX) == TEST_COPY_SUFFIX then
+    return "The AI has not driven this setup here yet."
+  end
+  return "No AI times: this is the original layout, and the AI drives only its \"(Paddock test)\""
+    .. " copy. Drive that copy to be compared."
+end
+
 ---The path of core's GET /reference for this car, track, layout and setup.
 function hotlap.referencePath(car, track, layout, setupHash)
   return "/reference?car=" .. encode(car) .. "&track=" .. encode(track)

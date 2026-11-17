@@ -39,6 +39,13 @@ Pass `--ac-root` if the game is not in the default Steam folder.
 
 **Stop the AI driver** in the window gives you the car back at any moment.
 
+**Starting the game yourself with an AI experiment open** leaves the car to you: the agent holds
+the AI back ([ADR 0021](../adr/0021-human-keeps-the-car.md)), the Run tab says "Experiment N is
+for the AI to drive", your laps are not counted in it, and **Let the AI drive this plan** hands
+the car over. The same hold applies after **Stop the AI driver**: laps you drive are never
+counted in an experiment for the AI. A plan that arrives while the game is already open, from
+the window or the web, still starts the AI at once.
+
 Without the window (for scripted runs), the same steps go through core's API, and a free run
 is started with a file the agent reads every two seconds:
 

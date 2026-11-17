@@ -179,6 +179,7 @@ def test_the_window_shows_each_pass_and_asks_core_once_per_setup(agent: Agent) -
 def test_the_window_asks_again_after_thirty_seconds(agent: Agent) -> None:
     core = FakeCore({"corners": []})
     agent.mock["web_post"] = core
+    agent.mock["layout"] = "synthetic_paddock"  # the AI's test copy
     draw(agent)
     agent.drive.idle(29 * 60)
     draw(agent)
@@ -187,6 +188,29 @@ def test_the_window_asks_again_after_thirty_seconds(agent: Agent) -> None:
 
     assert len(core.asked) == 2
     assert agent.rt.eval('require("game.hotlap_link").message').startswith("The AI has not")
+
+
+def test_on_the_original_layout_the_window_says_why_there_are_no_ai_times(agent: Agent) -> None:
+    agent.mock["web_post"] = FakeCore({"corners": []})
+    agent.mock["layout"] = "layout_f1"
+    draw(agent)
+    agent.drive.idle(5)
+    draw(agent)
+
+    message = agent.rt.eval('require("game.hotlap_link").message')
+    assert "original layout" in message and "(Paddock test)" in message
+
+
+@pytest.mark.parametrize(
+    ("layout", "words"),
+    [
+        ("", "original layout"),
+        ("layout_f1", "original layout"),
+        ("layout_f1_paddock", "has not driven this setup"),
+    ],
+)
+def test_no_ai_times_are_explained_by_the_layout(rt, layout, words) -> None:
+    assert words in hotlap(rt).noReferenceText(layout)
 
 
 def test_nothing_is_shown_or_asked_while_the_ai_drives(agent: Agent) -> None:

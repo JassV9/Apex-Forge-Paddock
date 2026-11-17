@@ -73,7 +73,9 @@ function ghost.update(dt, car)
   end
   local retries = ghost.state.retries
   local lapsDone = plan.lapsDone()  -- the plan's count; a free run counts the car's laps
-  if plan.blockOrder() == nil then lapsDone = car.lapCount end
+  if plan.blockOrder() == nil or (ghost.state.free and plan.driver() ~= "ai") then
+    lapsDone = car.lapCount
+  end
   local actions = core.step(ghost.state, {
     dt = dt, planId = plan.experimentId(), driverAi = plan.driver() == "ai", allowed = allowed(),
     block = plan.blockOrder(), parked = car.isInPit and car.speedKmh < 1,
@@ -100,6 +102,8 @@ function ghost.stop() perform(core.stop(ghost.state)) end
 function ghost.resume() core.resume(ghost.state) end
 function ghost.hold() core.hold(ghost.state) end
 function ghost.held() return ghost.state.held end
+---True while the AI laps the car on its own setup (block 0): no experiment owns those laps.
+function ghost.freeRun() return core.active(ghost.state) and ghost.state.block == 0 end
 function ghost.lap() core.lap(ghost.state) end
 function ghost.calibrate()
   calibration.recount()

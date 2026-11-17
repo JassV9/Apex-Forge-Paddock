@@ -353,6 +353,36 @@ def test_a_free_run_laps_the_car_on_its_setup_until_a_plan_arrives(rt):
     assert seen == ["autopilot_off", "teleport_pits"] and state.phase == "off"
 
 
+def test_free_laps_ignore_a_plan_open_for_a_human(rt):
+    ghost, state = machine(rt)
+    human = {"driverAi": False, "block": 2}
+    ghost.step(state, obs(rt, **human))  # the agent steps every frame: the plan is known
+
+    ghost.lap(state)
+    assert names(ghost.step(state, obs(rt, **human))) == ["autopilot_off", "teleport_pits"]
+    run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, **human)
+    ghost.loaded(state, True, "")
+
+    assert state.block == 0 and "free laps" in state.message
+    assert run_for(rt, ghost, state, 30, **human) == [], "it keeps lapping its own setup"
+
+
+def test_free_ai_laps_next_to_a_human_plan_count_for_no_block(agent: Agent) -> None:
+    base, soft = setups(agent)
+    agent.mock["physicsAllowed"] = True
+    write_plan(agent, [("Setup K", base, LAPS), ("Setup R", soft, LAPS)], driver="human")
+    agent.drive.pit(True)
+    agent.drive.idle(130)  # the plan is read in the pits
+    ghost = agent.rt.eval('require("game.ghost")')
+    ghost.lap()
+    agent.drive.idle(130)
+    let_ai_load(agent)
+    stint(agent, 2)
+
+    assert ghost.freeRun() and agent.passes()
+    assert all("block" not in p for p in agent.passes()), "free laps belong to no experiment"
+
+
 def test_the_agent_records_free_ai_laps_in_an_ai_session(agent: Agent) -> None:
     agent.mock["physicsAllowed"] = True
     commands = agent.spool_root.parent / "outbox"

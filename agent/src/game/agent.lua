@@ -102,7 +102,10 @@ end
 
 -- An experiment for the AI counts only the AI's laps: a person's laps on its setup would put
 -- another driver into its blocks.
-local function countsForPlan() return plan.driver() ~= "ai" or ghost.active() end
+local function countsForPlan()
+  if ghost.freeRun() then return false end  -- free laps belong to no experiment
+  return plan.driver() ~= "ai" or ghost.active()
+end
 
 ---Begin a spool session. A human's laps and the AI's laps never share a session, so the
 ---driver of every pass is known (source "human" or "ai").

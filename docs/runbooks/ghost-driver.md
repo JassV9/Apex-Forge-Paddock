@@ -91,6 +91,7 @@ trade-off waits for you. Leave the game running; about 40 minutes per experiment
 | Reset by the game, or no lap counted for 10 minutes | Back to the pits, the block is retried |
 | Less than 30 L at the start | Every block starts with 30 L (or the first block's fuel, if more) |
 | Free laps below 4 L | Back to the pits to refuel; not a retry |
+| Free laps while a plan for a human is open on the car | The AI laps the car's own setup (block 0) and the laps count for no experiment; the plan's blocks stay for the driver |
 | Three retries in one block (in free laps: without a lap in between) | The run stops and the window says why |
 | A setup value does not take | Every change is undone and the run stops |
 | The track gives no physics access | Nothing happens to the car; the window says so |

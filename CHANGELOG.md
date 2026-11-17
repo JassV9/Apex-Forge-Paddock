@@ -4,6 +4,12 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Fix, agent: free AI laps (Calibrate, Let the AI drive laps) drove the block of a plan open
+  for a human, loading its setup, because they used block 0 only when the car had no active plan
+  block. Seen on the Formula Hybrid 2026 with an old human experiment open: the AI loaded its
+  Setup H and would have tagged the laps to that experiment. Free laps are now always block 0,
+  count the car's own laps, and belong to no experiment. Unverified in game beyond the first
+  "driving free laps" on that car.
 - Fix, engine and core (ADR 0022): AI experiment 6 was judged inconclusive with corner time
   +-450 ms because the game was restarted mid-experiment. A new session resets the clock and
   the tank, so time in session and fuel (correlated 0.94, under the old 0.98 limit) were both

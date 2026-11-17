@@ -153,7 +153,8 @@ function ghost.step(s, o)
   if o.planId ~= s.planId then  -- a new experiment: an earlier stop or choice does not carry over
     s.planId, s.halted, s.override, s.free = o.planId, false, false, false
   end
-  if o.block == nil and s.free then o.block = 0 end
+  -- free laps are the car on its own setup, block 0, even with a plan open for a human
+  if s.free and (o.block == nil or not o.driverAi) then o.block = 0 end
   if s.phase == "off" then return fromOff(s, o) end
   if s.phase == "to_pits" then
     if not wanted(s, o) then

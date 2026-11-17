@@ -67,7 +67,7 @@ list and its pass count grows as you drive.
 
 1. Drive a few laps so a session with its setup exists, then open **Propose** in the
    dashboard: pick the session, one setup item, a number of clicks, and write the hypothesis.
-2. On the experiment's page: **Plan** (shows what four blocks can detect), then **Start**.
+2. On the experiment's page: **Plan** (shows how many blocks the noise needs and what they can detect), then **Start**.
    Core writes `outbox/runplans/<car>.json` and one setup file per arm under
    `outbox/setups/<car>/`. The same can be done from the game: the **Setups** tab of the
    Paddock window lists what to test next with **I drive it** and **AI drives it**.

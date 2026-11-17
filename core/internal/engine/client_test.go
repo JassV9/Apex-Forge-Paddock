@@ -32,7 +32,8 @@ func TestPlanPostsTheContractAndDecodesTheReply(t *testing.T) {
 		}
 		_, _ = w.Write([]byte(`{"sigma":0.028,"sigma_source":"assumed","corners":[1,2],
 			"blocks":[{"order":1,"arm":"baseline","laps_target":3}],
-			"passes_per_arm":6,"mde_detect":0.03,"mde_decide":0.05}`))
+			"passes_per_arm":6,"mde_detect":0.03,"mde_decide":0.05,
+			"sigma_lap":0.01,"sigma_lap_source":"planned","mde_target":0.02,"target_met":false}`))
 	}))
 	defer server.Close()
 
@@ -44,7 +45,8 @@ func TestPlanPostsTheContractAndDecodesTheReply(t *testing.T) {
 	if got.LapsPerBlock != 3 || len(got.Corners) != 2 {
 		t.Errorf("engine received %+v", got)
 	}
-	if reply.PassesPerArm != 6 || reply.Blocks[0].Arm != contracts.PlanResponseBlocksElemArmBaseline {
+	if reply.PassesPerArm != 6 || reply.Blocks[0].Arm != contracts.PlanResponseBlocksElemArmBaseline ||
+		reply.SigmaLap != 0.01 || reply.TargetMet {
 		t.Errorf("reply = %+v", reply)
 	}
 }

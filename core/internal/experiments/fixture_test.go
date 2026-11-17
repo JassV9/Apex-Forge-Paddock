@@ -34,6 +34,7 @@ func (f *fakeEngine) Plan(_ context.Context, request contracts.PlanRequest) (con
 	reply := contracts.PlanResponse{
 		Sigma: 0.028, SigmaSource: contracts.PlanResponseSigmaSourceAssumed, Corners: request.Corners,
 		PassesPerArm: 2 * request.LapsPerBlock, MdeDetect: 0.02, MdeDecide: 0.03,
+		SigmaLapSource: contracts.PlanResponseSigmaLapSourceNone, MdeTarget: 0.03, TargetMet: true,
 	}
 	arms := []contracts.PlanResponseBlocksElemArm{
 		contracts.PlanResponseBlocksElemArmBaseline, contracts.PlanResponseBlocksElemArmVariant,

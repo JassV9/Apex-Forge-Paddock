@@ -4,6 +4,24 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Fix, core (ADR 0025): the training program judged AI experiments 5 to 10 as soon as the last
+  lap began (block 4's lap 3 had 4 of 14 corners in the FH26 verdicts), because a lap counted
+  when its first pass arrived. A push lap now counts once the car has finished it: one attempt
+  (session and game lap) reached every corner of the track, a later block has passes, or no
+  pass arrived for 15 minutes (car stuck three times, game closed), so a stopped run is still
+  judged. Restarts and retries are re-driven laps, not finished ones. The out-lap rule stays.
+- Engine and core (ADR 0025): plans count the noise of whole laps. The engine estimates the
+  error a lap shares across its corners from the baseline's laps (between-lap variance of the
+  random-intercept model, corners weighted as in ADR 0023, robust). Laps of earlier run plans
+  come first, free and calibration laps only when there are fewer than six of those. A plan
+  adds A-B pairs of 3-lap blocks, up to eight blocks, until it decides a target of four bands
+  (20 ms of corner time) or the whole bands the standard plan already needs. A plan that
+  cannot reach its target says so. Contracts: `PlanPass.lap`/`planned`,
+  `PlanResponse`/`PlanSummary` `sigma_lap`, `sigma_lap_source`, `mde_target`, `target_met`;
+  the plan's ledger line and the dashboard name them. Replayed offline, the Ferrari's
+  experiment 5 still plans 4 blocks. The FH26's experiments 7 to 10 would plan 8, 8, 4 and 6
+  blocks, and 7 and 8 say 8 blocks cannot reach 25 ms. Past plans and verdicts are not
+  changed. Unverified in game.
 - Engine (ADR 0023): each corner now counts by its own scatter. The effect model is fitted by
   weighted least squares, each corner weighted by the inverse of its residual variance in the
   experiment's own passes (unweighted full model, both arms pooled). A corner up to 1.5 times

@@ -86,18 +86,28 @@ func readArms(ctx context.Context, q querier, id int64, parameter string) ([]con
 		}, id, parameter)
 }
 
-// A block's laps are counted from the passes tagged with it; lap 0 is the out-lap.
+// A block's laps are counted from the passes tagged with it; lap 0 is the out-lap, and a push
+// lap counts once the car has finished it (laps.go).
 func readBlocks(ctx context.Context, q querier, id int64) ([]contracts.ExperimentBlock, error) {
-	return queryAll(ctx, q,
-		`SELECT b."order", a.label_code, b.laps_target, COALESCE(max(p.block_lap), 0), count(p.id)
+	blocks, err := queryAll(ctx, q,
+		`SELECT b."order", a.label_code, b.laps_target, count(p.id)
 		 FROM run_block b
 		 JOIN experiment_arm a ON a.id = b.arm_id
 		 LEFT JOIN corner_pass p ON p.block_id = b.id
 		 WHERE b.experiment_id = $1 GROUP BY b.id, a.label_code ORDER BY b."order"`,
 		func(rows *sql.Rows) (contracts.ExperimentBlock, error) {
 			var block contracts.ExperimentBlock
-			return block, rows.Scan(&block.Order, &block.Label, &block.LapsTarget, &block.LapsDone, &block.Passes)
+			return block, rows.Scan(&block.Order, &block.Label, &block.LapsTarget, &block.Passes)
 		}, id)
+	if err != nil || len(blocks) == 0 {
+		return blocks, err
+	}
+	evidence, err := readLapEvidence(ctx, q, id)
+	if err != nil {
+		return nil, err
+	}
+	countLaps(blocks, evidence)
+	return blocks, nil
 }
 
 func readPredictions(ctx context.Context, q querier, id int64) ([]contracts.PredictionSpec, error) {

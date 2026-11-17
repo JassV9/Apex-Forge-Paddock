@@ -187,8 +187,8 @@ func (s *Service) PublishRunning(ctx context.Context) error {
 	return nil
 }
 
-// Plan asks the engine what an A-B-A-B plan can detect and stores the plan. From here on the
-// success test is fixed: nothing in the service changes it.
+// Plan asks the engine for an A-B-A-B plan sized for the baseline's noise (ADR 0025) and stores
+// it. From here on the success test is fixed: nothing in the service changes it.
 func (s *Service) Plan(ctx context.Context, id int64) (contracts.Experiment, error) {
 	exp, err := loadRecord(ctx, s.database, id, false)
 	if err != nil {
@@ -205,8 +205,7 @@ func (s *Service) Plan(ctx context.Context, id int64) (contracts.Experiment, err
 	if err != nil {
 		return contracts.Experiment{}, fmt.Errorf("plan experiment %d: %w", id, err)
 	}
-	reason := fmt.Sprintf("%d blocks of %d laps; decides effects of %.3g or more on %s (scatter %s).",
-		len(plan.Blocks), s.lapsPerBlock, plan.MdeDecide, exp.test.Channel, plan.SigmaSource)
+	reason := planReason(plan, exp.test.Channel)
 	return s.act(ctx, id, false, func(tx *sql.Tx, current record) error {
 		if err := move(ctx, tx, id, current.state, Planned, reason); err != nil {
 			return err

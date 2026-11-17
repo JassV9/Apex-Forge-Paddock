@@ -37,6 +37,16 @@ class PlanBlock(BaseModel):
     laps_target: int = Field(..., ge=1)
 
 
+class SigmaLapSource(StrEnum):
+    """
+    planned: from push laps of earlier run plans on the baseline. free: from all its laps (fewer than six planned ones). none: too few laps to tell, assumed 0.
+    """
+
+    planned = "planned"
+    free = "free"
+    none = "none"
+
+
 class PlanResponse(BaseModel):
     """
     An A-B-A-B run plan and what it can answer.
@@ -66,4 +76,22 @@ class PlanResponse(BaseModel):
         ...,
         description="Smallest effect that also clears the equivalence band with 80 % power: what a decision needs.",
         ge=0.0,
+    )
+    sigma_lap: float = Field(
+        ...,
+        description="Scatter of whole laps: the error a lap shares across all its corners, in the primary channel's unit.",
+        ge=0.0,
+    )
+    sigma_lap_source: SigmaLapSource = Field(
+        ...,
+        description="planned: from push laps of earlier run plans on the baseline. free: from all its laps (fewer than six planned ones). none: too few laps to tell, assumed 0.",
+    )
+    mde_target: float = Field(
+        ...,
+        description="The decision effect the plan was sized for, a whole number of equivalence bands: four, or the fewest that cover what four blocks decide on pass scatter alone.",
+        ge=0.0,
+    )
+    target_met: bool = Field(
+        ...,
+        description="false: even the longest plan allowed decides only mde_decide, more than mde_target.",
     )

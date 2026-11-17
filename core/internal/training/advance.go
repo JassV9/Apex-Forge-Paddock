@@ -103,7 +103,8 @@ func (s *Service) tend(ctx context.Context, id int64, exp contracts.Experiment) 
 	return false, nil // accepted, reverted, aborted or discarded: closed
 }
 
-// driven reports whether every block has its laps.
+// driven reports whether every block has its laps. A lap counts once the car has finished it,
+// so the verdict waits for the last lap's corners (docs/adr/0025-finished-laps-and-lap-noise.md).
 func driven(exp contracts.Experiment) bool {
 	if len(exp.Blocks) == 0 {
 		return false
@@ -119,7 +120,7 @@ func driven(exp contracts.Experiment) bool {
 func progress(exp contracts.Experiment) string {
 	for _, block := range exp.Blocks {
 		if block.LapsDone < block.LapsTarget {
-			return fmt.Sprintf("block %d of %d, lap %d of %d", block.Order, len(exp.Blocks), block.LapsDone, block.LapsTarget)
+			return fmt.Sprintf("block %d of %d, %d of %d laps done", block.Order, len(exp.Blocks), block.LapsDone, block.LapsTarget)
 		}
 	}
 	return "all blocks driven"

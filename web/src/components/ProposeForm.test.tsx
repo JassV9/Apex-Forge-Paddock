@@ -59,6 +59,25 @@ describe("ProposeForm", () => {
     expect(screen.getByLabelText("Setup item")).toHaveValue("ARB_FRONT");
   });
 
+  it("names a linked group once", async () => {
+    const wing = {
+      name: "WING_1",
+      label: "Rear Wing (WING_1 + WING_9)",
+      min: 0,
+      max: 2,
+      step: 1,
+      value: 1,
+    };
+    const api = apiWith({ items: vi.fn(() => Promise.resolve([wing])) });
+    render(<ProposeForm sessionId={3} api={api} onProposed={vi.fn()} />);
+
+    const option = await screen.findByRole("option", {
+      name: "Rear Wing (WING_1 + WING_9): now 1, 0 to 2",
+    });
+
+    expect(option).toBeInTheDocument();
+  });
+
   it("says what core refused", async () => {
     const refusal = new Error("ARB_FRONT = 5 is above its maximum 4");
     const api = apiWith({ create: () => Promise.reject(refusal) });

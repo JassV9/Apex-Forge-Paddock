@@ -63,7 +63,7 @@ samples, DuckDB inside the engine for queries over Parquet
 | --- | --- | --- | --- |
 | `agent/` | CSP Lua | Corner map, pass capture with conditions, applying setup values with read-back and rollback, the setup desk window, the AI test driver and its calibration | Judge a setup, call an LLM, write anything but its own files under `paddock/` while driving |
 | `core/internal/ingest` | Go | Tailing the spool, schema validation, Parquet parts, `corner_pass` rows (and the SQL for them) | Compute engineering metrics; write to the spool |
-| `core/internal/setups` | Go | Parameter catalog, setup versions, `.ini` writer, diffing | Accept a value off the step grid or out of range |
+| `core/internal/setups` | Go | Parameter catalog, setup versions, `.ini` writer, diffing, linked items ([ADR 0026](adr/0026-linked-setup-items.md)) | Accept a value off the step grid or out of range; move one member of a linked group alone |
 | `core/internal/experiments` | Go | Experiment state machine, run plans, verdict ledger, rollback | Do statistics (it asks the engine) |
 | `core/internal/passes` | Go | Read path for a session's passes and their raw samples (Parquet) | Write anything |
 | `core/internal/reference` | Go | A session's corners against the AI on the same car, track and setup: matching, the driver/car class, the technique metrics that differ | Write anything; let anything but its rule decide a class |
@@ -146,7 +146,7 @@ the session's Parquet parts.
 1. **Propose.** `POST /experiments` names a session, one setup item and a number of clicks.
    Core takes the champion of that car and track as the baseline (before the first
    experiment: the setup of the session's latest pass), makes the variant with
-   `setups.Step`, and stores the hypothesis, the predictions, the success test and the
+   `setups.Step` (a linked item moves with its group, [ADR 0026](adr/0026-linked-setup-items.md)), and stores the hypothesis, the predictions, the success test and the
    guardrails. Nothing changes them later.
 2. **Plan.** Core asks the engine (`POST /plan`) for interleaved blocks and stores them. The
    engine sizes the plan for the scatter of single passes and of whole laps on the baseline:
@@ -302,6 +302,7 @@ The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/00
 | Corners weighted by their own scatter (inverse residual variance, floor 1.5x typical, cap 10:1), named in the verdict reason ([ADR 0023](adr/0023-corners-weighted-by-their-own-scatter.md)) | Tested (pytest incl. hypothesis, coverage simulations, replay of experiments 5 to 10's real rows offline); unverified in game |
 | Hybrid battery per pass: `ers` on the pass line (CSP `kersCharge`, `kersInput`, only with `kersPresent`), `corner_pass.ers_*` (migration 00010), the start charge sent as covariate `ers_charge_start` ([ADR 0024](adr/0024-ers-state-per-pass.md)) | Tested offline (agent pytest on the mocked CSP API, Go ingest against PostgreSQL, pytest simulation); **unverified in game** |
 | A lap counts once finished (every corner, next block, or 15 minutes quiet); plans sized for lap noise (`stats/lap_noise.py`, four to eight blocks, target of four bands, `sigma_lap` and `target_met` on the plan) ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)) | Tested (Go table-driven and against PostgreSQL, pytest incl. hypothesis and simulations, Vitest, offline replay of experiments 5 and 7 to 10's baselines); **unverified in game** |
+| Linked setup items are one setting: detected per car (same label and range, equal in every setup read back from the car, at least 3, and moved) or declared (`setups.DeclaredLinks`: FH26 `WING_1` + `WING_9`); experiments, base setups, setup items, ranking and training treat a group as one item, labelled `Rear Wing (WING_1 + WING_9)` ([ADR 0026](adr/0026-linked-setup-items.md)) | Tested (Go table-driven and against PostgreSQL, Vitest; detection run read-only on the real rows: FH26 rear wing found, nothing on the Ferrari 488 GT3); **unverified in game** |
 | AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |

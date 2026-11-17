@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -72,24 +73,43 @@ func (s *Service) CreateBase(ctx context.Context, request BaseRequest) (contract
 	return s.Get(ctx, id)
 }
 
-// applyChanges steps the baseline by every change, in item order.
+// applyChanges steps the baseline by every change, in item order. Changes to members of one
+// linked group are one change: the group moves once (docs/adr/0026-linked-setup-items.md).
 func applyChanges(ctx context.Context, s *Service, base baseline, changes map[string]int) (setups.Values, error) {
 	catalog, _, err := loadCatalog(ctx, s.database, base.carID)
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, 0, len(changes))
-	for name := range changes {
-		names = append(names, name)
+	links, err := loadLinks(ctx, s.database, base.carID, catalog)
+	if err != nil {
+		return nil, err
 	}
-	slices.Sort(names)
+	settings, err := oneChangePerSetting(links, changes)
+	if err != nil {
+		return nil, err
+	}
 	values := base.values
-	for _, name := range names {
-		if values, err = setups.Step(catalog, values, name, changes[name]); err != nil {
+	for _, name := range slices.Sorted(maps.Keys(settings)) {
+		if values, err = setups.Step(catalog, links, values, name, settings[name]); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
 	}
 	return values, nil
+}
+
+// oneChangePerSetting files every change under its group's leader. Two members of a group
+// asked to move differently cannot both be done.
+func oneChangePerSetting(links setups.Links, changes map[string]int) (map[string]int, error) {
+	settings := map[string]int{}
+	for _, name := range slices.Sorted(maps.Keys(changes)) {
+		leader := links.Leader(name)
+		if clicks, seen := settings[leader]; seen && clicks != changes[name] {
+			return nil, fmt.Errorf("%s moves with %s, by %d clicks or by %d: %w",
+				name, leader, clicks, changes[name], ErrInvalid)
+		}
+		settings[leader] = changes[name]
+	}
+	return settings, nil
 }
 
 func baseOrigin(evidence []string) (origin, error) {

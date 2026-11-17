@@ -4,6 +4,17 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Fix, core (ADR 0026): linked setup items are one setting. The FH26 keeps `WING_9` equal to
+  `WING_1` (both "Rear Wing", 0..2), so experiments 13 and 14, which moved one of them, asked
+  for a setup the car cannot hold and were aborted. Core now finds such groups per car: same
+  label and range, equal in every setup the agent read back from the car (at least 3), and
+  moved at least once, so items that never changed are not linked by accident; the FH26's rear
+  wing is also declared in `setups.DeclaredLinks`. A change to any member moves every member by
+  the same clicks (arm values, run plan, `.ini` files, base setups); the setup items, the
+  ledger and the proposals name the group once, "Rear Wing (WING_1 + WING_9)"; a group is one
+  candidate, a measurement on any member is the group's, and training never proposes a lone
+  member. On the real data it finds only the FH26 rear wing; the Ferrari 488 GT3 and the other
+  cars are unchanged. Past experiments stay as recorded. Unverified in game.
 - Fix, agent: the AI no longer laps a block whose setup is not on the car. Seen in game (FH26,
   experiment 13, rear wing `WING_1` 1 -> 0): Setup S was set and checked, but on leaving the
   pits the car held a different setup, so for 40 minutes the AI drove 28 laps that were never

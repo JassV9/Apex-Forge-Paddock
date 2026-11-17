@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/setups"
 )
 
 // knob is one item of a car's setup menu and what the agent's catalog says it does.
@@ -25,6 +27,7 @@ type car struct {
 	drivetrain string
 	judged     int // experiments the engine has given a verdict on
 	knobs      []knob
+	links      setups.Links
 }
 
 func (c car) knob(name string) (knob, bool) {
@@ -90,9 +93,41 @@ func readCars(ctx context.Context, database *sql.DB) ([]car, error) {
 		return nil, fmt.Errorf("read setup items: %w", err)
 	}
 	for i := range cars {
-		cars[i].knobs = byCar[cars[i].id]
+		if err := cars[i].oneKnobPerSetting(ctx, database, byCar[cars[i].id]); err != nil {
+			return nil, err
+		}
 	}
 	return cars, nil
+}
+
+// oneKnobPerSetting keeps a linked group as one knob, its leader's, labelled with its members:
+// the group is one setting, so it does one job (docs/adr/0026-linked-setup-items.md).
+func (c *car) oneKnobPerSetting(ctx context.Context, database *sql.DB, knobs []knob) error {
+	menu, err := experiments.CarMenu(ctx, database, c.id)
+	if err != nil {
+		return err
+	}
+	c.links = menu.Links
+	for _, k := range knobs {
+		if c.links.Leader(k.name) != k.name {
+			continue
+		}
+		if _, linked := c.links[k.name]; linked {
+			k.label = c.links.Label(menu.Catalog, k.name)
+		}
+		c.knobs = append(c.knobs, k)
+	}
+	return nil
+}
+
+// fileUnderLeaders files every measurement of a linked item under its group's leader: testing
+// one member tested the group.
+func fileUnderLeaders(cars []car, measurements map[int64][]contracts.Measurement) {
+	for _, c := range cars {
+		for i := range measurements[c.id] {
+			measurements[c.id][i].Parameter = c.links.Leader(measurements[c.id][i].Parameter)
+		}
+	}
 }
 
 // A measurement is one result of a finished one-factor experiment. An experiment that is

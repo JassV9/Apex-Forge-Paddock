@@ -57,6 +57,7 @@ func (s *Service) Profiles(ctx context.Context) ([]contracts.SensitivityProfile,
 	if err != nil {
 		return nil, err
 	}
+	fileUnderLeaders(cars, measurements)
 	profiles, err := s.build(ctx, cars, measurements)
 	if err != nil {
 		return nil, err

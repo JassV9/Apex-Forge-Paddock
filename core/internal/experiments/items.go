@@ -13,7 +13,8 @@ import (
 
 // SetupItems lists what an experiment on the session could change: every item of the car's
 // setup menu that an experiment may move, with its value on the setup the experiment would
-// start from. Items the setup has no value for are left out.
+// start from. Items the setup has no value for are left out. A linked group is one item, under
+// its leader's name and labelled with its members (docs/adr/0026-linked-setup-items.md).
 func (s *Service) SetupItems(ctx context.Context, sessionID int64) ([]contracts.SetupItem, error) {
 	base, err := baselineOf(ctx, s.database, sessionID)
 	if err != nil {
@@ -23,14 +24,18 @@ func (s *Service) SetupItems(ctx context.Context, sessionID int64) ([]contracts.
 	if err != nil {
 		return nil, err
 	}
+	links, err := loadLinks(ctx, s.database, base.carID, catalog)
+	if err != nil {
+		return nil, err
+	}
 	items := []contracts.SetupItem{}
 	for name, parameter := range catalog {
 		value, present := base.values[name]
-		if parameter.Excluded || !present {
+		if parameter.Excluded || !present || links.Leader(name) != name {
 			continue
 		}
 		items = append(items, contracts.SetupItem{
-			Name: name, Label: parameter.Label, Min: parameter.Min, Max: parameter.Max,
+			Name: name, Label: links.Label(catalog, name), Min: parameter.Min, Max: parameter.Max,
 			Step: parameter.Step, Value: value,
 		})
 	}

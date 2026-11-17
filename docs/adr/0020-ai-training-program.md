@@ -33,7 +33,9 @@ The next experiment is the best-ranked proposal of the session's diagnosis on an
 program has not tested yet. The ranking itself already drops what this car measured as
 negligible or worse ([ADR 0011](0011-sensitivity-and-ranking.md)) and is rebuilt from the
 ledger on every call, so each verdict changes what comes next. The program ends at its target
-or when nothing is left to test.
+or when nothing is left to test. Linked items are one setting: a step on any member tested the
+group, and the group is proposed under its leader, never a lone member
+([ADR 0026](0026-linked-setup-items.md)).
 
 **The ledger says who decided.** A baseline the program keeps is recorded with the program's
 reason and `decided_by: training` (migration 00009), never as the driver's call. The first

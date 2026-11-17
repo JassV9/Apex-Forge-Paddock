@@ -74,9 +74,11 @@ export function toRequest(sessionId: number, draft: Draft): ExperimentCreate {
   };
 }
 
-/** Label and id: on many cars several items share a label ("Bump" on each corner). */
+/** Label and id: on many cars several items share a label ("Bump" on each corner). A linked
+ * group's label already names its items ("Rear Wing (WING_1 + WING_9)", ADR 0026). */
 function itemLabel(item: SetupItem): string {
-  const name = item.label === "" ? item.name : `${item.label} [${item.name}]`;
+  const named = item.label === "" || item.label.includes(item.name);
+  const name = named ? item.label || item.name : `${item.label} [${item.name}]`;
   return `${name}: now ${String(item.value)}, ${String(item.min)} to ${String(item.max)}`;
 }
 

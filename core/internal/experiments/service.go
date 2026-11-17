@@ -61,7 +61,7 @@ func (s *Service) List(ctx context.Context) ([]contracts.Experiment, error) {
 	return experiments, nil
 }
 
-// Create proposes an experiment: one setup item moved by some clicks, against the setup the
+// Create proposes an experiment: one setting moved by some clicks, against the setup the
 // session was driven on. The variant is validated against the car's setup menu here, so an
 // experiment that could not be driven is never stored.
 func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate) (contracts.Experiment, error) {
@@ -72,19 +72,14 @@ func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate
 	if err != nil {
 		return contracts.Experiment{}, err
 	}
-	catalog, ids, err := loadCatalog(ctx, s.database, base.carID)
+	variant, parameterID, err := oneSetting(ctx, s.database, base, request.Parameter, request.Clicks)
 	if err != nil {
 		return contracts.Experiment{}, err
-	}
-	variant, err := setups.Step(catalog, base.values, request.Parameter, request.Clicks)
-	if err != nil {
-		return contracts.Experiment{}, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	cameFrom, err := originOf(ctx, s.database, int64(request.SessionId), request.HypothesisKey)
 	if err != nil {
 		return contracts.Experiment{}, err
 	}
-	parameterID := ids[request.Parameter]
 	id, err := s.store(ctx, draft{
 		carID: base.carID, trackID: base.trackID, kind: contracts.ExperimentKindOfat,
 		baselineVersion: base.versionID, variantValues: variant, parameterID: &parameterID,
@@ -97,6 +92,25 @@ func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate
 	s.logger.InfoContext(ctx, "experiment proposed", "experiment_id", id,
 		"parameter", request.Parameter, "clicks", request.Clicks, "driver", driverOf(request.Driver))
 	return s.Get(ctx, id)
+}
+
+// oneSetting is the variant of a one-factor experiment and the id of the item it is filed
+// under. A linked item moves with its group, which is filed under its leader, whichever member
+// was asked for (docs/adr/0026-linked-setup-items.md).
+func oneSetting(ctx context.Context, q querier, base baseline, name string, clicks int) (setups.Values, int64, error) {
+	catalog, ids, err := loadCatalog(ctx, q, base.carID)
+	if err != nil {
+		return nil, 0, err
+	}
+	links, err := loadLinks(ctx, q, base.carID, catalog)
+	if err != nil {
+		return nil, 0, err
+	}
+	variant, err := setups.Step(catalog, links, base.values, name, clicks)
+	if err != nil {
+		return nil, 0, fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
+	return variant, ids[links.Leader(name)], nil
 }
 
 func checkRequest(request contracts.ExperimentCreate) error {

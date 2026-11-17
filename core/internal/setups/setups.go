@@ -76,20 +76,25 @@ func Validate(catalog Catalog, values, anchor Values) error {
 
 // Step returns base with one item moved by a number of clicks, validated. This is the only
 // way an experiment makes a variant: a one-factor variant differs from its baseline in exactly
-// one item, a base setup (docs/adr/0018-base-setup.md) is one Step per measured change.
-func Step(catalog Catalog, base Values, name string, clicks int) (Values, error) {
+// one setting, a base setup (docs/adr/0018-base-setup.md) is one Step per measured change. A
+// linked item moves with its whole group, every member by the same clicks
+// (docs/adr/0026-linked-setup-items.md); links may be nil.
+func Step(catalog Catalog, links Links, base Values, name string, clicks int) (Values, error) {
 	if clicks == 0 {
 		return nil, fmt.Errorf("%s: a change of 0 clicks is not a change", name)
 	}
-	item, known := catalog[name]
-	if !known {
-		return nil, fmt.Errorf("%s: %w", name, ErrUnknownItem)
+	changed := Values{}
+	for _, member := range links.Members(name) {
+		item, known := catalog[member]
+		if !known {
+			return nil, fmt.Errorf("%s: %w", member, ErrUnknownItem)
+		}
+		current, present := base[member]
+		if !present {
+			return nil, fmt.Errorf("%s: the baseline setup has no value for it: %w", member, ErrUnknownItem)
+		}
+		changed[member] = current + float64(clicks)*item.Step
 	}
-	current, present := base[name]
-	if !present {
-		return nil, fmt.Errorf("%s: the baseline setup has no value for it: %w", name, ErrUnknownItem)
-	}
-	changed := Values{name: current + float64(clicks)*item.Step}
 	if err := Validate(catalog, changed, base); err != nil {
 		return nil, err
 	}
@@ -97,7 +102,9 @@ func Step(catalog Catalog, base Values, name string, clicks int) (Values, error)
 	for key, value := range base {
 		variant[key] = value
 	}
-	variant[name] = changed[name]
+	for member, value := range changed {
+		variant[member] = value
+	}
 	return variant, nil
 }
 

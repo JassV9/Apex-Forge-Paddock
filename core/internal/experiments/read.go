@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/setups"
 )
 
 const headSQL = `
@@ -29,6 +31,7 @@ func readExperiment(ctx context.Context, q querier, id int64) (contracts.Experim
 		return contracts.Experiment{}, err
 	}
 	steps := []func() error{
+		func() (err error) { exp.ParameterLabel, err = settingLabel(ctx, q, exp); return },
 		func() (err error) { exp.Arms, err = readArms(ctx, q, id, exp.Parameter); return },
 		func() (err error) { exp.Blocks, err = readBlocks(ctx, q, id); return },
 		func() (err error) { exp.Predictions, err = readPredictions(ctx, q, id); return },
@@ -71,6 +74,33 @@ func readHead(ctx context.Context, q querier, id int64) (contracts.Experiment, e
 		}
 	}
 	return exp, nil
+}
+
+// The items a one-factor experiment's variant moved away from its baseline.
+const movedItemsSQL = `
+SELECT item FROM experiment_arm b
+JOIN setup_version bv ON bv.id = b.setup_version_id
+JOIN experiment_arm a ON a.experiment_id = b.experiment_id AND NOT a.is_baseline
+JOIN setup_version av ON av.id = a.setup_version_id
+CROSS JOIN LATERAL jsonb_object_keys(av."values") AS item
+WHERE b.experiment_id = $1 AND b.is_baseline AND bv."values"->item IS DISTINCT FROM av."values"->item
+ORDER BY item`
+
+// settingLabel names the setting a one-factor experiment moved as its setups record it: a
+// linked group once, with every member it moved (docs/adr/0026-linked-setup-items.md). An
+// experiment that moved one item keeps the item's label.
+func settingLabel(ctx context.Context, q querier, exp contracts.Experiment) (string, error) {
+	if exp.Kind != contracts.ExperimentKindOfat || exp.Parameter == "" {
+		return exp.ParameterLabel, nil
+	}
+	moved, err := queryAll(ctx, q, movedItemsSQL, func(rows *sql.Rows) (string, error) {
+		var item string
+		return item, rows.Scan(&item)
+	}, exp.Id)
+	if err != nil || !slices.Contains(moved, exp.Parameter) {
+		return exp.ParameterLabel, err
+	}
+	return setups.GroupLabel(exp.ParameterLabel, moved), nil
 }
 
 // Arms are listed by code name, so their order says nothing about which is the baseline.

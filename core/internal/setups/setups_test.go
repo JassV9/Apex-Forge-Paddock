@@ -72,7 +72,7 @@ func TestStep(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			variant, err := Step(mx5(), base, tt.item, tt.clicks)
+			variant, err := Step(mx5(), nil, base, tt.item, tt.clicks)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", err, tt.wantErr)
 			}
@@ -89,7 +89,7 @@ func TestStep(t *testing.T) {
 	if base["ARB_FRONT"] != 2 {
 		t.Error("Step modified the baseline")
 	}
-	if _, err := Step(mx5(), base, "ARB_FRONT", 0); err == nil {
+	if _, err := Step(mx5(), nil, base, "ARB_FRONT", 0); err == nil {
 		t.Error("a change of 0 clicks was accepted")
 	}
 }

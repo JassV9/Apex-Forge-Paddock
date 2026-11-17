@@ -44,11 +44,15 @@ func (s *Service) Proposals(ctx context.Context, sessionID int64) (contracts.Pro
 	if err != nil {
 		return contracts.Proposals{}, err
 	}
+	menu, err := experiments.CarMenu(ctx, s.database, carID)
+	if err != nil {
+		return contracts.Proposals{}, err
+	}
 	profiles, err := s.Profiles(ctx)
 	if err != nil {
 		return contracts.Proposals{}, err
 	}
-	request := proposeRequest(candidatesOf(diagnosis), carID, profiles)
+	request := proposeRequest(candidatesOf(diagnosis, menu), carID, profiles)
 	request.Sigma, request.Corners = sigma, max(corners, 1)
 	proposals, err := s.engine.Propose(ctx, request)
 	if err != nil {
@@ -73,8 +77,9 @@ func proposeRequest(candidates []contracts.ProposeCandidate, carID int64, profil
 }
 
 // candidatesOf lists every change the diagnosis names once, most strongly supported
-// hypothesis first, with the hypotheses it would test.
-func candidatesOf(diagnosis contracts.Diagnosis) []contracts.ProposeCandidate {
+// hypothesis first, with the hypotheses it would test. A change to any member of a linked
+// group is the group's change, under its leader (docs/adr/0026-linked-setup-items.md).
+func candidatesOf(diagnosis contracts.Diagnosis, menu experiments.Menu) []contracts.ProposeCandidate {
 	type change struct {
 		parameter string
 		clicks    int
@@ -83,18 +88,26 @@ func candidatesOf(diagnosis contracts.Diagnosis) []contracts.ProposeCandidate {
 	candidates := []contracts.ProposeCandidate{}
 	for _, hypothesis := range diagnosis.Hypotheses {
 		for _, c := range hypothesis.Candidates {
-			key := change{c.Parameter, c.Clicks}
+			key := change{menu.Links.Leader(c.Parameter), c.Clicks}
 			at, seen := index[key]
 			if !seen {
 				at = len(candidates)
 				index[key] = at
 				candidates = append(candidates, contracts.ProposeCandidate{
-					Parameter: c.Parameter, Label: c.Label, Clicks: c.Clicks, Why: c.Why,
-					Hypotheses: []string{},
+					Parameter: key.parameter, Label: settingLabel(menu, c), Clicks: c.Clicks,
+					Why: c.Why, Hypotheses: []string{},
 				})
 			}
 			candidates[at].Hypotheses = append(candidates[at].Hypotheses, hypothesis.Key)
 		}
 	}
 	return candidates
+}
+
+// settingLabel is the group's label for a linked item, the diagnosis's own otherwise.
+func settingLabel(menu experiments.Menu, c contracts.Candidate) string {
+	if _, linked := menu.Links[c.Parameter]; linked {
+		return menu.Links.Label(menu.Catalog, c.Parameter)
+	}
+	return c.Label
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/setups"
 )
 
 // next starts the program's next experiment: the best-ranked change of the session's
@@ -16,7 +18,11 @@ func (s *Service) next(ctx context.Context, program contracts.TrainingProgram) e
 	if err != nil {
 		return fmt.Errorf("rank experiments for program %d: %w", program.Id, err)
 	}
-	proposal, found := pick(proposals.Ranked, program.Steps)
+	menu, err := experiments.SessionMenu(ctx, s.database, int64(program.SessionId))
+	if err != nil {
+		return err
+	}
+	proposal, found := pick(proposals.Ranked, program.Steps, menu.Links)
 	if !found {
 		return s.finish(ctx, int64(program.Id), fmt.Sprintf(
 			"Done: nothing left to test from session %d's diagnosis after %d experiment(s).",
@@ -37,13 +43,16 @@ func (s *Service) next(ctx context.Context, program contracts.TrainingProgram) e
 	return s.start(ctx, int64(program.Id), int64(exp.Id))
 }
 
-// pick returns the first ranked proposal whose item no step has tested.
-func pick(ranked []contracts.Proposal, steps []contracts.TrainingStep) (contracts.Proposal, bool) {
+// pick returns the first ranked proposal whose setting no step has tested. Members of a
+// linked group are one setting: a step on any member tested the group, and a proposal is
+// filed under the group's leader, never a lone member (docs/adr/0026-linked-setup-items.md).
+func pick(ranked []contracts.Proposal, steps []contracts.TrainingStep, links setups.Links) (contracts.Proposal, bool) {
 	tested := map[string]bool{}
 	for _, step := range steps {
-		tested[step.Parameter] = true
+		tested[links.Leader(step.Parameter)] = true
 	}
 	for _, proposal := range ranked {
+		proposal.Parameter = links.Leader(proposal.Parameter)
 		if !tested[proposal.Parameter] {
 			return proposal, true
 		}

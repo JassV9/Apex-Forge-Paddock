@@ -12,13 +12,14 @@ vi.mock("../charts/UPlotChart", () => ({
   ),
 }));
 
-function show(corner: number) {
+function show(corner: number, where?: string) {
   const loadAi = vi.fn((sessionId: number, seq: number) =>
     Promise.resolve({ ...traceOf(seq, 590), session_id: sessionId }),
   );
   const ai: AiPassSource = {
     corner: (n) => cotaReference.corners.find((c) => c.corner === n),
     load: loadAi,
+    where,
   };
   const load = (seq: number) => Promise.resolve(traceOf(seq));
   render(
@@ -39,6 +40,16 @@ describe("the AI's pass in the telemetry", () => {
     });
     expect(loadAi).toHaveBeenCalledWith(57, 30);
     expect(screen.getByRole("img", { name: /^Speed/ })).toHaveAccessibleName(/AI best 9\.045/);
+  });
+
+  it("says when the AI's pass is on the layout's test copy, the same track", async () => {
+    show(1, "AI on COTA F1 2026 (Paddock test), the same track");
+
+    expect(
+      await screen.findByRole("checkbox", {
+        name: /AI passes; AI on COTA F1 2026 \(Paddock test\), the same track\)/,
+      }),
+    ).toBeVisible();
   });
 
   it("is not offered when the AI drove another setup there", async () => {

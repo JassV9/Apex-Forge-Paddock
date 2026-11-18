@@ -28,7 +28,8 @@ func NewService(database *sql.DB) *Service {
 }
 
 // Session compares every corner of a session on one of its setups (empty: the setup of
-// its latest pass) with the AI's passes on the same car and track.
+// its latest pass) with the AI's passes on the same car and track: its own track row and
+// the rows of its layout's variant that are the same track (aiTracks, docs/adr/0027).
 func (s *Service) Session(ctx context.Context, sessionID int64, setupHash string) (contracts.SessionReference, error) {
 	info, err := s.session(ctx, sessionID)
 	if err != nil {
@@ -44,36 +45,41 @@ func (s *Service) Session(ctx context.Context, sessionID int64, setupHash string
 	} else if !drove(driven, setupHash) {
 		return contracts.SessionReference{}, fmt.Errorf("session %d has no valid pass on setup %s: %w", sessionID, setupHash, ErrNotFound)
 	}
-	in, err := s.input(ctx, info, sessionID, setupHash)
+	in, reference, err := s.input(ctx, info, sessionID, setupHash)
 	if err != nil {
 		return contracts.SessionReference{}, err
 	}
 	in.Human = onSetup(own, setupHash)
-	reference := contracts.SessionReference{
-		SessionId: int(sessionID), Car: info.car, Track: info.track, Layout: info.layout,
-		Setups: driven, MarginFloorS: MarginFloorS, AiPasses: len(in.AI), Corners: Compare(in),
-	}
-	if setupHash != "" {
-		reference.SetupHash = &setupHash
-	}
+	reference.SessionId, reference.Setups, reference.Corners = int(sessionID), driven, Compare(in)
 	return reference, nil
 }
 
-// input loads the AI's passes, the car's setups and the corner names.
-func (s *Service) input(ctx context.Context, info sessionInfo, sessionID int64, setupHash string) (Input, error) {
-	ai, err := s.passes(ctx, aiPassesSQL, info.carID, info.trackID, sessionID)
+// input loads the AI's passes on the grouped track rows, the car's setups and the corner
+// names, and starts the reply with what was grouped.
+func (s *Service) input(ctx context.Context, info sessionInfo, sessionID int64, setupHash string) (Input, contracts.SessionReference, error) {
+	reference := contracts.SessionReference{Car: info.car, Track: info.acID, Layout: info.track.Layout,
+		MarginFloorS: MarginFloorS}
+	tracks, note, err := s.aiTracks(ctx, info)
 	if err != nil {
-		return Input{}, fmt.Errorf("AI passes for session %d: %w", sessionID, err)
+		return Input{}, reference, err
+	}
+	ai, counted, err := s.aiPasses(ctx, info, sessionID, tracks)
+	if err != nil {
+		return Input{}, reference, err
+	}
+	reference.AiTracks, reference.VariantNote, reference.AiPasses = counted, note, len(ai)
+	if setupHash != "" {
+		reference.SetupHash = &setupHash
 	}
 	values, err := s.setupValues(ctx, info.carID)
 	if err != nil {
-		return Input{}, err
+		return Input{}, reference, err
 	}
-	names, err := s.cornerNames(ctx, info.trackID)
+	names, err := s.cornerNames(ctx, info.track.ID)
 	if err != nil {
-		return Input{}, err
+		return Input{}, reference, err
 	}
-	return Input{AI: ai, SetupHash: setupHash, Values: values, Names: names}, nil
+	return Input{AI: ai, SetupHash: setupHash, Values: values, Names: names}, reference, nil
 }
 
 // ForSetup returns the AI's times per corner on exactly one setup of a car on a track

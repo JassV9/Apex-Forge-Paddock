@@ -4,7 +4,14 @@ import type { CornerReference, SessionReference } from "../../api/client";
 import { seconds, signedSeconds } from "../../format";
 import { useLoaded } from "../../hooks/useLoaded";
 import { telemetryHref } from "../../hooks/useRoute";
-import { byTimeLost, CLASS_LABEL, differenceText, matchNote, noAiNote } from "./referenceData";
+import {
+  aiSourceText,
+  byTimeLost,
+  CLASS_LABEL,
+  differenceText,
+  matchNote,
+  noAiNote,
+} from "./referenceData";
 
 export type ReferenceLoader = (sessionId: number, setupHash?: string) => Promise<SessionReference>;
 
@@ -103,7 +110,8 @@ export function ReferencePanel({ sessionId, load }: { sessionId: number; load: R
   if (reference.kind === "loading") return <p className="empty">Loading the comparison…</p>;
   if (reference.kind === "failed") return <p role="alert">The comparison could not be loaded.</p>;
   const data = reference.value;
-  const noAi = noAiNote(data.layout, data.ai_passes);
+  const noAi = noAiNote(data);
+  const source = aiSourceText(data);
   return (
     <section className="panel-reference card" aria-label="Against the AI">
       <h3>Against the AI</h3>
@@ -116,6 +124,12 @@ export function ReferencePanel({ sessionId, load }: { sessionId: number; load: R
       {noAi !== "" && (
         <p role="note" className="reference-no-ai">
           {noAi}
+        </p>
+      )}
+      {source !== "" && (
+        <p className="reference-source">
+          {source}. Compared in the web app only: the game shows AI times only on the layout the AI
+          drove.
         </p>
       )}
       <SetupChooser data={data} onPick={setSetupHash} />

@@ -5958,6 +5958,51 @@ func (j *ReferenceSetup) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type ReferenceTrack struct {
+	// Valid AI passes on this track row, on any setup.
+	AiPasses int `json:"ai_passes"`
+
+	// Track layout; empty for single-layout tracks.
+	Layout string `json:"layout"`
+
+	// The layout's name in the game, such as "COTA F1 2026 (Paddock test)".
+	Name string `json:"name"`
+
+	// True for a variant of the session's layout (the same physical track, another
+	// track row); false for the session's own.
+	Variant bool `json:"variant"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ReferenceTrack) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ai_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_passes in ReferenceTrack: required")
+	}
+	if _, ok := raw["layout"]; raw != nil && !ok {
+		return fmt.Errorf("field layout in ReferenceTrack: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ReferenceTrack: required")
+	}
+	if _, ok := raw["variant"]; raw != nil && !ok {
+		return fmt.Errorf("field variant in ReferenceTrack: required")
+	}
+	type Plain ReferenceTrack
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.AiPasses {
+		return fmt.Errorf("field %s: must be >= %v", "ai_passes", 0)
+	}
+	*j = ReferenceTrack(plain)
+	return nil
+}
+
 // What the agent must load and for how many laps. Written by core as runplan.json;
 // the agent reads it in the pits. Labels are code names: the plan does not say
 // which setup is the baseline.
@@ -6747,12 +6792,19 @@ func (j *SessionPasses) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-// A session's corners against AC's AI on the same car, track, layout and setup
-// (docs/adr/0019-ai-reference-driver.md). Every number is computed by core from
-// stored passes, with the count of passes behind it. Read-only.
+// A session's corners against AC's AI on the same car, track and setup
+// (docs/adr/0019-ai-reference-driver.md): the AI's passes on the session's own
+// layout and on a variant of it that is the same physical track
+// (docs/adr/0027-layout-variants.md). Every number is computed by core from stored
+// passes, with the count of passes behind it. Read-only.
 type SessionReference struct {
-	// Valid AI passes stored on this car and track, on any setup.
+	// Valid AI passes stored on this car and its ai_tracks, on any setup.
 	AiPasses int `json:"ai_passes"`
+
+	// The track rows whose AI passes are compared with: the session's own first, then
+	// a variant of its layout on the same track (<layout> and <layout>_paddock) whose
+	// corner map matches. A read-side grouping; no row is rewritten.
+	AiTracks []ReferenceTrack `json:"ai_tracks"`
 
 	// The car's id in the game.
 	Car string `json:"car"`
@@ -6779,6 +6831,11 @@ type SessionReference struct {
 
 	// The track's id in the game.
 	Track string `json:"track"`
+
+	// Why a variant of this layout on the same track is not compared with (its corner
+	// map differs), in words; empty when there is no such variant or it is compared
+	// with.
+	VariantNote string `json:"variant_note"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -6789,6 +6846,9 @@ func (j *SessionReference) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["ai_passes"]; raw != nil && !ok {
 		return fmt.Errorf("field ai_passes in SessionReference: required")
+	}
+	if _, ok := raw["ai_tracks"]; raw != nil && !ok {
+		return fmt.Errorf("field ai_tracks in SessionReference: required")
 	}
 	if _, ok := raw["car"]; raw != nil && !ok {
 		return fmt.Errorf("field car in SessionReference: required")
@@ -6810,6 +6870,9 @@ func (j *SessionReference) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["track"]; raw != nil && !ok {
 		return fmt.Errorf("field track in SessionReference: required")
+	}
+	if _, ok := raw["variant_note"]; raw != nil && !ok {
+		return fmt.Errorf("field variant_note in SessionReference: required")
 	}
 	type Plain SessionReference
 	var plain Plain

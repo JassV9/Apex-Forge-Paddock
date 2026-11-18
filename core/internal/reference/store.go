@@ -46,16 +46,18 @@ ORDER BY agent_hash, id DESC`
 
 // sessionInfo is what the comparison needs of a session row.
 type sessionInfo struct {
-	carID, trackID     int64
-	car, track, layout string
+	carID     int64
+	car, acID string
+	track     TrackRow
 }
 
 func (s *Service) session(ctx context.Context, sessionID int64) (sessionInfo, error) {
 	var info sessionInfo
 	err := s.database.QueryRowContext(ctx, `
-		SELECT s.car_id, s.track_id, c.ac_id, t.ac_id, t.layout
+		SELECT s.car_id, c.ac_id, t.ac_id, t.id, t.layout, t.name, t.corner_map
 		FROM session s JOIN car c ON c.id = s.car_id JOIN track t ON t.id = s.track_id
-		WHERE s.id = $1`, sessionID).Scan(&info.carID, &info.trackID, &info.car, &info.track, &info.layout)
+		WHERE s.id = $1`, sessionID).Scan(&info.carID, &info.car, &info.acID,
+		&info.track.ID, &info.track.Layout, &info.track.Name, &info.track.CornerMap)
 	if errors.Is(err, sql.ErrNoRows) {
 		return info, fmt.Errorf("session %d: %w", sessionID, ErrNotFound)
 	}

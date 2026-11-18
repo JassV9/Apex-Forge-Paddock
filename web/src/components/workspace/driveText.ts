@@ -38,38 +38,41 @@ export interface LayoutHint {
   command?: string;
   /** The test copy to pick instead, when the layout picked is an original that has one. */
   testCopy?: string;
-  /** Your laps here are compared with the AI's. */
+  /** The AI drives here, so the game shows its times. */
   aiCanDrive: boolean;
 }
 
+/** What driving an original layout gives, in the web app and in the game (docs/adr/0027). */
+const ORIGINAL_LAYOUT =
+  "Original layout: no AI times in the game. In the web app your laps are compared with the AI's on its test copy, the same track.";
+
 /**
- * What picking a layout means for a person driving it. The AI drives, and so can be compared
- * with, only the Paddock test copy of a layout (docs/adr/0014-ghost-driver.md); the original is
- * driven and recorded all the same.
+ * What picking a layout means for a person driving it. The AI drives only the Paddock test
+ * copy of a layout (docs/adr/0014-ghost-driver.md), so only there does the game show its
+ * times; laps on the original are compared with the copy's in the web app (docs/adr/0027).
  */
 export function layoutHint(track: LauncherTrack, layout: LauncherLayout): LayoutHint {
   if (layout.ai_can_drive) {
     return {
-      text: "Test copy: your laps here are compared with the AI's, corner by corner.",
+      text: "Test copy: the AI drives here, so the game shows its times and your laps are compared with them, corner by corner.",
       aiCanDrive: true,
     };
   }
-  const original = "Original layout: your laps are recorded, but not compared with the AI.";
   if (layout.test_copy !== "") {
     return {
-      text: `${original} The AI drives only the test copy, ${layout.test_copy}; pick that to be compared.`,
+      text: `${ORIGINAL_LAYOUT} Pick the test copy, ${layout.test_copy}, for AI times in the game too.`,
       testCopy: layout.test_copy,
       aiCanDrive: false,
     };
   }
   if (layout.layout === "") {
     return {
-      text: `${original} This track has no layout folder to make a test copy of, so it never can be.`,
+      text: "Single layout: your laps are recorded. This track has no layout folder to make a test copy of, so the AI never drives it and there is nothing to compare with.",
       aiCanDrive: false,
     };
   }
   return {
-    text: `${original} The AI drives only a test copy, which does not exist yet. Make it, then reload:`,
+    text: `${ORIGINAL_LAYOUT} The AI drives only a test copy, which does not exist yet. Make it, then reload:`,
     command: `python tools/prepare_test_layout.py ${track.id} ${layout.layout}`,
     aiCanDrive: false,
   };
@@ -77,7 +80,7 @@ export function layoutHint(track: LauncherTrack, layout: LauncherLayout): Layout
 
 /** A layout's line in the picker. */
 export function layoutLabel(layout: LauncherLayout): string {
-  return layout.ai_can_drive ? `${layout.name} · compared with the AI` : layout.name;
+  return layout.ai_can_drive ? `${layout.name} · AI drives here` : layout.name;
 }
 
 function controlsText(check: ControlsCheck): string {

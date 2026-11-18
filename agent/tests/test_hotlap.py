@@ -191,7 +191,8 @@ def test_the_window_asks_again_after_thirty_seconds(agent: Agent) -> None:
 
 
 def test_on_the_original_layout_the_window_says_why_there_are_no_ai_times(agent: Agent) -> None:
-    agent.mock["web_post"] = FakeCore({"corners": []})
+    core = FakeCore({"corners": []})
+    agent.mock["web_post"] = core
     agent.mock["layout"] = "layout_f1"
     draw(agent)
     agent.drive.idle(5)
@@ -199,6 +200,9 @@ def test_on_the_original_layout_the_window_says_why_there_are_no_ai_times(agent:
 
     message = agent.rt.eval('require("game.hotlap_link").message')
     assert "original layout" in message and "(Paddock test)" in message
+    # The game asks for its own layout only, never the test copy: core groups an original with
+    # its copy for the web app alone (docs/adr/0027), so the window shows no AI times here.
+    assert core.asked and all(asked["layout"] == ["layout_f1"] for asked in core.asked)
 
 
 @pytest.mark.parametrize(

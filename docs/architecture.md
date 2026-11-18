@@ -66,7 +66,7 @@ samples, DuckDB inside the engine for queries over Parquet
 | `core/internal/setups` | Go | Parameter catalog, setup versions, `.ini` writer, diffing, linked items ([ADR 0026](adr/0026-linked-setup-items.md)) | Accept a value off the step grid or out of range; move one member of a linked group alone |
 | `core/internal/experiments` | Go | Experiment state machine, run plans, verdict ledger, rollback | Do statistics (it asks the engine) |
 | `core/internal/passes` | Go | Read path for a session's passes and their raw samples (Parquet) | Write anything |
-| `core/internal/reference` | Go | A session's corners against the AI on the same car, track and setup: matching, the driver/car class, the technique metrics that differ | Write anything; let anything but its rule decide a class |
+| `core/internal/reference` | Go | A session's corners against the AI on the same car, track and setup: matching, the driver/car class, the technique metrics that differ, a layout grouped with its test copy when the corner maps match ([ADR 0027](adr/0027-layout-variants.md)) | Write anything; let anything but its rule decide a class |
 | `core/internal/api` | Go | REST API for the dashboard and the in-game desk | Hold logic that belongs to another package |
 | `core/internal/store` | Go | Database connection, migrations, the API's read queries | — |
 | `core/internal/launcher` (`cmd/paddock-launcher`) | Go, on the Windows host | Listing installed cars and layouts, starting Practice through Content Manager, backing up `controls.ini` and restoring it when the game changed the bindings | Write anything outside `paddock/` except putting back its own `controls.ini` backup; change CM's presets or settings |
@@ -272,12 +272,16 @@ Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
 
 1. `GET /sessions/{id}/reference`: `core/internal/reference` takes the session's valid passes
    on one of its setups and the AI's on the same car and track, from the newest AI session with
-   three passes of the corner on that setup (else the nearest setup, said per corner).
+   three passes of the corner on that setup (else the nearest setup, said per corner). The
+   track is the session's track row plus its layout's variant (`<layout>` and
+   `<layout>_paddock`) when their corner maps match, read-side only and listed in `ai_tracks`
+   ([ADR 0027](adr/0027-layout-variants.md)), so a lap on an original layout is compared with
+   the AI on its test copy in the web app.
 2. Per corner: medians, the AI's robust spread, the gaps, and the class: driver when the
    typical pass is slower than the AI by more than `max(spread, 10 ms)`, car otherwise; the
    technique metrics that differ beyond their step.
 3. `GET /reference?car=&track=&layout=&setup_hash=` gives the game the AI's times on exactly
-   that setup; the hotlap window (`agent/src/core/hotlap.lua`, `agent/src/game/hotlap.lua`)
+   that setup and layout, never a variant's (no AI times in the game on an original layout); the hotlap window (`agent/src/core/hotlap.lua`, `agent/src/game/hotlap.lua`)
    shows each pass against them.
 
 The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/0019-ai-reference-driver.md).
@@ -290,7 +294,7 @@ The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/00
 | agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 151 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
 | engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 187 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
-| web: one workspace (session rail, overview grid, overlaid telemetry per corner, diagnosis, experiments with propose panel and scorecard, garage); a read-only build | Working, 123 tests |
+| web: one workspace (session rail, overview grid, overlaid telemetry per corner, diagnosis, experiments with propose panel and scorecard, garage); a read-only build | Working, 186 tests |
 | End to end: the Lua agent on the mocked game, core and the engine through a diagnosis, three experiments, and the profile, ranking and scorecard they leave (`make test-e2e`) | Passes locally and in CI |
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
 | Read-only demo: nginx door, replica layout in Compose, smoke test (`make demo-replica`, `make demo-replica-check`) | Working locally and in CI |
@@ -307,6 +311,7 @@ The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/00
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
 | AI as the reference driver: `GET /sessions/{id}/reference`, `GET /reference`, the hotlap window, "Against the AI" and the AI overlay in the dashboard ([ADR 0019](adr/0019-ai-reference-driver.md)) | Tested offline and against a real PostgreSQL; run on real AI sessions only; the window is **unverified in game** |
+| A layout and its test copy are one track in the web app: an original-layout session is compared with the AI on `<layout>_paddock` when the corner maps match (same numbers, apexes within 5 m), `ai_tracks` and `variant_note` on the reply; the game's `GET /reference` stays exact ([ADR 0027](adr/0027-layout-variants.md)) | Tested (Go table-driven and against PostgreSQL, Vitest, agent pytest); run read-only on the real rows (COTA groups, the Hungaroring has no original row yet); **unverified in game and in a browser** |
 
 The data model (`docs/MASTER_PROMPT.md` section 3) is introduced table by table, each in the
 phase that first uses it.

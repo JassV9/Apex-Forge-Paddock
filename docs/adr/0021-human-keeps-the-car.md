@@ -58,6 +58,10 @@ original layout is recorded but never compared. The Drive panel says so for an o
 ("recorded, but not compared with the AI"), offers **Use the test copy** when there is one,
 the "Against the AI" tab states the same with the session's layout when the AI has no passes
 there, and the hotlap window's footer says so instead of "the AI has not driven this setup".
+*Amended by [ADR 0027](0027-layout-variants.md):* the web app now compares a session on the
+original layout with the AI on its test copy when their corner maps match, and the Drive panel
+and "Against the AI" say "compared in the web app, never shown in the game"; the game is
+unchanged.
 
 **Base setup defaults to the person who owns the session** (`I drive` in a session that is not
 the AI's) and says what to do next after building: it is only proposed; Plan and Start, then the

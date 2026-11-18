@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { CornerReference, FeatureDifference } from "../../api/client";
+import type { CornerReference, FeatureDifference, SessionReference } from "../../api/client";
 import { cotaReference } from "../../test-reference";
-import { byTimeLost, differenceText, matchNote, metricLabel, noAiNote } from "./referenceData";
+import {
+  aiSourceText,
+  byTimeLost,
+  differenceText,
+  matchNote,
+  metricLabel,
+  noAiNote,
+} from "./referenceData";
 
 const [t2, t1] = cotaReference.corners as [CornerReference, CornerReference];
 const none: CornerReference = {
@@ -27,15 +34,52 @@ describe("referenceData", () => {
   });
 
   it.each([
-    ["layout_f1", 0, "original layout (layout_f1)"],
-    ["", 0, "original layout."],
-    ["layout_f1_paddock", 0, "has not driven this car on this layout"],
-    ["layout_f1", 5, ""],
-    ["layout_f1_paddock", 5, ""],
-  ])("explains no AI to compare with on layout %j with %j AI passes", (layout, passes, words) => {
-    const note = noAiNote(layout, passes);
-    if (words === "") expect(note).toBe("");
-    else expect(note).toContain(words);
+    ["layout_f1", 0, "", "original layout (layout_f1)"],
+    ["layout_f1", 0, "", "compared here, in the web app"],
+    ["layout_f1", 0, "", "never shown in the game"],
+    ["", 0, "", "single layout"],
+    ["layout_f1_paddock", 0, "", "has not driven this car on this layout"],
+    [
+      "layout_f1",
+      0,
+      "The AI's laps on F1 (Paddock test) are not compared with: x.",
+      "not compared with: x",
+    ],
+    ["layout_f1", 5, "", ""],
+    ["layout_f1_paddock", 5, "", ""],
+  ])(
+    "explains no AI on layout %j with %j AI passes (note %j)",
+    (layout, passes, variant, words) => {
+      const data = { ...cotaReference, layout, ai_passes: passes, variant_note: variant };
+      const note = noAiNote(data);
+      if (words === "") expect(note).toBe("");
+      else expect(note).toContain(words);
+    },
+  );
+
+  it("names the variant the AI drove, the same track, and nothing on the own layout", () => {
+    const original: SessionReference = {
+      ...cotaReference,
+      layout: "layout_f1_2026",
+      ai_tracks: [
+        { layout: "layout_f1_2026", name: "COTA F1 2026", variant: false, ai_passes: 0 },
+        {
+          layout: "layout_f1_2026_paddock",
+          name: "COTA F1 2026 (Paddock test)",
+          variant: true,
+          ai_passes: 40,
+        },
+      ],
+    };
+    expect(aiSourceText(original)).toBe("AI on COTA F1 2026 (Paddock test), the same track");
+    expect(aiSourceText(cotaReference)).toBe("");
+    const both = {
+      ...original,
+      ai_tracks: original.ai_tracks.map((t) => ({ ...t, ai_passes: 3 })),
+    };
+    expect(aiSourceText(both)).toBe(
+      "AI on this layout and on COTA F1 2026 (Paddock test), the same track",
+    );
   });
 
   it("says when the AI drove another setup, and why there is no reference", () => {

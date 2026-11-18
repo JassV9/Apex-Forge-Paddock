@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { PassTrace, SessionReference } from "../../api/client";
 import type { AiPassSource } from "../telemetry/AiOverlay";
+import { aiSourceText } from "./referenceData";
 
 interface ReferenceApi {
   reference: (sessionId: number) => Promise<SessionReference>;
@@ -38,6 +39,7 @@ export function useAiSource(
     return {
       corner: (corner: number) => reference.corners.find((c) => c.corner === corner),
       load: (session: number, seq: number) => api.trace(session, seq),
+      where: aiSourceText(reference),
     };
   }, [reference, sessionId, api]);
 }

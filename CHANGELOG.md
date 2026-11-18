@@ -4,6 +4,18 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Core and web (ADR 0027): a layout and its test copy are one track in the web app. A session
+  on an original layout (e.g. `fn_cota / layout_f1_2026`) is now compared, in "Against the AI"
+  and the AI overlay, with the AI's sessions on `<layout>_paddock`, labelled "AI on COTA F1 2026
+  (Paddock test), the same track". Grouped only when the corner maps match (same corner numbers,
+  every apex within 5 m); otherwise the reply says why (`variant_note`). Read side only: track
+  rows and ingest are unchanged, `ai_tracks` on `GET /sessions/{id}/reference` lists the rows
+  used. The game is unchanged: `GET /reference` stays exact, so the hotlap window shows no AI
+  times on an original layout (guarded by a core and an agent test). The Drive panel and the
+  empty state now say "compared in the web app, never shown in the game" instead of "recorded,
+  but not compared with the AI"; the copy is marked "AI drives here". Experiments and the ledger
+  do not pool across layouts. On the real data COTA groups (tracks 1 and 22, identical corner
+  maps); the Hungaroring has no original-layout row yet. Unverified in game and in a browser.
 - Fix, core (ADR 0026): linked setup items are one setting. The FH26 keeps `WING_9` equal to
   `WING_1` (both "Rear Wing", 0..2), so experiments 13 and 14, which moved one of them, asked
   for a setup the car cannot hold and were aborted. Core now finds such groups per car: same

@@ -920,6 +920,17 @@ export interface components {
       /** @description Valid passes of the session on it. */
       passes: number;
     };
+    /** ReferenceTrack */
+    ReferenceTrack: {
+      /** @description Track layout; empty for single-layout tracks. */
+      layout: string;
+      /** @description The layout's name in the game, such as "COTA F1 2026 (Paddock test)". */
+      name: string;
+      /** @description True for a variant of the session's layout (the same physical track, another track row); false for the session's own. */
+      variant: boolean;
+      /** @description Valid AI passes on this track row, on any setup. */
+      ai_passes: number;
+    };
     /**
      * CornerReference
      * @description One corner: the driver's times, the AI's on the matched setup, the gap and its class.
@@ -970,7 +981,7 @@ export interface components {
     };
     /**
      * SessionReference
-     * @description A session's corners against AC's AI on the same car, track, layout and setup (docs/adr/0019-ai-reference-driver.md). Every number is computed by core from stored passes, with the count of passes behind it. Read-only.
+     * @description A session's corners against AC's AI on the same car, track and setup (docs/adr/0019-ai-reference-driver.md): the AI's passes on the session's own layout and on a variant of it that is the same physical track (docs/adr/0027-layout-variants.md). Every number is computed by core from stored passes, with the count of passes behind it. Read-only.
      */
     "session_reference.schema": {
       session_id: number;
@@ -986,8 +997,12 @@ export interface components {
       setups: components["schemas"]["ReferenceSetup"][];
       /** @description The smallest margin a corner is classed with, seconds, whatever the AI's spread. */
       margin_floor_s: number;
-      /** @description Valid AI passes stored on this car and track, on any setup. */
+      /** @description Valid AI passes stored on this car and its ai_tracks, on any setup. */
       ai_passes: number;
+      /** @description The track rows whose AI passes are compared with: the session's own first, then a variant of its layout on the same track (<layout> and <layout>_paddock) whose corner map matches. A read-side grouping; no row is rewritten. */
+      ai_tracks: components["schemas"]["ReferenceTrack"][];
+      /** @description Why a variant of this layout on the same track is not compared with (its corner map differs), in words; empty when there is no such variant or it is compared with. */
+      variant_note: string;
       /** @description Every corner of the session with a valid pass on the compared setup, by number. */
       corners: components["schemas"]["CornerReference"][];
     };

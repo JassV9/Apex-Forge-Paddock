@@ -59,8 +59,8 @@ func TestSessionComparesTheLatestSetupWithTheAI(t *testing.T) {
 	if len(got.Setups) != 2 || got.Setups[0].SetupHash != "s1" || got.Setups[0].Passes != 4 {
 		t.Errorf("setups = %+v, want s1 with 4 valid passes first", got.Setups)
 	}
-	if got.AiPasses != 6 {
-		t.Errorf("AI passes = %d, want the 6 valid ones on this layout", got.AiPasses)
+	if got.AiPasses != 6 || len(got.AiTracks) != 1 || got.AiTracks[0].AiPasses != 6 || got.VariantNote != "" {
+		t.Errorf("AI passes = %d on %+v, want the 6 valid ones on this layout only", got.AiPasses, got.AiTracks)
 	}
 	if len(got.Corners) != 1 || got.Corners[0].Match != "nearest" || *got.Corners[0].AiSetupHash != "s1" {
 		t.Errorf("corners on s2 = %+v, want T1 against the AI on the nearest setup s1", got.Corners)

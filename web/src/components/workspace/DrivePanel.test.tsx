@@ -82,15 +82,17 @@ describe("DrivePanel", () => {
 
     const track = await screen.findByLabelText("Track");
     expect(
-      screen.getByRole("option", { name: "COTA F1 (Paddock test) · compared with the AI" }),
+      screen.getByRole("option", { name: "COTA F1 (Paddock test) · AI drives here" }),
     ).toBeTruthy();
 
     fireEvent.change(track, { target: { value: "fn_cota|f1_paddock" } });
-    expect(screen.getByText(/your laps here are compared with the AI's/)).toBeVisible();
+    expect(screen.getByText(/the AI drives here, so the game shows its times/)).toBeVisible();
 
     fireEvent.change(track, { target: { value: "fn_cota|f1" } });
-    expect(screen.getByText(/recorded, but not compared with the AI/)).toBeVisible();
-    expect(screen.getByText(/The AI drives only the test copy, f1_paddock/)).toBeVisible();
+    expect(screen.getByText(/In the web app your laps are compared with the AI's/)).toBeVisible();
+    expect(
+      screen.getByText(/Pick the test copy, f1_paddock, for AI times in the game/),
+    ).toBeVisible();
 
     fireEvent.change(track, { target: { value: "fn_cota|gp" } });
     expect(screen.getByText("python tools/prepare_test_layout.py fn_cota gp")).toBeVisible();

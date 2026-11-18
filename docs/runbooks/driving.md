@@ -34,15 +34,17 @@ real change of bindings has not happened yet.
    default `3_clear`, with the Optimum track; `template` keeps the preset's), `--port`
    (default 8090).
 3. Open http://localhost:5173. In the **Drive** panel at the top of the session rail, pick the
-   car and the track. A layout marked "compared with the AI" is a Paddock test copy. On an
-   original layout the panel says your laps are recorded but not compared with the AI, offers
-   **Use the test copy** (or shows the command that makes one), and under the pickers lists
-   what is open on the car (below).
+   car and the track. A layout marked "AI drives here" is a Paddock test copy. On an original
+   layout the panel says the game shows no AI times there, and that in the web app your laps
+   are compared with the AI's on its test copy, the same track
+   ([ADR 0027](../adr/0027-layout-variants.md)); it offers **Use the test copy** (or shows the
+   command that makes one), and under the pickers lists what is open on the car (below).
 4. Press **Start driving**. You drive: the launcher sends no AI command. It backs up
    `controls.ini`, writes `Documents/Assetto Corsa/paddock/launch/paddock.cmpreset` and asks CM
    to start Practice in the pits, clear, on an optimum track. If CM cannot start, it says so in
-   its own window. Drive the "(Paddock test)" layout: your corners are compared with the AI's
-   only on the same layout and setup ([ADR 0019](../adr/0019-ai-reference-driver.md)).
+   its own window. Your corners are compared with the AI's on the same setup and track: in the
+   game only on the "(Paddock test)" layout, in the web app also from the original layout
+   ([ADR 0019](../adr/0019-ai-reference-driver.md), [ADR 0027](../adr/0027-layout-variants.md)).
 5. Drive. The agent records every corner pass; core ingests them as you go. The **Paddock
    Hotlap** window shows each corner against your best and the AI's; on the original layout it
    says there are no AI times and why.

@@ -41,14 +41,18 @@ describe("driveText", () => {
     expect(blockedReason(status)).toEqual(reason);
   });
 
-  it("tells a driver on an original layout that the AI cannot be compared there", () => {
+  it("tells a driver on an original layout: compared in the web app, never shown in the game", () => {
     const track = { id: "fn_cota", name: "COTA", layouts: [] };
     const original = { layout: "gp", name: "GP", ai_can_drive: false, test_copy: "" };
 
     const hint = layoutHint(track, original);
 
     expect(hint.aiCanDrive).toBe(false);
-    expect(hint.text).toContain("recorded, but not compared with the AI");
+    expect(hint.text).toContain("no AI times in the game");
+    expect(hint.text).toContain(
+      "In the web app your laps are compared with the AI's on its test copy",
+    );
+    expect(hint.text).not.toContain("not compared");
     expect(hint.command).toBe("python tools/prepare_test_layout.py fn_cota gp");
     expect(hint.testCopy).toBeUndefined();
     expect(layoutHint(track, { ...original, test_copy: "gp_paddock" }).testCopy).toBe("gp_paddock");

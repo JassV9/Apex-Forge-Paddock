@@ -13,6 +13,16 @@ export const cotaReference: SessionReference = {
   ],
   margin_floor_s: 0.01,
   ai_passes: 40,
+  ai_tracks: [
+    {
+      layout: "layout_f1_2026_paddock",
+      name: "COTA F1 2026 (Paddock test)",
+      variant: false,
+      ai_passes: 40,
+    },
+    { layout: "layout_f1_2026", name: "COTA F1 2026", variant: true, ai_passes: 0 },
+  ],
+  variant_note: "",
   corners: [
     {
       corner: 2,

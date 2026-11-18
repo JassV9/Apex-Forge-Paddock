@@ -11,6 +11,8 @@ export interface AiPassSource {
   corner: (corner: number) => CornerReference | undefined;
   /** The samples of a pass of another session: the AI's. */
   load: (sessionId: number, seq: number) => Promise<PassTrace>;
+  /** Where the AI drove, when on a variant of this layout ("AI on …, the same track"). */
+  where?: string;
 }
 
 /** A seq no pass of the session has, so the AI's pass has its own row and line. */
@@ -57,7 +59,8 @@ export function useAiOverlay(source: AiPassSource | undefined, corner: number) {
           }}
           style={{ accentColor: INK.ai }}
         />{" "}
-        Overlay the AI&apos;s best pass on this setup ({String(reference.ai_n)} AI passes)
+        Overlay the AI&apos;s best pass on this setup ({String(reference.ai_n)} AI passes
+        {source?.where ? `; ${source.where}` : ""})
       </label>
       {on && loading.kind === "failed" && (
         <span role="alert"> Its samples could not be loaded.</span>

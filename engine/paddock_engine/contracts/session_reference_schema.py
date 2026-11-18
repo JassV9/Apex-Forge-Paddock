@@ -6,6 +6,23 @@ from pydantic import BaseModel, ConfigDict, Field
 from enum import StrEnum
 
 
+class ReferenceTrack(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    layout: str = Field(..., description="Track layout; empty for single-layout tracks.")
+    name: str = Field(
+        ..., description='The layout\'s name in the game, such as "COTA F1 2026 (Paddock test)".'
+    )
+    variant: bool = Field(
+        ...,
+        description="True for a variant of the session's layout (the same physical track, another track row); false for the session's own.",
+    )
+    ai_passes: int = Field(
+        ..., description="Valid AI passes on this track row, on any setup.", ge=0
+    )
+
+
 class ReferenceSetup(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -126,7 +143,7 @@ class CornerReference(BaseModel):
 
 class SessionReference(BaseModel):
     """
-    A session's corners against AC's AI on the same car, track, layout and setup (docs/adr/0019-ai-reference-driver.md). Every number is computed by core from stored passes, with the count of passes behind it. Read-only.
+    A session's corners against AC's AI on the same car, track and setup (docs/adr/0019-ai-reference-driver.md): the AI's passes on the session's own layout and on a variant of it that is the same physical track (docs/adr/0027-layout-variants.md). Every number is computed by core from stored passes, with the count of passes behind it. Read-only.
     """
 
     model_config = ConfigDict(
@@ -149,7 +166,15 @@ class SessionReference(BaseModel):
         ge=0.0,
     )
     ai_passes: int = Field(
-        ..., description="Valid AI passes stored on this car and track, on any setup.", ge=0
+        ..., description="Valid AI passes stored on this car and its ai_tracks, on any setup.", ge=0
+    )
+    ai_tracks: list[ReferenceTrack] = Field(
+        ...,
+        description="The track rows whose AI passes are compared with: the session's own first, then a variant of its layout on the same track (<layout> and <layout>_paddock) whose corner map matches. A read-side grouping; no row is rewritten.",
+    )
+    variant_note: str = Field(
+        ...,
+        description="Why a variant of this layout on the same track is not compared with (its corner map differs), in words; empty when there is no such variant or it is compared with.",
     )
     corners: list[CornerReference] = Field(
         ...,

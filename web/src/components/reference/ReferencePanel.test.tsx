@@ -23,14 +23,52 @@ describe("ReferencePanel", () => {
     expect(screen.getByText(/40 AI passes on this car and track/)).toBeVisible();
   });
 
-  it("says plainly why there is nothing to compare with on the original layout", async () => {
+  it("compares the original layout with the AI on its test copy, labelled as the same track", async () => {
+    const original = {
+      ...cotaReference,
+      layout: "layout_f1_2026",
+      ai_tracks: [
+        { layout: "layout_f1_2026", name: "COTA F1 2026", variant: false, ai_passes: 0 },
+        {
+          layout: "layout_f1_2026_paddock",
+          name: "COTA F1 2026 (Paddock test)",
+          variant: true,
+          ai_passes: 40,
+        },
+      ],
+    };
+    render(<ReferencePanel sessionId={2} load={() => Promise.resolve(original)} />);
+
+    expect(
+      await screen.findByText(/AI on COTA F1 2026 \(Paddock test\), the same track/),
+    ).toHaveTextContent("Compared in the web app only");
+    expect(screen.getByText(/40 AI passes on this car and track/)).toBeVisible();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("says plainly why there is nothing to compare with on the original layout yet", async () => {
     const original = { ...cotaReference, layout: "layout_f1_2026", ai_passes: 0 };
     render(<ReferencePanel sessionId={2} load={() => Promise.resolve(original)} />);
 
     const note = await screen.findByRole("note");
     expect(note).toHaveTextContent("You drove the original layout (layout_f1_2026)");
-    expect(note).toHaveTextContent('only the "(Paddock test)" copy');
+    expect(note).toHaveTextContent("compared here, in the web app");
+    expect(note).toHaveTextContent("never shown in the game");
+    expect(note).not.toHaveTextContent("not compared with the AI");
     expect(screen.queryByText(/AI passes on this car and track/)).not.toBeInTheDocument();
+  });
+
+  it("says why a test copy with another corner map is not compared with", async () => {
+    const differs = {
+      ...cotaReference,
+      layout: "layout_f1_2026",
+      ai_passes: 0,
+      variant_note:
+        "The AI's laps on COTA F1 2026 (Paddock test) are not compared with: corner 2's apex is 50.0 m from this layout's, more than 5 m.",
+    };
+    render(<ReferencePanel sessionId={2} load={() => Promise.resolve(differs)} />);
+
+    expect(await screen.findByRole("note")).toHaveTextContent("corner 2's apex is 50.0 m");
   });
 
   it("says the AI has not driven the test copy yet, when it has not", async () => {

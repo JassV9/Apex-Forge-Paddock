@@ -164,12 +164,4 @@ function corners.zoneAt(map, d)
   return nil
 end
 
----Speed class from the typical minimum speed through the corner.
-function corners.speedClass(vMinKmh)
-  if not vMinKmh then return "?" end
-  if vMinKmh < 110 then return "slow" end
-  if vMinKmh < 190 then return "medium" end
-  return "fast"
-end
-
 return corners

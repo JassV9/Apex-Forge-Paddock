@@ -124,7 +124,12 @@ tests validate them against the same schema files.
 ## The measurement path (phase 2)
 
 1. `engine/paddock_engine/phases/segment.py` cuts a pass into brake, entry, mid and exit
-   (ported from v0 and tested against its outputs).
+   (ported from v0 and tested against its outputs) for the per-pass features. Within an
+   experiment, the response analysis (`POST /response`) puts every pass on a 1 m grid
+   (`phases/align.py`), joins it with the next pass where the zones touch (`phases/join.py`),
+   and cuts both arms at the same metres, frozen from the baseline's median events: braking,
+   entry, mid, exit and traction, none silently empty (`phases/cuts.py`,
+   [ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)).
 2. `features/` turns the samples and phases into named metrics: corner time, speeds, per-phase
    axle slip with a confidence, driver inputs (brake point, trail braking, throttle pickup,
    corrections), and the channels v0 lacked (steering per g, front saturation index, yaw
@@ -134,6 +139,10 @@ tests validate them against the same schema files.
    classification against a region of practical equivalence
    ([ADR 0008](adr/0008-effect-model.md)), each corner weighted by its own scatter
    (`stats/weights.py`, [ADR 0023](adr/0023-corners-weighted-by-their-own-scatter.md)).
+   Speed classes belong to corners, frozen from the baseline's median minimum speed and cut
+   where this car and track's corners have their largest gaps (`features/regimes.py`,
+   [ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)); a pass's own minimum
+   speed never picks its class.
    `stats/mde.py` says what a plan can detect before it is driven; `stats/noise.py` measures
    the scatter per corner and `stats/lap_noise.py` the error a whole lap shares across its
    corners ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)).
@@ -290,10 +299,10 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 
 | Piece | State |
 | --- | --- |
-| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard, base setup request, response and reply; generators and drift check | Working, checked in CI |
+| Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard, base setup request, response and reply, response request and response; generators and drift check | Working, checked in CI |
 | agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 151 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
-| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 187 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
+| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose`, `POST /response` | Working, 206 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
 | web: one workspace (session rail, overview grid, overlaid telemetry per corner, diagnosis, experiments with propose panel and scorecard, garage); a read-only build | Working, 186 tests |
 | End to end: the Lua agent on the mocked game, core and the engine through a diagnosis, three experiments, and the profile, ranking and scorecard they leave (`make test-e2e`) | Passes locally and in CI |
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
@@ -310,6 +319,7 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 | AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
+| Corner phases at fixed distances, per-corner speed regimes and the vehicle-response analysis: `phases/align.py`, `events.py`, `cuts.py`, `join.py`, `reference.py`, `features/regimes.py`, `engine/paddock_engine/response/` with its metrics and parameter-to-observable configuration (`metrics.toml`, `parameters.toml`), `POST /response` (`contracts/response_*.schema.json`), absolute `brake_point_m` / `throttle_pickup_point_m` ([ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)) | Tested (pytest incl. hypothesis, the real FH26 and 488 GT3 corner medians as a fixture, offline replay of experiment 15's real passes); core does not call `/response` yet; **unverified in game** |
 | AI as the reference driver: `GET /sessions/{id}/reference`, `GET /reference`, the hotlap window, "Against the AI" and the AI overlay in the dashboard ([ADR 0019](adr/0019-ai-reference-driver.md)) | Tested offline and against a real PostgreSQL; run on real AI sessions only; the window is **unverified in game** |
 | A layout and its test copy are one track in the web app: an original-layout session is compared with the AI on `<layout>_paddock` when the corner maps match (same numbers, apexes within 5 m), `ai_tracks` and `variant_note` on the reply; the game's `GET /reference` stays exact ([ADR 0027](adr/0027-layout-variants.md)) | Tested (Go table-driven and against PostgreSQL, Vitest, agent pytest); run read-only on the real rows (COTA groups, the Hungaroring has no original row yet); **unverified in game and in a browser** |
 

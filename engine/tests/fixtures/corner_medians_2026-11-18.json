@@ -1,0 +1,269 @@
+{
+ "about": "Per corner: median minimum speed (km/h) and median peak lateral g of the AI's valid passes, per car and track, from the live database on 2026-11-18 (telemetry audit of docs/investigations/2026-11-18-ghost-driver-reliability.md). Used by tests/test_regimes.py.",
+ "tracks": [
+  {
+   "track": "fn_cota",
+   "car": "ks_ferrari_488_gt3",
+   "corners": [
+    {
+     "corner": 1,
+     "v_min_kmh": 63.88,
+     "lat_g_peak": 1.793,
+     "passes": 73
+    },
+    {
+     "corner": 2,
+     "v_min_kmh": 129.6,
+     "lat_g_peak": 1.885,
+     "passes": 118
+    },
+    {
+     "corner": 3,
+     "v_min_kmh": 174.63,
+     "lat_g_peak": 1.677,
+     "passes": 117
+    },
+    {
+     "corner": 4,
+     "v_min_kmh": 165.65,
+     "lat_g_peak": 1.837,
+     "passes": 116
+    },
+    {
+     "corner": 5,
+     "v_min_kmh": 127.29,
+     "lat_g_peak": 1.773,
+     "passes": 109
+    },
+    {
+     "corner": 6,
+     "v_min_kmh": 128.49,
+     "lat_g_peak": 1.49,
+     "passes": 106
+    },
+    {
+     "corner": 7,
+     "v_min_kmh": 103.69,
+     "lat_g_peak": 1.934,
+     "passes": 112
+    },
+    {
+     "corner": 8,
+     "v_min_kmh": 102.01,
+     "lat_g_peak": 1.648,
+     "passes": 113
+    },
+    {
+     "corner": 9,
+     "v_min_kmh": 100.28,
+     "lat_g_peak": 1.622,
+     "passes": 108
+    },
+    {
+     "corner": 10,
+     "v_min_kmh": 136.94,
+     "lat_g_peak": 1.814,
+     "passes": 111
+    },
+    {
+     "corner": 11,
+     "v_min_kmh": 62.45,
+     "lat_g_peak": 1.517,
+     "passes": 112
+    },
+    {
+     "corner": 12,
+     "v_min_kmh": 66.09,
+     "lat_g_peak": 1.555,
+     "passes": 107
+    },
+    {
+     "corner": 13,
+     "v_min_kmh": 67.0,
+     "lat_g_peak": 1.581,
+     "passes": 105
+    },
+    {
+     "corner": 14,
+     "v_min_kmh": 68.31,
+     "lat_g_peak": 1.684,
+     "passes": 107
+    },
+    {
+     "corner": 15,
+     "v_min_kmh": 125.95,
+     "lat_g_peak": 1.789,
+     "passes": 105
+    },
+    {
+     "corner": 16,
+     "v_min_kmh": 112.88,
+     "lat_g_peak": 1.762,
+     "passes": 81
+    },
+    {
+     "corner": 17,
+     "v_min_kmh": 65.96,
+     "lat_g_peak": 1.578,
+     "passes": 74
+    }
+   ]
+  },
+  {
+   "track": "fn_cota",
+   "car": "rss_formula_hybrid_2026",
+   "corners": [
+    {
+     "corner": 1,
+     "v_min_kmh": 86.25,
+     "lat_g_peak": 2.476,
+     "passes": 29
+    },
+    {
+     "corner": 2,
+     "v_min_kmh": 185.91,
+     "lat_g_peak": 3.966,
+     "passes": 24
+    },
+    {
+     "corner": 3,
+     "v_min_kmh": 270.94,
+     "lat_g_peak": 3.832,
+     "passes": 25
+    },
+    {
+     "corner": 4,
+     "v_min_kmh": 242.07,
+     "lat_g_peak": 3.838,
+     "passes": 25
+    },
+    {
+     "corner": 5,
+     "v_min_kmh": 210.83,
+     "lat_g_peak": 4.132,
+     "passes": 23
+    },
+    {
+     "corner": 6,
+     "v_min_kmh": 185.67,
+     "lat_g_peak": 3.439,
+     "passes": 22
+    },
+    {
+     "corner": 7,
+     "v_min_kmh": 168.1,
+     "lat_g_peak": 3.276,
+     "passes": 21
+    },
+    {
+     "corner": 8,
+     "v_min_kmh": 144.14,
+     "lat_g_peak": 3.133,
+     "passes": 20
+    },
+    {
+     "corner": 9,
+     "v_min_kmh": 149.33,
+     "lat_g_peak": 2.888,
+     "passes": 20
+    },
+    {
+     "corner": 10,
+     "v_min_kmh": 197.78,
+     "lat_g_peak": 2.126,
+     "passes": 20
+    }
+   ]
+  },
+  {
+   "track": "fn_hungaroring",
+   "car": "rss_formula_hybrid_2026",
+   "corners": [
+    {
+     "corner": 1,
+     "v_min_kmh": 96.58,
+     "lat_g_peak": 2.422,
+     "passes": 353
+    },
+    {
+     "corner": 2,
+     "v_min_kmh": 104.37,
+     "lat_g_peak": 2.615,
+     "passes": 439
+    },
+    {
+     "corner": 3,
+     "v_min_kmh": 171.71,
+     "lat_g_peak": 3.506,
+     "passes": 438
+    },
+    {
+     "corner": 4,
+     "v_min_kmh": 202.44,
+     "lat_g_peak": 3.454,
+     "passes": 433
+    },
+    {
+     "corner": 5,
+     "v_min_kmh": 142.88,
+     "lat_g_peak": 2.968,
+     "passes": 433
+    },
+    {
+     "corner": 6,
+     "v_min_kmh": 102.54,
+     "lat_g_peak": 2.892,
+     "passes": 433
+    },
+    {
+     "corner": 7,
+     "v_min_kmh": 104.26,
+     "lat_g_peak": 2.803,
+     "passes": 433
+    },
+    {
+     "corner": 8,
+     "v_min_kmh": 151.63,
+     "lat_g_peak": 2.974,
+     "passes": 433
+    },
+    {
+     "corner": 9,
+     "v_min_kmh": 148.1,
+     "lat_g_peak": 2.973,
+     "passes": 433
+    },
+    {
+     "corner": 10,
+     "v_min_kmh": 192.23,
+     "lat_g_peak": 2.994,
+     "passes": 432
+    },
+    {
+     "corner": 11,
+     "v_min_kmh": 192.43,
+     "lat_g_peak": 3.407,
+     "passes": 431
+    },
+    {
+     "corner": 12,
+     "v_min_kmh": 116.06,
+     "lat_g_peak": 2.615,
+     "passes": 430
+    },
+    {
+     "corner": 13,
+     "v_min_kmh": 106.05,
+     "lat_g_peak": 2.58,
+     "passes": 430
+    },
+    {
+     "corner": 14,
+     "v_min_kmh": 118.65,
+     "lat_g_peak": 2.754,
+     "passes": 359
+    }
+   ]
+  }
+ ]
+}

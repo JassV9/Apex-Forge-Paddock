@@ -92,6 +92,15 @@ def test_pass_features_carry_every_channel_and_the_validity() -> None:
     ]
     for metric in measured:
         assert features.metrics[metric] is not None, metric
+    # absolute points (ADR 0031): from the zone start, consistent with the apex-relative pair
+    brake_point, pickup_point = (
+        features.metrics["brake_point_m"],
+        features.metrics["throttle_pickup_point_m"],
+    )
+    assert brake_point == pytest.approx(0.0, abs=1.0)  # braking from the first sample
+    assert brake_point is not None and pickup_point is not None
+    apex = brake_point + (features.metrics["brake_dist_m"] or 0.0)
+    assert pickup_point - apex == pytest.approx(features.metrics["throttle_pickup_m"])
 
 
 def test_a_pass_with_three_wheels_off_is_not_valid() -> None:

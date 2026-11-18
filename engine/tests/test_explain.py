@@ -117,8 +117,8 @@ def test_acceptance_a_reply_that_invents_a_metric_or_a_number_is_rejected(
 
 def test_a_reply_that_stays_inside_the_pack_is_shown(pack: EvidencePack) -> None:
     honest = reply(
-        summary="In slow corners the front slips 7.7 degrees and the rear 3.3, over 32 passes.",
-        why="front_slip_mid_deg.slow is 7.67; in fast corners it is 3.7. Try ARB_FRONT by 1 click.",
+        summary="In slow corners the front slips 7.3 degrees and the rear 3.3, over 37 passes.",
+        why="front_slip_mid_deg.slow is 7.33; in fast corners it is 3.7. Try ARB_FRONT by 1 click.",
         cites=["front_slip_mid_deg.slow", "front_slip_mid_deg.fast"],
     )
 
@@ -131,8 +131,8 @@ def test_a_reply_that_stays_inside_the_pack_is_shown(pack: EvidencePack) -> None
 
 
 def test_a_number_is_checked_at_the_precision_it_is_written(pack: EvidencePack) -> None:
-    assert validate(reply(why="Front slip is 7.667 degrees."), pack) == ""
-    assert validate(reply(why="Front slip is 7.6 degrees."), pack).endswith(": 7.6")
+    assert validate(reply(why="Front slip is 7.331 degrees."), pack) == ""
+    assert validate(reply(why="Front slip is 7.4 degrees."), pack).endswith(": 7.4")
     assert validate(reply(why="Corner T12 is the worst."), pack) == ""
     assert validate(reply(why="Between 3.3-2.9 at the rear."), pack) == ""
 

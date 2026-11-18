@@ -86,8 +86,8 @@ WHERE b.experiment_id = $1 ORDER BY b."order"`
 // arm. Blocks carry code names only: the plan does not say which setup is the baseline.
 func readRunPlan(ctx context.Context, q querier, id int64) (contracts.RunPlan, []armSetup, error) {
 	plan := contracts.RunPlan{V: 1, ExperimentId: int(id)}
-	err := q.QueryRowContext(ctx, `SELECT plan_revision, driver FROM experiment WHERE id = $1`, id).
-		Scan(&plan.Revision, &plan.Driver)
+	err := q.QueryRowContext(ctx, `SELECT plan_revision, driver, ai_hint_share FROM experiment WHERE id = $1`, id).
+		Scan(&plan.Revision, &plan.Driver, &plan.AiHintShare)
 	if err != nil {
 		return plan, nil, fmt.Errorf("read plan revision of experiment %d: %w", id, err)
 	}

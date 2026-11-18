@@ -50,7 +50,8 @@ def test_channel_names_are_the_contract_columns(rt: Any) -> None:
     names = to_py(rt.eval('require("core.channels")').names)
     columns = schema("spool_pass")["properties"]["samples"]["properties"]["columns"]
 
-    assert names == columns["required"]
+    # the columns added with docs/adr/0028 are optional: older lines have none of them
+    assert names[: len(columns["required"])] == columns["required"]
     assert set(names) == set(columns["properties"])
 
 

@@ -37,6 +37,67 @@ class SpoolCar(BaseModel):
     name: str
 
 
+class SessionAi(BaseModel):
+    """
+    The AI's settings on the player's car when the session started. In a human session: what the AI would drive with.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tyre_hint_base: float = Field(
+        ..., description="The car's own AI tyre hint, ai.ini [TYRES] HINT."
+    )
+    learned_share: float = Field(
+        ...,
+        description="Share of the car's own AI tyre hint (ai.ini [TYRES] HINT) the calibration learned (ai_tune file).",
+    )
+    pinned_share: float | None = Field(
+        None,
+        description="Share of the car's own AI tyre hint (ai.ini [TYRES] HINT) pinned by the run plan or the free-lap command; only in an AI session.",
+    )
+    applied_hint: float | None = Field(
+        None,
+        description="Tyre hint the AI drives with: tyre_hint_base times the pinned share, else the learned one; only in an AI session.",
+    )
+    extra_grip: float | None = Field(
+        None,
+        description="Extra AI grip the agent sets while the AI drives (1: the car's own grip); only in an AI session.",
+    )
+    aero_hint: float | None = Field(
+        None, description="ai.ini [PHYSICS_HINTS] AERO_HINT, when the file has one."
+    )
+    brake_hint: float | None = Field(
+        None, description="ai.ini [PEDALS] BRAKE_HINT, when the file has one."
+    )
+    level: float | None = Field(
+        None, description="AI level, 0..1, -1 without AI (ac.StateCar.aiLevel)."
+    )
+    aggression: float | None = Field(
+        None, description="AI aggression, 0..1, -1 without AI (ac.StateCar.aiAggression)."
+    )
+
+
+class SessionContext(BaseModel):
+    """
+    What the session was driven under (docs/adr/0028-run-context-and-ai-provenance.md). Absent in sessions recorded before the agent sent it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cars_count: int = Field(
+        ..., description="Cars in the session (CSP ac.StateSim.carsCount).", ge=1
+    )
+    csp_version: str | None = Field(None, description="CSP's version (ac.getPatchVersion).")
+    csp_build: int | None = Field(None, description="CSP's build number (ac.getPatchVersionCode).")
+    ai: SessionAi = Field(
+        ...,
+        description="The AI's settings on the player's car when the session started. In a human session: what the AI would drive with.",
+        title="SessionAi",
+    )
+
+
 class Direction(StrEnum):
     L = "L"
     R = "R"
@@ -102,3 +163,8 @@ class SpoolSession(BaseModel):
     agent_version: str = Field(..., min_length=1)
     car: SpoolCar = Field(..., title="SpoolCar")
     track: SpoolTrack = Field(..., title="SpoolTrack")
+    context: SessionContext | None = Field(
+        None,
+        description="What the session was driven under (docs/adr/0028-run-context-and-ai-provenance.md). Absent in sessions recorded before the agent sent it.",
+        title="SessionContext",
+    )

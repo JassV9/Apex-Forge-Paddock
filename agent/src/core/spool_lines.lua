@@ -5,6 +5,7 @@
 -- Pure Lua.
 
 local channels = require("core.channels")
+local context = require("core.context_lines")
 
 local lines = {}
 
@@ -47,7 +48,8 @@ local function cornerJson(c)
 end
 
 ---The first line of a session: car, track and the corner map.
----@param meta table sessionId, startedAtMs, source, agentVersion, carId, carName, trackId, layout, trackName, mapVersion
+---@param meta table sessionId, startedAtMs, source, agentVersion, carId, carName, trackId, layout,
+---trackName, mapVersion, context? (core/context_lines.lua `session`)
 ---@param map table corner map from corners.build
 function lines.session(meta, map)
   local cornerList = {}
@@ -60,7 +62,8 @@ function lines.session(meta, map)
     ',"track":{"ac_id":', quote(meta.trackId), ',"layout":', quote(meta.layout),
     ',"name":', quote(meta.trackName), ',"length_m":', num(map.L, 2),
     ',"corner_map_version":', int(meta.mapVersion),
-    ',"corners":[', concat(cornerList, ","), "]}}",
+    ',"corners":[', concat(cornerList, ","), "]}",
+    meta.context and context.session(meta.context) or "", "}",
   })
 end
 
@@ -151,6 +154,7 @@ local function headJson(raw, meta)
   end
   if meta.conditions then parts[#parts + 1] = conditionsJson(meta.conditions) end
   if meta.ers then parts[#parts + 1] = ersJson(raw) end
+  if meta.context then parts[#parts + 1] = context.pass(raw, meta.context) end
   return concat(parts)
 end
 
@@ -168,7 +172,8 @@ end
 
 ---Start encoding a finished pass. Call lines.step until it returns the line.
 ---@param raw table finished pass from recorder:feed (corner, n, cols, tIn, tOut)
----@param meta table sessionId, seq, startMs, lap?, setupHash?, block?, conditions?, ers? (true: the car has a battery)
+---@param meta table sessionId, seq, startMs, lap?, setupHash?, block?, conditions?, ers? (true: the
+---car has a battery), context? (core/context_lines.lua `pass`)
 function lines.beginPass(raw, meta)
   return { raw = raw, head = headJson(raw, meta), encoded = {}, done = 0 }
 end

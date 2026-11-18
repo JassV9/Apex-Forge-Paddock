@@ -9,11 +9,12 @@ local hotlap = require("game.hotlap")
 local lines = require("core.spool_lines")
 local plan = require("game.plan")
 local recorder = require("core.recorder")
+local runcontext = require("game.runcontext")
 local setup = require("game.setup")
 local spool = require("core.spool")
 
 local agent = {
-  VERSION = "0.1.0",
+  VERSION = "0.2.0",  -- the session line says "0.2.0+<build>" (game/runcontext.lua)
   MAP_VERSION = 1,  -- bump when corners.lua changes what it detects
   ready = false,
   status = "starting",
@@ -59,9 +60,10 @@ end
 local function sessionMeta()
   return {
     sessionId = agent.sessionId, startedAtMs = nowMs(), source = agent.source,
-    agentVersion = agent.VERSION, carId = ac.getCarID(0), carName = ac.getCarName(0),
-    trackId = ac.getTrackID(), layout = ac.getTrackLayout() or "", trackName = ac.getTrackName(),
-    mapVersion = agent.MAP_VERSION,
+    agentVersion = agent.VERSION .. "+" .. runcontext.build(), carId = ac.getCarID(0),
+    carName = ac.getCarName(0), trackId = ac.getTrackID(), layout = ac.getTrackLayout() or "",
+    trackName = ac.getTrackName(), mapVersion = agent.MAP_VERSION,
+    context = runcontext.session(agent.source, ac.getCar(0), ac.getSim()),
   }
 end
 
@@ -75,6 +77,7 @@ function agent.init()
   end
   agent.rec = recorder.new(agent.map)
   agent.t = 0
+  carlink.chooseClock(ac.getCar(0))
   agent.lastReset = ac.getCar(0).resetCounter
   agent.wasInPit = ac.getCar(0).isInPitlane
   agent.startSession("human")
@@ -152,6 +155,7 @@ local function writeStatus()
     plan = plan.status(), plan_message = plan.message, ghost = ghost.phase(),
     ghost_message = ghost.message(), ghost_allowed = ghost.allowed(),
     calibration = ghost.calibration(), ghost_held = ghost.held(),
+    ai_hint = ghost.appliedHint(), ai_hint_pinned = ghost.pinnedShare(),
   })
   if text == lastStatus then return end
   lastStatus, lastWriteAt = text, os.preciseClock()
@@ -169,6 +173,7 @@ local function encode(raw, car)
     startMs = nowMs() - (raw.tOut - raw.tIn) * 1000,
     lap = car.lapCount, setupHash = agent.setupHash, block = countsForPlan() and plan.tag() or nil,
     conditions = carlink.conditions(car, ac.getSim()), ers = carlink.hasErs(car),
+    context = runcontext.pass(car),
   })
 end
 

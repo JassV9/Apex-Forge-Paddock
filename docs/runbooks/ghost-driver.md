@@ -79,6 +79,56 @@ a loss, and starts the next untested item ([ADR 0020](../adr/0020-ai-training-pr
 trade-off waits for you. Leave the game running; about 40 minutes per experiment on a 2:15 lap.
 `GET /training` and the window show where it is; **Stop training** ends it.
 
+## A pinned-hint experiment (Experiment C of the reliability investigation)
+
+Why: [ADR 0028](../adr/0028-run-context-and-ai-provenance.md). An experiment can fix the share of
+the car's AI tyre hint the AI drives with in all its blocks, instead of the share calibration
+learned. One A/B per hint, never two hints inside one A/B.
+
+1. **Rebuild core first, then install the agent** (`python tools/install_agent.py`). An older
+   core rejects the new agent's lines (`schema` rejects in its log). The session line's
+   `agent_version` then reads `0.2.0+<12 hex digits>`; `0.2.0+dev` means the copy was not
+   installed by the tool.
+2. Calibrate as usual (above), so the learned share stays the reference.
+3. Optionally look at the car at a test hint without changing the calibration: free laps that
+   learn nothing,
+
+   ```bash
+   echo "{\"id\": \"$(date +%s)\", \"at\": $(date +%s), \"command\": \"ai_laps_fixed\", \"ai_hint_share\": 0.97}" \
+     > "$HOME/Documents/Assetto Corsa/paddock/outbox/agent_command.json"
+   ```
+
+   (without `ai_hint_share` it drives at the learned share). A share outside 0.5 to 1.5 is
+   ignored.
+4. Propose each A/B with its hint, the AI driving, from the calibrated AI session:
+
+   ```bash
+   curl -s -X POST localhost:8080/experiments -H 'Content-Type: application/json' -d '{
+     "session_id": <AI session>, "parameter": "WING_1", "clicks": -1, "driver": "ai",
+     "ai_hint_share": 0.93, "statement": "Rear wing -1 at hint 0.93", "predictions": []}'
+   ```
+
+   then Plan and Start as for any experiment. Core refuses a pin on an experiment the human
+   drives (422) and one outside 0.5 to 1.5; nothing is stored. The order of the investigation
+   is 0.93, 0.885, 1.0, 0.97, 0.9409.
+5. While it runs, `agent_status.json` shows `ai_hint` (what the AI was given) and
+   `ai_hint_pinned`. The run stops by itself, before a lap counts, when the hint given is not
+   base x pinned share, or when the fuel read back after the refuel is more than 0.5 L off.
+6. Afterwards check what was driven:
+
+   ```sql
+   SELECT b."order", c.ai_pinned_share, c.ai_hint_min, c.ai_hint_max, c.passes
+   FROM run_context c JOIN run_block b ON b.id = c.block_id
+   WHERE b.experiment_id = $1 ORDER BY b."order";
+   ```
+
+   Every block should show the same min and max, equal to the session row's
+   `ai_tyre_hint_base x ai_pinned_share`; the `ai_tune` file is unchanged by the whole run.
+
+Not seen in game yet: whether CSP takes `setAITyresHint` above the learned share without the AI
+leaving the track (that is what the experiment measures), and whether `car.timestamp` advances
+for the player's car (if not, passes say `"clock": "app"`).
+
 ## What the agent does with the car, and when it gives up
 
 | Situation | What happens |
@@ -89,7 +139,9 @@ trade-off waits for you. Leave the game running; about 40 minutes per experiment
 | More than 5 units of damage in any zone on track | Back to the pits, repaired, the block is retried |
 | Any damage in the pit lane on the way out (brushing the pit wall) | Repaired on the spot, the AI drives on |
 | Reset by the game, or no lap counted for 10 minutes | Back to the pits, the block is retried |
-| Less than 30 L at the start | Every block starts with 30 L (or the first block's fuel, if more) |
+| Less than 30 L at the start | Every block starts with 30 L (or the first block's fuel, if more), never more than the tank holds |
+| The fuel read back 1 s after the refuel is more than 0.5 L off | The run stops: "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L" |
+| A plan pins the AI's tyre hint and the hint given is another (or CSP refused it) | The run stops, naming both hints; the `ai_tune` file is never written during a pinned run |
 | Free laps below 4 L | Back to the pits to refuel; not a retry |
 | Free laps while a plan for a human is open on the car | The AI laps the car's own setup (block 0) and the laps count for no experiment; the plan's blocks stay for the driver |
 | Three retries in one block (in free laps: without a lap in between) | The run stops and the window says why |

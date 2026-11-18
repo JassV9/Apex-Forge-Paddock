@@ -53,6 +53,12 @@ class ExperimentCreate(BaseModel):
         "human",
         description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
     )
+    ai_hint_share: float | None = Field(
+        None,
+        description="For an experiment the AI drives: the share of the car's own AI tyre hint pinned for all its blocks, written into the run plan and never changed. Absent: the share the AI's calibration learned (docs/adr/0028-run-context-and-ai-provenance.md).",
+        ge=0.5,
+        le=1.5,
+    )
     hypothesis_key: str | None = Field(
         None,
         description="Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",

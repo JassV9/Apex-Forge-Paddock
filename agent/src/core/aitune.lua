@@ -26,6 +26,33 @@ end
 ---The share of the car's AI tyre hint the AI drives with.
 function aitune.hint(state) return state.hint end
 
+-- a share outside this range is not a hint anyone pinned on purpose
+aitune.PIN_MIN, aitune.PIN_MAX = 0.5, 1.5
+
+---A pinned share as given (a run plan's ai_hint_share, a command's), or nil when it is not a
+---number in PIN_MIN..PIN_MAX.
+function aitune.validShare(value)
+  if type(value) ~= "number" or value < aitune.PIN_MIN or value > aitune.PIN_MAX then return nil end
+  return value
+end
+
+---The share the AI drives with: the pinned one when there is one, else the learned one
+---(docs/adr/0028-run-context-and-ai-provenance.md). A pin never changes what was learned.
+function aitune.share(state, pinned) return pinned or state.hint end
+
+local HINT_EPSILON = 1e-6
+
+---Why the hint the AI was given (nil: none was taken) is not the pinned one, or nil when it is
+---or nothing is pinned.
+function aitune.pinMismatch(base, pinned, applied)
+  if not pinned then return nil end
+  local want = base * pinned
+  if applied and math.abs(applied - want) <= HINT_EPSILON then return nil end
+  local given = applied and string.format("%.4f", applied) or "not set"
+  return string.format("the AI's tyre hint is %s, the plan pins %.4f (%.4f of the car's %.4f)",
+    given, want, pinned, base)
+end
+
 ---Feed every frame on track while the AI drives: position, and whether something just went
 ---wrong (wheels off the track, a spin or stop, a reset, damage).
 function aitune.observe(state, pos, incident)

@@ -79,6 +79,48 @@ class PassErs(BaseModel):
     )
 
 
+class Clock(StrEnum):
+    """
+    Clock of the t column: CSP's physics time (car.timestamp) or the app's.
+    """
+
+    physics = "physics"
+    app = "app"
+
+
+class PassContext(BaseModel):
+    """
+    What the pass was driven under (docs/adr/0028-run-context-and-ai-provenance.md).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    clock: Clock = Field(
+        ..., description="Clock of the t column: CSP's physics time (car.timestamp) or the app's."
+    )
+    ai_hint: float | None = Field(
+        None,
+        description="Tyre hint the AI was given when the pass ended; only while the AI drives.",
+    )
+    damage_max: float = Field(
+        ..., description="Largest damage zone when the pass ended (AC's units).", ge=0.0
+    )
+    resets: int = Field(..., description="The car's reset counter when the pass ended.", ge=0)
+    abs_share: float = Field(
+        ..., description="Share of the pass's samples with ABS acting, 0..1.", ge=0.0, le=1.0
+    )
+    tc_share: float = Field(
+        ...,
+        description="Share of the pass's samples with traction control acting, 0..1.",
+        ge=0.0,
+        le=1.0,
+    )
+    drs_share: float = Field(
+        ..., description="Share of the pass's samples with DRS open, 0..1.", ge=0.0, le=1.0
+    )
+
+
 class SampleColumns(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -107,6 +149,64 @@ class SampleColumns(BaseModel):
     out: list[float] = Field(..., description="Wheels outside the track, 0..4.")
     rh_f: list[float] = Field(..., description="Front ride height, m.")
     rh_r: list[float] = Field(..., description="Rear ride height, m.")
+    nd_fl: list[float] | None = Field(
+        None,
+        description="Normalised slip FL (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+    )
+    nd_fr: list[float] | None = Field(
+        None,
+        description="Normalised slip FR (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+    )
+    nd_rl: list[float] | None = Field(
+        None,
+        description="Normalised slip RL (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+    )
+    nd_rr: list[float] | None = Field(
+        None,
+        description="Normalised slip RR (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+    )
+    w_fl: list[float] | None = Field(
+        None, description="Wheel angular speed FL, rad/s (CSP angularSpeed). Optional."
+    )
+    w_fr: list[float] | None = Field(
+        None, description="Wheel angular speed FR, rad/s (CSP angularSpeed). Optional."
+    )
+    w_rl: list[float] | None = Field(
+        None, description="Wheel angular speed RL, rad/s (CSP angularSpeed). Optional."
+    )
+    w_rr: list[float] | None = Field(
+        None, description="Wheel angular speed RR, rad/s (CSP angularSpeed). Optional."
+    )
+    st_fl: list[float] | None = Field(
+        None, description="Suspension travel FL, as CSP reports it (suspensionTravel). Optional."
+    )
+    st_fr: list[float] | None = Field(
+        None, description="Suspension travel FR, as CSP reports it (suspensionTravel). Optional."
+    )
+    st_rl: list[float] | None = Field(
+        None, description="Suspension travel RL, as CSP reports it (suspensionTravel). Optional."
+    )
+    st_rr: list[float] | None = Field(
+        None, description="Suspension travel RR, as CSP reports it (suspensionTravel). Optional."
+    )
+    vx: list[float] | None = Field(
+        None,
+        description="Velocity sideways in the car's frame, m/s (CSP localVelocity.x). Optional.",
+    )
+    vz: list[float] | None = Field(
+        None,
+        description="Velocity forwards in the car's frame, m/s (CSP localVelocity.z). Optional.",
+    )
+    x: list[float] | None = Field(
+        None, description="World position x, m (CSP position.x). Optional."
+    )
+    z: list[float] | None = Field(
+        None, description="World position z, m (CSP position.z). Optional."
+    )
+    gear: list[float] | None = Field(
+        None, description="Gear, 0 neutral, -1 reverse (CSP gear). Optional."
+    )
+    rpm: list[float] | None = Field(None, description="Engine rpm (CSP rpm). Optional.")
 
 
 class PassSamples(BaseModel):
@@ -214,6 +314,11 @@ class SpoolPass(BaseModel):
         None,
         description="The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput); only on a car with KERS/ERS.",
         title="PassErs",
+    )
+    context: PassContext | None = Field(
+        None,
+        description="What the pass was driven under (docs/adr/0028-run-context-and-ai-provenance.md).",
+        title="PassContext",
     )
     samples: PassSamples | None = Field(
         None,

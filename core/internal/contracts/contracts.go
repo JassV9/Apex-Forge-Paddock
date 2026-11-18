@@ -2327,6 +2327,12 @@ func (j *ExperimentBlock) UnmarshalJSON(value []byte) error {
 // A proposed experiment: one knob, one or more clicks, against the setup a session
 // was driven on.
 type ExperimentCreate struct {
+	// For an experiment the AI drives: the share of the car's own AI tyre hint pinned
+	// for all its blocks, written into the run plan and never changed. Absent: the
+	// share the AI's calibration learned
+	// (docs/adr/0028-run-context-and-ai-provenance.md).
+	AiHintShare *float64 `json:"ai_hint_share,omitempty,omitzero"`
+
 	// Clicks to move it; negative is down. Never 0.
 	Clicks int `json:"clicks"`
 
@@ -2407,6 +2413,12 @@ func (j *ExperimentCreate) UnmarshalJSON(value []byte) error {
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
+	}
+	if plain.AiHintShare != nil && 1.5 < *plain.AiHintShare {
+		return fmt.Errorf("field %s: must be <= %v", "ai_hint_share", 1.5)
+	}
+	if plain.AiHintShare != nil && 0.5 > *plain.AiHintShare {
+		return fmt.Errorf("field %s: must be >= %v", "ai_hint_share", 0.5)
 	}
 	if v, ok := raw["driver"]; !ok || v == nil {
 		plain.Driver = "human"
@@ -4478,6 +4490,87 @@ func (j *PassConditions) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// What the pass was driven under (docs/adr/0028-run-context-and-ai-provenance.md).
+type PassContext struct {
+	// Share of the pass's samples with ABS acting, 0..1.
+	AbsShare float64 `json:"abs_share"`
+
+	// Tyre hint the AI was given when the pass ended; only while the AI drives.
+	AiHint *float64 `json:"ai_hint,omitempty,omitzero"`
+
+	// Clock of the t column: CSP's physics time (car.timestamp) or the app's.
+	Clock SpoolPassContextClock `json:"clock"`
+
+	// Largest damage zone when the pass ended (AC's units).
+	DamageMax float64 `json:"damage_max"`
+
+	// Share of the pass's samples with DRS open, 0..1.
+	DrsShare float64 `json:"drs_share"`
+
+	// The car's reset counter when the pass ended.
+	Resets int `json:"resets"`
+
+	// Share of the pass's samples with traction control acting, 0..1.
+	TcShare float64 `json:"tc_share"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *PassContext) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["abs_share"]; raw != nil && !ok {
+		return fmt.Errorf("field abs_share in PassContext: required")
+	}
+	if _, ok := raw["clock"]; raw != nil && !ok {
+		return fmt.Errorf("field clock in PassContext: required")
+	}
+	if _, ok := raw["damage_max"]; raw != nil && !ok {
+		return fmt.Errorf("field damage_max in PassContext: required")
+	}
+	if _, ok := raw["drs_share"]; raw != nil && !ok {
+		return fmt.Errorf("field drs_share in PassContext: required")
+	}
+	if _, ok := raw["resets"]; raw != nil && !ok {
+		return fmt.Errorf("field resets in PassContext: required")
+	}
+	if _, ok := raw["tc_share"]; raw != nil && !ok {
+		return fmt.Errorf("field tc_share in PassContext: required")
+	}
+	type Plain PassContext
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 < plain.AbsShare {
+		return fmt.Errorf("field %s: must be <= %v", "abs_share", 1)
+	}
+	if 0 > plain.AbsShare {
+		return fmt.Errorf("field %s: must be >= %v", "abs_share", 0)
+	}
+	if 0 > plain.DamageMax {
+		return fmt.Errorf("field %s: must be >= %v", "damage_max", 0)
+	}
+	if 1 < plain.DrsShare {
+		return fmt.Errorf("field %s: must be <= %v", "drs_share", 1)
+	}
+	if 0 > plain.DrsShare {
+		return fmt.Errorf("field %s: must be >= %v", "drs_share", 0)
+	}
+	if 0 > plain.Resets {
+		return fmt.Errorf("field %s: must be >= %v", "resets", 0)
+	}
+	if 1 < plain.TcShare {
+		return fmt.Errorf("field %s: must be <= %v", "tc_share", 1)
+	}
+	if 0 > plain.TcShare {
+		return fmt.Errorf("field %s: must be >= %v", "tc_share", 0)
+	}
+	*j = PassContext(plain)
+	return nil
+}
+
 // The hybrid battery during the pass, as CSP reports it (kersCharge, kersInput);
 // only on a car with KERS/ERS.
 type PassErs struct {
@@ -6007,6 +6100,11 @@ func (j *ReferenceTrack) UnmarshalJSON(value []byte) error {
 // the agent reads it in the pits. Labels are code names: the plan does not say
 // which setup is the baseline.
 type RunPlan struct {
+	// Share of the car's own AI tyre hint the AI drives every block with, instead of
+	// the share its calibration learned
+	// (docs/adr/0028-run-context-and-ai-provenance.md). Absent: the learned share.
+	AiHintShare *float64 `json:"ai_hint_share,omitempty,omitzero"`
+
 	// Blocks corresponds to the JSON schema field "blocks".
 	Blocks []RunPlanBlock `json:"blocks"`
 
@@ -6162,6 +6260,12 @@ func (j *RunPlan) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
+	if plain.AiHintShare != nil && 1.5 < *plain.AiHintShare {
+		return fmt.Errorf("field %s: must be <= %v", "ai_hint_share", 1.5)
+	}
+	if plain.AiHintShare != nil && 0.5 > *plain.AiHintShare {
+		return fmt.Errorf("field %s: must be >= %v", "ai_hint_share", 0.5)
+	}
 	if plain.Blocks != nil && len(plain.Blocks) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "blocks", 1)
 	}
@@ -6191,6 +6295,9 @@ type SampleColumns struct {
 	// Throttle pedal, 0..1.
 	Gas []float64 `json:"gas"`
 
+	// Gear, 0 neutral, -1 reverse (CSP gear). Optional.
+	Gear []float64 `json:"gear,omitempty,omitzero"`
+
 	// Lateral acceleration, g.
 	LatG []float64 `json:"lat_g"`
 
@@ -6209,6 +6316,22 @@ type SampleColumns struct {
 	// Longitudinal acceleration, g.
 	LonG []float64 `json:"lon_g"`
 
+	// Normalised slip FL (CSP ndSlip; 1 is the peak of the tyre's grip). Optional,
+	// docs/adr/0028.
+	NdFl []float64 `json:"nd_fl,omitempty,omitzero"`
+
+	// Normalised slip FR (CSP ndSlip; 1 is the peak of the tyre's grip). Optional,
+	// docs/adr/0028.
+	NdFr []float64 `json:"nd_fr,omitempty,omitzero"`
+
+	// Normalised slip RL (CSP ndSlip; 1 is the peak of the tyre's grip). Optional,
+	// docs/adr/0028.
+	NdRl []float64 `json:"nd_rl,omitempty,omitzero"`
+
+	// Normalised slip RR (CSP ndSlip; 1 is the peak of the tyre's grip). Optional,
+	// docs/adr/0028.
+	NdRr []float64 `json:"nd_rr,omitempty,omitzero"`
+
 	// Wheels outside the track, 0..4.
 	Out []float64 `json:"out"`
 
@@ -6217,6 +6340,9 @@ type SampleColumns struct {
 
 	// Rear ride height, m.
 	RhR []float64 `json:"rh_r"`
+
+	// Engine rpm (CSP rpm). Optional.
+	Rpm []float64 `json:"rpm,omitempty,omitzero"`
 
 	// Slip angle FL, degrees.
 	SaFl []float64 `json:"sa_fl"`
@@ -6242,6 +6368,18 @@ type SampleColumns struct {
 	// Slip ratio RR.
 	SrRr []float64 `json:"sr_rr"`
 
+	// Suspension travel FL, as CSP reports it (suspensionTravel). Optional.
+	StFl []float64 `json:"st_fl,omitempty,omitzero"`
+
+	// Suspension travel FR, as CSP reports it (suspensionTravel). Optional.
+	StFr []float64 `json:"st_fr,omitempty,omitzero"`
+
+	// Suspension travel RL, as CSP reports it (suspensionTravel). Optional.
+	StRl []float64 `json:"st_rl,omitempty,omitzero"`
+
+	// Suspension travel RR, as CSP reports it (suspensionTravel). Optional.
+	StRr []float64 `json:"st_rr,omitempty,omitzero"`
+
 	// Steering wheel angle, degrees.
 	Steer []float64 `json:"steer"`
 
@@ -6251,8 +6389,32 @@ type SampleColumns struct {
 	// Speed, m/s.
 	V []float64 `json:"v"`
 
+	// Velocity sideways in the car's frame, m/s (CSP localVelocity.x). Optional.
+	Vx []float64 `json:"vx,omitempty,omitzero"`
+
+	// Velocity forwards in the car's frame, m/s (CSP localVelocity.z). Optional.
+	Vz []float64 `json:"vz,omitempty,omitzero"`
+
+	// Wheel angular speed FL, rad/s (CSP angularSpeed). Optional.
+	WFl []float64 `json:"w_fl,omitempty,omitzero"`
+
+	// Wheel angular speed FR, rad/s (CSP angularSpeed). Optional.
+	WFr []float64 `json:"w_fr,omitempty,omitzero"`
+
+	// Wheel angular speed RL, rad/s (CSP angularSpeed). Optional.
+	WRl []float64 `json:"w_rl,omitempty,omitzero"`
+
+	// Wheel angular speed RR, rad/s (CSP angularSpeed). Optional.
+	WRr []float64 `json:"w_rr,omitempty,omitzero"`
+
+	// World position x, m (CSP position.x). Optional.
+	X []float64 `json:"x,omitempty,omitzero"`
+
 	// Yaw rate, rad/s.
 	Yaw []float64 `json:"yaw"`
+
+	// World position z, m (CSP position.z). Optional.
+	Z []float64 `json:"z,omitempty,omitzero"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -6738,6 +6900,104 @@ func (j *SensitivityResponse) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s length: must be >= %d", "model_version", 1)
 	}
 	*j = SensitivityResponse(plain)
+	return nil
+}
+
+// The AI's settings on the player's car when the session started. In a human
+// session: what the AI would drive with.
+type SessionAi struct {
+	// ai.ini [PHYSICS_HINTS] AERO_HINT, when the file has one.
+	AeroHint *float64 `json:"aero_hint,omitempty,omitzero"`
+
+	// AI aggression, 0..1, -1 without AI (ac.StateCar.aiAggression).
+	Aggression *float64 `json:"aggression,omitempty,omitzero"`
+
+	// Tyre hint the AI drives with: tyre_hint_base times the pinned share, else the
+	// learned one; only in an AI session.
+	AppliedHint *float64 `json:"applied_hint,omitempty,omitzero"`
+
+	// ai.ini [PEDALS] BRAKE_HINT, when the file has one.
+	BrakeHint *float64 `json:"brake_hint,omitempty,omitzero"`
+
+	// Extra AI grip the agent sets while the AI drives (1: the car's own grip); only
+	// in an AI session.
+	ExtraGrip *float64 `json:"extra_grip,omitempty,omitzero"`
+
+	// Share of the car's own AI tyre hint (ai.ini [TYRES] HINT) the calibration
+	// learned (ai_tune file).
+	LearnedShare float64 `json:"learned_share"`
+
+	// AI level, 0..1, -1 without AI (ac.StateCar.aiLevel).
+	Level *float64 `json:"level,omitempty,omitzero"`
+
+	// Share of the car's own AI tyre hint (ai.ini [TYRES] HINT) pinned by the run
+	// plan or the free-lap command; only in an AI session.
+	PinnedShare *float64 `json:"pinned_share,omitempty,omitzero"`
+
+	// The car's own AI tyre hint, ai.ini [TYRES] HINT.
+	TyreHintBase float64 `json:"tyre_hint_base"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SessionAi) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["learned_share"]; raw != nil && !ok {
+		return fmt.Errorf("field learned_share in SessionAi: required")
+	}
+	if _, ok := raw["tyre_hint_base"]; raw != nil && !ok {
+		return fmt.Errorf("field tyre_hint_base in SessionAi: required")
+	}
+	type Plain SessionAi
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = SessionAi(plain)
+	return nil
+}
+
+// What the session was driven under
+// (docs/adr/0028-run-context-and-ai-provenance.md). Absent in sessions recorded
+// before the agent sent it.
+type SessionContext struct {
+	// The AI's settings on the player's car when the session started. In a human
+	// session: what the AI would drive with.
+	Ai SessionAi `json:"ai"`
+
+	// Cars in the session (CSP ac.StateSim.carsCount).
+	CarsCount int `json:"cars_count"`
+
+	// CSP's build number (ac.getPatchVersionCode).
+	CspBuild *int `json:"csp_build,omitempty,omitzero"`
+
+	// CSP's version (ac.getPatchVersion).
+	CspVersion *string `json:"csp_version,omitempty,omitzero"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SessionContext) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["ai"]; raw != nil && !ok {
+		return fmt.Errorf("field ai in SessionContext: required")
+	}
+	if _, ok := raw["cars_count"]; raw != nil && !ok {
+		return fmt.Errorf("field cars_count in SessionContext: required")
+	}
+	type Plain SessionContext
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.CarsCount {
+		return fmt.Errorf("field %s: must be >= %v", "cars_count", 1)
+	}
+	*j = SessionContext(plain)
 	return nil
 }
 
@@ -7555,6 +7815,10 @@ type SpoolPass struct {
 	// State of the car and track when the pass ended. FL, FR, RL, RR order.
 	Conditions *PassConditions `json:"conditions,omitempty,omitzero"`
 
+	// What the pass was driven under
+	// (docs/adr/0028-run-context-and-ai-provenance.md).
+	Context *PassContext `json:"context,omitempty,omitzero"`
+
 	// Corner number from the session line's corner map.
 	Corner int `json:"corner"`
 
@@ -7593,6 +7857,36 @@ type SpoolPass struct {
 
 	// Format version of this line.
 	V SpoolPassV `json:"v"`
+}
+
+type SpoolPassContextClock string
+
+const SpoolPassContextClockApp SpoolPassContextClock = "app"
+const SpoolPassContextClockPhysics SpoolPassContextClock = "physics"
+
+var enumValues_SpoolPassContextClock = []interface{}{
+	"physics",
+	"app",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *SpoolPassContextClock) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_SpoolPassContextClock {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SpoolPassContextClock, v)
+	}
+	*j = SpoolPassContextClock(v)
+	return nil
 }
 
 type SpoolPassKind string
@@ -7714,6 +8008,11 @@ type SpoolSession struct {
 
 	// Car corresponds to the JSON schema field "car".
 	Car SpoolCar `json:"car"`
+
+	// What the session was driven under
+	// (docs/adr/0028-run-context-and-ai-provenance.md). Absent in sessions recorded
+	// before the agent sent it.
+	Context *SessionContext `json:"context,omitempty,omitzero"`
 
 	// Kind corresponds to the JSON schema field "kind".
 	Kind SpoolSessionKind `json:"kind"`

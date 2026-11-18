@@ -1323,6 +1323,8 @@ export interface components {
        * @enum {string}
        */
       driver: "human" | "ai";
+      /** @description For an experiment the AI drives: the share of the car's own AI tyre hint pinned for all its blocks, written into the run plan and never changed. Absent: the share the AI's calibration learned (docs/adr/0028-run-context-and-ai-provenance.md). */
+      ai_hint_share?: number;
       /** @description Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own. */
       hypothesis_key?: string;
     };

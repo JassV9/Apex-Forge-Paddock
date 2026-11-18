@@ -16,11 +16,12 @@ const insertPassSQL = `
 INSERT INTO corner_pass (
     session_id, corner_id, seq, t_start, duration_s, lap_in_session, setup_hash, n_samples,
     fuel_l, tyre_core_c, tyre_surface_c, tyre_press, wear, grip, air_c, road_c, features,
-    setup_version_id, block_id, block_lap, ers_charge_start, ers_charge_end, ers_deploy_mean
+    setup_version_id, block_id, block_lap, ers_charge_start, ers_charge_end, ers_deploy_mean,
+    ai_hint, damage_max, reset_counter, abs_share, tc_share, drs_share, clock
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
     (SELECT id FROM setup_version WHERE car_id = $18 AND agent_hash = $7 ORDER BY id DESC LIMIT 1),
     (SELECT id FROM run_block WHERE experiment_id = $19 AND "order" = $20),
-    $21, $22, $23, $24)
+    $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
 ON CONFLICT (session_id, corner_id, t_start) DO NOTHING`
 
 // passFeatures is corner_pass.features as ingest writes it. The engine adds its own keys.
@@ -46,6 +47,7 @@ func insertPass(ctx context.Context, tx *sql.Tx, session sessionRef, cornerID in
 	args = append(args, string(features), session.carID)
 	args = append(args, blockArgs(pass.Block)...)
 	args = append(args, ersArgs(pass.Ers)...)
+	args = append(args, passContextArgs(pass.Context)...)
 	outcome, err := tx.ExecContext(ctx, insertPassSQL, args...)
 	if err != nil {
 		return false, err
@@ -54,7 +56,10 @@ func insertPass(ctx context.Context, tx *sql.Tx, session sessionRef, cornerID in
 	if err != nil {
 		return false, fmt.Errorf("rows affected: %w", err)
 	}
-	return affected == 1, nil
+	if affected != 1 {
+		return false, nil
+	}
+	return true, saveBlockContext(ctx, tx, session, pass)
 }
 
 // conditionArgs are the eight condition columns, all NULL when the pass has no conditions

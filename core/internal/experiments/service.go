@@ -84,7 +84,7 @@ func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate
 		carID: base.carID, trackID: base.trackID, kind: contracts.ExperimentKindOfat,
 		baselineVersion: base.versionID, variantValues: variant, parameterID: &parameterID,
 		clicks: request.Clicks, statement: strings.TrimSpace(request.Statement), origin: cameFrom,
-		predictions: request.Predictions, driver: request.Driver,
+		predictions: request.Predictions, driver: request.Driver, aiHintShare: request.AiHintShare,
 	})
 	if err != nil {
 		return contracts.Experiment{}, err
@@ -116,6 +116,9 @@ func oneSetting(ctx context.Context, q querier, base baseline, name string, clic
 func checkRequest(request contracts.ExperimentCreate) error {
 	if strings.TrimSpace(request.Statement) == "" {
 		return fmt.Errorf("the hypothesis needs a statement: %w", ErrInvalid)
+	}
+	if err := checkHintPin(request.AiHintShare, request.Driver); err != nil {
+		return err
 	}
 	for _, prediction := range request.Predictions {
 		if prediction.Low > prediction.High {

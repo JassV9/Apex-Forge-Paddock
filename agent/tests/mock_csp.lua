@@ -32,6 +32,7 @@ M.maxDepth = 0
 local function wheel()
   return {
     slipAngle = 0, slipRatio = 0, ndSlip = 0, load = 3000, tyreInsideTemperature = 85,
+    angularSpeed = 0, suspensionTravel = 0.05,
     tyreMiddleTemperature = 82, tyreOutsideTemperature = 78, tyreCoreTemperature = 90,
     tyreOptimumTemperature = 90, tyrePressure = 27.5, tyreWear = 0.02,
   }
@@ -44,10 +45,13 @@ M.car = {
   fuel = 42.5, lapCount = 0, damage = { [0] = 0, 0, 0, 0, 0 },
   -- KERS/ERS as ac.StateCar names them; a test sets kersPresent for a hybrid car
   kersPresent = false, kersCharge = 0, kersInput = 0,
+  -- run context (docs/adr/0028-run-context-and-ai-provenance.md), names as in ac.StateCar
+  timestamp = 1000, localVelocity = vec3(), position = vec3(), gear = 3, rpm = 6000, maxFuel = 120,
+  absInAction = false, tractionControlInAction = false, drsActive = false, aiLevel = 1, aiAggression = 0.5,
 }
 M.sim = {
   trackLengthM = M.L, isPaused = false, isReplayActive = false, raceSessionType = 2,
-  roadGrip = 0.97, ambientTemperature = 24, roadTemperature = 31,
+  roadGrip = 0.97, ambientTemperature = 24, roadTemperature = 31, carsCount = 1,
 }
 M.now = 0     -- seconds since script start; the test driver advances it
 M.writes = {} -- every file write: { path, at (M.now), bytes, async }
@@ -67,6 +71,8 @@ function ac.getCarName() return M.carName or M.carID end
 function ac.getTrackID() return M.trackID end
 function ac.getTrackLayout() return M.layout end
 function ac.getTrackName() return M.trackName or M.trackID end
+function ac.getPatchVersion() return M.cspVersion or "0.3.0-preview581" end
+function ac.getPatchVersionCode() return M.cspBuild or 3400 end
 function ac.hasTrackSpline() return true end
 function ac.log(s) M.calls.log[#M.calls.log + 1] = tostring(s) end
 function ac.storage(t) return t end
@@ -158,6 +164,7 @@ function ac.INIConfig.carData(_, file)
       if t and t[key] then return t[key] end
     end
     if file == "ai.ini" and section == "TYRES" and key == "HINT" then return M.aiTyresHint or default end
+    if file == "ai.ini" and M.aiIni and M.aiIni[section .. "/" .. key] then return M.aiIni[section .. "/" .. key] end
     return default
   end
   return obj
@@ -275,17 +282,18 @@ function physics.teleportCarTo(i, spawn)
   M.car.isInPitlane, M.car.isInPit = true, true
   M.car.speedMs, M.car.speedKmh = 0, 0
 end
-function physics.setCarFuel(i, liters) record("fuel", liters) M.car.fuel = liters end
+-- a tank that does not take the fuel (seen in experiment 15) keeps what it had
+function physics.setCarFuel(i, liters)
+  record("fuel", liters) if not M.fuelStuck then M.car.fuel = math.min(liters, M.car.maxFuel) end end
 function physics.resetCarState(i) record("repair") for z = 0, 4 do M.car.damage[z] = 0 end end
 function ac.tryToStart() record("start") return true end
 function physics.setCarBodyDamage(i, d)
-  record("repair_body", d.x, d.y, d.z, d.w)
-  for z = 0, 3 do M.car.damage[z] = 0 end
-end
+  record("repair_body", d.x, d.y, d.z, d.w) for z = 0, 3 do M.car.damage[z] = 0 end end
 function physics.setAILapsToComplete(i, laps) record("laps_to_complete", laps) end
 function physics.setAIPitStopRequest(i, on) record("pit_request", on) end
 function physics.setExtraAIGrip(i, v) record("extra_grip", v) end
-function physics.setAITyresHint(i, v) record("tyres_hint", v) end
+-- MOCK.hintFails: CSP refuses the call
+function physics.setAITyresHint(i, v) if M.hintFails then error("refused") end record("tyres_hint", v) end
 
 script = {}
 function setInterval(fn, s) end

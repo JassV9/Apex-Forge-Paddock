@@ -170,15 +170,23 @@ func firstCause(err error) string {
 	return validation.Error()
 }
 
-// The schema cannot say "every column has n values", so it is checked here.
+// The schema cannot say "every column has n values", so it is checked here. An optional column
+// is either absent or has n values too.
 func checkColumnLengths(pass *contracts.SpoolPass) error {
 	if pass.Samples == nil {
 		return nil
 	}
+	n := pass.Samples.N
 	for index, column := range sampleColumns(&pass.Samples.Columns) {
-		if len(column) != pass.Samples.N {
+		if len(column) != n {
 			return reject(ReasonColumnLength, "column %s has %d values, n is %d",
-				sampleColumnNames[index], len(column), pass.Samples.N)
+				sampleColumnNames[index], len(column), n)
+		}
+	}
+	for index, column := range extraColumns(&pass.Samples.Columns) {
+		if len(column) != 0 && len(column) != n {
+			return reject(ReasonColumnLength, "column %s has %d values, n is %d",
+				extraColumnNames[index], len(column), n)
 		}
 	}
 	return nil

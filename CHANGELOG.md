@@ -4,6 +4,22 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Agent and core (ADR 0028, audit findings C1, I9, I10): run context and AI provenance. The
+  session line now says what it was driven under (CSP version and build, cars in the session,
+  the car's AI tyre, aero and brake hints, the learned share, AI level and aggression; in an AI
+  session also the pinned share, the hint given and the extra grip), and `agent_version` names
+  the build (`0.2.0+<hash>`, written by `tools/install_agent.py`; `+dev` otherwise). Every pass
+  carries the tyre hint the AI was given, damage, resets, the share of samples with ABS, TC and
+  DRS acting and the clock of `t` (CSP's `car.timestamp` when present), and new optional sample
+  columns: normalised slip, wheel angular speed and suspension travel per wheel, body velocity,
+  world position, gear and rpm. An AI experiment can pin `ai_hint_share` at proposal; the run
+  plan carries it, the agent drives every block at that share, never learns from or writes the
+  calibration file during it, and stops when the hint given is another. `ai_laps_fixed` laps at
+  a test hint without learning. After every refuel the fuel is read back and a block more than
+  0.5 L off stops the run (experiment 15's block 1 ran on 24 L). Migration 00011 adds
+  `experiment.ai_hint_share`, the pass context columns on `corner_pass` and `run_context` (per
+  session and per block). Core must be rebuilt before the new agent is installed: an older core
+  rejects its lines. Tested offline only; **unverified in game**.
 - Core and web (ADR 0027): a layout and its test copy are one track in the web app. A session
   on an original layout (e.g. `fn_cota / layout_f1_2026`) is now compared, in "Against the AI"
   and the AI overlay, with the AI's sessions on `<layout>_paddock`, labelled "AI on COTA F1 2026

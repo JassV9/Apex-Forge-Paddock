@@ -166,7 +166,7 @@ func saveSession(ctx context.Context, tx *sql.Tx, s *contracts.SpoolSession, par
 	if err != nil {
 		return fmt.Errorf("save session: %w", err)
 	}
-	return nil
+	return saveSessionContext(ctx, tx, s)
 }
 
 func savePasses(ctx context.Context, tx *sql.Tx, session sessionRef, passes []*contracts.SpoolPass, result *ChunkResult) error {

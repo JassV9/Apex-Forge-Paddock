@@ -115,6 +115,79 @@
           }
         }
       }
+    },
+    "context": {
+      "title": "SessionContext",
+      "description": "What the session was driven under (docs/adr/0028-run-context-and-ai-provenance.md). Absent in sessions recorded before the agent sent it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cars_count",
+        "ai"
+      ],
+      "properties": {
+        "cars_count": {
+          "description": "Cars in the session (CSP ac.StateSim.carsCount).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "csp_version": {
+          "description": "CSP's version (ac.getPatchVersion).",
+          "type": "string"
+        },
+        "csp_build": {
+          "description": "CSP's build number (ac.getPatchVersionCode).",
+          "type": "integer"
+        },
+        "ai": {
+          "title": "SessionAi",
+          "description": "The AI's settings on the player's car when the session started. In a human session: what the AI would drive with.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tyre_hint_base",
+            "learned_share"
+          ],
+          "properties": {
+            "tyre_hint_base": {
+              "description": "The car's own AI tyre hint, ai.ini [TYRES] HINT.",
+              "type": "number"
+            },
+            "learned_share": {
+              "description": "Share of the car's own AI tyre hint (ai.ini [TYRES] HINT) the calibration learned (ai_tune file).",
+              "type": "number"
+            },
+            "pinned_share": {
+              "description": "Share of the car's own AI tyre hint (ai.ini [TYRES] HINT) pinned by the run plan or the free-lap command; only in an AI session.",
+              "type": "number"
+            },
+            "applied_hint": {
+              "description": "Tyre hint the AI drives with: tyre_hint_base times the pinned share, else the learned one; only in an AI session.",
+              "type": "number"
+            },
+            "extra_grip": {
+              "description": "Extra AI grip the agent sets while the AI drives (1: the car's own grip); only in an AI session.",
+              "type": "number"
+            },
+            "aero_hint": {
+              "description": "ai.ini [PHYSICS_HINTS] AERO_HINT, when the file has one.",
+              "type": "number"
+            },
+            "brake_hint": {
+              "description": "ai.ini [PEDALS] BRAKE_HINT, when the file has one.",
+              "type": "number"
+            },
+            "level": {
+              "description": "AI level, 0..1, -1 without AI (ac.StateCar.aiLevel).",
+              "type": "number"
+            },
+            "aggression": {
+              "description": "AI aggression, 0..1, -1 without AI (ac.StateCar.aiAggression).",
+              "type": "number"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {

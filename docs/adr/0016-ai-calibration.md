@@ -93,3 +93,7 @@ what the game showed to work; per section is the next step if a car needs it. Lo
 **Consequences.** The AI is slower everywhere, not only where it went wrong: on this car it
 drives below the limit in corners it already handled. Effects that only appear at the very
 limit of grip can be understated; the experiment's statistics still compare like with like.
+
+*Amended by [ADR 0028](0028-run-context-and-ai-provenance.md) (2026-11-18):* an experiment can pin
+the share for all its blocks (`ai_hint_share`); a pinned run neither learns nor writes the
+calibration file, and every session and pass records the share and hint it was driven with.

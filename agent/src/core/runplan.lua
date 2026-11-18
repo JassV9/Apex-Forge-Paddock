@@ -7,6 +7,8 @@
 -- line, a teleport to the pits or a pit exit just before the line is not a lap.
 -- Pure Lua: no CSP calls.
 
+local aitune = require("core.aitune")
+
 local runplan = {}
 
 local EPSILON = 1e-6
@@ -31,8 +33,11 @@ function runplan.read(decoded)
   table.sort(blocks, function(a, b) return a.order < b.order end)
   local driver = decoded.driver == "ai" and "ai" or "human"
   local fromOrder = type(decoded.from_order) == "number" and decoded.from_order or nil
+  -- the AI's tyre hint pinned for every block (docs/adr/0028-run-context-and-ai-provenance.md)
+  local hintShare = aitune.validShare(decoded.ai_hint_share)
+  if decoded.ai_hint_share ~= nil and not hintShare then return nil, "run plan pins an invalid ai_hint_share" end
   return { experimentId = decoded.experiment_id, revision = decoded.revision, blocks = blocks,
-    driver = driver, fromOrder = fromOrder }
+    driver = driver, fromOrder = fromOrder, hintShare = hintShare }
 end
 
 function runplan.new()

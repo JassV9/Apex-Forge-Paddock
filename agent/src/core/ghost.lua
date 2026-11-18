@@ -18,6 +18,11 @@
 -- A game that starts with an experiment for the AI open on the car is the driver's, not the
 -- AI's (docs/adr/0021-human-keeps-the-car.md): `hold` keeps the AI from taking the car, for
 -- that experiment and for any that follows, until `resume`, `lap` or `calibrate`.
+--
+-- Run context (docs/adr/0028-run-context-and-ai-provenance.md): the fuel is read back after
+-- every refuel and a block that does not hold it stops the run; a plan that pins the AI's tyre
+-- hint stops the run when the hint the AI was given is another; free laps can run at a fixed
+-- share without learning.
 
 local ghost = {
   STUCK_KMH = 15,     -- slower than this on track counts as stuck
@@ -29,6 +34,8 @@ local ghost = {
   MAX_RETRIES = 3,
   MIN_FUEL_L = 30,    -- every block starts with the first block's fuel, but never less than this
   RESERVE_L = 4,      -- free laps go in to refuel below this; a dry car heads for the pits
+  FUEL_CHECK_S = 1,   -- the fuel is read back this long after the block was handed to the AI
+  FUEL_TOLERANCE_L = 0.5,
 }
 
 function ghost.new()
@@ -69,6 +76,13 @@ local function holdBack(s, o)
   return {}
 end
 
+-- the first block's fuel, never less than MIN_FUEL_L, never more than the tank holds
+local function fuelTarget(o)
+  local liters = math.max(o.fuel or 0, ghost.MIN_FUEL_L)
+  if o.maxFuel and o.maxFuel > 0 then liters = math.min(liters, o.maxFuel) end
+  return liters
+end
+
 local function fromOff(s, o)
   if not wanted(s, o) then return {} end
   if s.held then return holdBack(s, o) end
@@ -76,7 +90,7 @@ local function fromOff(s, o)
     s.message = "The AI cannot drive here: this track does not give apps physics access."
     return {}
   end
-  s.fuel, s.retries = math.max(o.fuel or 0, ghost.MIN_FUEL_L), 0
+  s.fuel, s.retries = fuelTarget(o), 0
   return goToPits(s, o.block, "AI driver: to the pits for " .. name(o.block) .. ".")
 end
 
@@ -110,6 +124,25 @@ local function retry(s, o, why)
   return goToPits(s, o.block, string.format("AI driver: %s, retrying %s.", why, name(o.block)))
 end
 
+-- the fuel read back once, FUEL_CHECK_S after the block began: a refuel that did not take
+-- (seen: experiment 15 drove block 1 on 24 L, the others on 48 L) would make the arms unequal
+local function fuelOff(s, o)
+  if not s.fuelCheck then return nil end
+  s.fuelCheck = s.fuelCheck - o.dt
+  if s.fuelCheck > 0 then return nil end
+  s.fuelCheck = nil
+  if o.fuel == nil or math.abs(o.fuel - s.fuel) <= ghost.FUEL_TOLERANCE_L then return nil end
+  return string.format("the car has %.1f L after refuelling for %s, the plan wants %.1f L",
+    o.fuel, name(s.block), s.fuel)
+end
+
+-- why the block cannot count: its setup is not on the car, its fuel or the AI's hint is not
+-- the plan's
+local function invalid(s, o)
+  if s.block ~= 0 and o.offCar then return o.offCar end
+  return fuelOff(s, o) or o.hintOff
+end
+
 local function whileDriving(s, o)
   if not wanted(s, o) then
     s.phase = "off"
@@ -120,7 +153,8 @@ local function whileDriving(s, o)
     s.retries = 0
     return goToPits(s, o.block, "AI driver: block done, to the pits for " .. name(o.block) .. ".")
   end
-  if s.block ~= 0 and o.offCar then return fail(s, o.offCar) end
+  local why = invalid(s, o)
+  if why then return fail(s, why) end
   if s.block == 0 and s.untilCalibrated and o.calibrated then
     s.phase, s.free, s.untilCalibrated = "off", false, false
     s.message = "AI calibrated on this car: the car is yours, or start an experiment."
@@ -154,7 +188,8 @@ end
 ---parked (in the pit box and still), onTrack, speedKmh, ai (car is AI controlled), fuel,
 ---damage (the largest damage zone), resets (the car's reset counter), lapsDone (laps the plan
 ---has counted in this block), calibrated (the AI calibration has its clean laps), offCar (why
----the block's setup is not on the car, or nil).
+---the block's setup is not on the car, or nil), maxFuel (the tank, litres), hintOff (why the
+---AI's tyre hint is not the one the plan pins, or nil).
 ---@return table[] actions, in order: autopilot_on/off, teleport_pits, repair, repair_body,
 ---set_fuel, load, start
 function ghost.step(s, o)
@@ -180,7 +215,7 @@ end
 function ghost.loaded(s, ok, message, offCar)
   if offCar then return fail(s, offCar) end
   if not ok then return fail(s, "the setup did not load (" .. tostring(message) .. ")") end
-  s.phase, s.stuck, s.damage, s.sinceLap = "driving", 0, nil, 0
+  s.phase, s.stuck, s.damage, s.sinceLap, s.fuelCheck = "driving", 0, nil, 0, ghost.FUEL_CHECK_S
   s.resets, s.lapsDone = nil, nil  -- the teleport and the start count as resets; begin afresh
   s.message = "AI driver: driving " .. name(s.block) .. "."
   return { act("autopilot_on"), act("start") }
@@ -205,10 +240,25 @@ function ghost.resume(s)
   if s.phase == "failed" then s.phase = "off" end
 end
 
----Let the AI lap the car on its current setup until stopped (when there is no plan).
-function ghost.lap(s)
+---Let the AI lap the car on its current setup until stopped (when there is no plan). It learns
+---its tyre hint, unless `fixed`: then it drives at `share` of the car's hint (the learned share
+---when nil) and nothing it does changes the calibration.
+---@param fixed boolean|nil
+---@param share number|nil
+function ghost.lap(s, fixed, share)
   s.free, s.halted, s.held, s.retries, s.untilCalibrated = true, false, false, 0, false
+  s.learn, s.freeShare = not fixed, fixed and share or nil
   if s.phase == "failed" then s.phase = "off" end
+end
+
+---True while free laps teach the AI its tyre hint.
+function ghost.learning(s) return s.block == 0 and s.learn ~= false end
+
+---The share of the car's tyre hint pinned for what the AI drives now, or nil (the learned share
+---applies): a plan's pin in its blocks, the fixed share in free laps.
+function ghost.pinnedShare(s, planShare)
+  if s.block == 0 then return s.freeShare end
+  return planShare
 end
 
 ---Free laps that end by themselves once the calibration says calibrated (`calibrated` in

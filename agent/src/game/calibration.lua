@@ -2,6 +2,8 @@
 -- gives the AI its learned tyre hint with `physics.setAITyresHint`: the car's own hint from its
 -- ai.ini times the learned share. The calibration of a car on a layout is kept in
 -- Documents/Assetto Corsa/paddock/ai_tune/<car>__<track>__<layout>.json, written after a lap.
+-- A pinned share (a run plan's ai_hint_share, or fixed free laps) is applied instead of the
+-- learned one and never reaches that file (docs/adr/0028-run-context-and-ai-provenance.md).
 
 local aitune = require("core.aitune")
 
@@ -14,8 +16,8 @@ local calibration = {
 }
 
 -- damage starts unknown: the first frame on track is its baseline, not an incident
-local last = { pos = nil, reset = nil, damage = nil, slow = 0, applied = nil }
-local baseHint = nil
+local last = { pos = nil, reset = nil, damage = nil, slow = 0, applied = nil, wanted = nil }
+local baseHint, hints = nil, nil
 
 local function safe(text) return (tostring(text or ""):gsub("[^%w%._%-]+", "_")) end
 
@@ -31,6 +33,24 @@ local function base()
     baseHint = ok and tonumber(v) or 1
   end
   return baseHint
+end
+
+local function iniNumber(config, section, key)
+  local ok, v = pcall(function() return config:get(section, key, nil) end)
+  return ok and tonumber(v) or nil
+end
+
+---The car's other AI hints from its ai.ini, read once; nil where the file has none.
+local function otherHints()
+  if hints == nil then
+    local ok, config = pcall(ac.INIConfig.carData, 0, "ai.ini")
+    hints = {}
+    if ok and config then
+      hints.aero = iniNumber(config, "PHYSICS_HINTS", "AERO_HINT")
+      hints.brake = iniNumber(config, "PEDALS", "BRAKE_HINT")
+    end
+  end
+  return hints
 end
 
 function calibration.load()
@@ -53,18 +73,19 @@ local function incident(car, dt)
   return hit, reset
 end
 
-local function apply()
-  local hint = base() * aitune.hint(calibration.state)
-  if hint ~= last.applied then
-    last.applied = hint
-    physics.setAITyresHint(0, hint)
-  end
+-- the hint counts as applied only once CSP took the call; a refused call is tried again
+local function apply(pinned)
+  local hint = base() * aitune.share(calibration.state, pinned)
+  last.wanted = hint
+  if hint ~= last.applied and pcall(physics.setAITyresHint, 0, hint) then last.applied = hint end
 end
 
 ---Every frame while the AI drives on track. `learning` is true in free laps only: during an
----experiment the hint is applied but never changed.
-function calibration.update(dt, car, learning)
-  apply()
+---experiment the hint is applied but never changed. With a `pinned` share the AI drives at it
+---and nothing is learned, counted or written.
+function calibration.update(dt, car, learning, pinned)
+  apply(pinned)
+  if pinned then return end
   local pos = car.splinePosition
   local hit, reset = incident(car, dt)
   aitune.observe(calibration.state, pos, hit)
@@ -76,8 +97,8 @@ function calibration.update(dt, car, learning)
 end
 
 ---The lap ended with a retry: an incident where the car is, and the lap is over.
-function calibration.aborted(learning)
-  if last.pos == nil then return end
+function calibration.aborted(learning, pinned)
+  if last.pos == nil or pinned then return end
   aitune.observe(calibration.state, last.pos, true)
   aitune.endLap(calibration.state, learning)
   save()
@@ -86,8 +107,28 @@ end
 ---The AI is handed the car or gives it back: the car's own hint is put back, nothing carries
 ---over.
 function calibration.release()
-  last.pos, last.reset, last.slow, last.damage, last.applied = nil, nil, 0, nil, nil
+  last.pos, last.reset, last.slow, last.damage, last.applied, last.wanted = nil, nil, 0, nil, nil, nil
+  baseHint, hints = nil, nil  -- read afresh for every hand-over, once
   pcall(physics.setAITyresHint, 0, base())
+end
+
+---The tyre hint the AI was last given (base x share), or nil since it was handed the car.
+function calibration.applied() return last.applied end
+
+---Why the hint the AI was given is not the pinned one, or nil (also before the first try).
+function calibration.hintOff(pinned)
+  if last.wanted == nil then return nil end
+  return aitune.pinMismatch(base(), pinned, last.applied)
+end
+
+---The AI's settings for the session line: the car's hints, the learned and the pinned share.
+function calibration.settings(pinned)
+  local other = otherHints()
+  return {
+    tyreHintBase = base(), learnedShare = aitune.hint(calibration.state), pinnedShare = pinned,
+    appliedHint = base() * aitune.share(calibration.state, pinned), aeroHint = other.aero,
+    brakeHint = other.brake,
+  }
 end
 
 function calibration.summary() return aitune.summary(calibration.state) end

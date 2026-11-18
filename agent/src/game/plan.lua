@@ -126,6 +126,9 @@ function plan.driver() return plan.state.plan and plan.state.plan.driver or nil 
 
 function plan.experimentId() return plan.state.plan and plan.state.plan.experimentId or nil end
 
+---The share of the car's tyre hint the plan pins for the AI, or nil.
+function plan.hintShare() return plan.state.plan and plan.state.plan.hintShare or nil end
+
 ---Push laps done and to do in the block being driven (nil without a block).
 function plan.progress()
   local block = runplan.block(plan.state)

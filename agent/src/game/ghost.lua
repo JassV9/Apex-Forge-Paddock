@@ -3,11 +3,12 @@
 -- prepare_test_layout.py makes such a copy of a layout). Elsewhere the agent says so and the
 -- human drives. Never used online: AC's autopilot and teleports are offline features.
 
+local aitune = require("core.aitune")
 local calibration = require("game.calibration")
 local core = require("core.ghost")
 local plan = require("game.plan")
 
-local ghost = { state = core.new(), KEEP_OUT_S = 2 }
+local ghost = { state = core.new(), KEEP_OUT_S = 2, EXTRA_AI_GRIP = 1 }
 
 -- In practice AC's AI drives a stint and then goes back to the pits by itself. It must not:
 -- a pit stop changes fuel and tyres in the middle of a block. CSP's block on pitting wears
@@ -17,7 +18,7 @@ local ghost = { state = core.new(), KEEP_OUT_S = 2 }
 local function keepOut()
   physics.setAILapsToComplete(0, 1000)
   physics.setAIPitStopRequest(0, false)
-  physics.setExtraAIGrip(0, 1)
+  physics.setExtraAIGrip(0, ghost.EXTRA_AI_GRIP)
 end
 local nextKeepOut = 0
 
@@ -58,6 +59,25 @@ perform = function(actions)
   end
 end
 
+---The share of the car's tyre hint pinned for what the AI drives now, or nil.
+function ghost.pinnedShare() return core.pinnedShare(ghost.state, plan.hintShare()) end
+
+-- what core/ghost.lua sees of the car and the plan this frame
+local function observe(dt, car, pinned)
+  local lapsDone = plan.lapsDone()  -- the plan's count; a free run counts the car's laps
+  if plan.blockOrder() == nil or (ghost.state.free and plan.driver() ~= "ai") then
+    lapsDone = car.lapCount
+  end
+  return {
+    dt = dt, planId = plan.experimentId(), driverAi = plan.driver() == "ai", allowed = allowed(),
+    block = plan.blockOrder(), parked = car.isInPit and car.speedKmh < 1,
+    onTrack = not car.isInPitlane, speedKmh = car.speedKmh, ai = car.isAIControlled, fuel = car.fuel,
+    maxFuel = car.maxFuel, damage = math.max(car.damage[0], car.damage[1], car.damage[2], car.damage[3]),
+    resets = car.resetCounter, lapsDone = lapsDone, calibrated = calibration.calibrated(),
+    offCar = plan.offCar(), hintOff = calibration.hintOff(pinned),
+  }
+end
+
 ---Every frame, before the car is sampled.
 local calibrationLoaded = false
 
@@ -71,26 +91,15 @@ function ghost.update(dt, car)
     nextKeepOut = ghost.KEEP_OUT_S
     pcall(keepOut)
   end
-  local retries = ghost.state.retries
-  local lapsDone = plan.lapsDone()  -- the plan's count; a free run counts the car's laps
-  if plan.blockOrder() == nil or (ghost.state.free and plan.driver() ~= "ai") then
-    lapsDone = car.lapCount
-  end
-  local actions = core.step(ghost.state, {
-    dt = dt, planId = plan.experimentId(), driverAi = plan.driver() == "ai", allowed = allowed(),
-    block = plan.blockOrder(), parked = car.isInPit and car.speedKmh < 1,
-    onTrack = not car.isInPitlane, speedKmh = car.speedKmh, ai = car.isAIControlled, fuel = car.fuel,
-    damage = math.max(car.damage[0], car.damage[1], car.damage[2], car.damage[3]),
-    resets = car.resetCounter, lapsDone = lapsDone, calibrated = calibration.calibrated(),
-    offCar = plan.offCar(),
-  })
+  local retries, pinned = ghost.state.retries, ghost.pinnedShare()
+  local actions = core.step(ghost.state, observe(dt, car, pinned))
   -- a block retried (reset by the game, stuck, damaged) is the clearest incident of all: the
   -- lap it ends is counted before the car leaves the track
-  if ghost.state.retries > retries then calibration.aborted(ghost.state.block == 0) end
+  if ghost.state.retries > retries then calibration.aborted(core.learning(ghost.state), pinned) end
   perform(actions)
-  -- free laps teach the AI where it needs a lower speed; an experiment only applies it
+  -- free laps teach the AI the grip it may assume; an experiment only applies it
   if ghost.state.phase == "driving" and not car.isInPitlane then
-    calibration.update(dt, car, ghost.state.block == 0)
+    calibration.update(dt, car, core.learning(ghost.state), ghost.pinnedShare())
   end
 end
 
@@ -98,6 +107,8 @@ function ghost.active() return core.active(ghost.state) end
 function ghost.phase() return ghost.state.phase end
 function ghost.message() return ghost.state.message end
 function ghost.calibration() return calibration.summary() end
+---The tyre hint the AI was last given, or nil.
+function ghost.appliedHint() return calibration.applied() end
 function ghost.allowed() return allowed() end
 function ghost.stop() perform(core.stop(ghost.state)) end
 function ghost.resume() core.resume(ghost.state) end
@@ -106,13 +117,20 @@ function ghost.held() return ghost.state.held end
 ---True while the AI laps the car on its own setup (block 0): no experiment owns those laps.
 function ghost.freeRun() return core.active(ghost.state) and ghost.state.block == 0 end
 function ghost.lap() core.lap(ghost.state) end
+---Free laps that learn nothing, at `share` of the car's tyre hint (the learned share when nil).
+---A share outside aitune's pin range is refused: the AI keeps what it was doing.
+function ghost.lapFixed(share)
+  if share ~= nil and not aitune.validShare(share) then return end
+  core.lap(ghost.state, true, share)
+end
 function ghost.calibrate()
   calibration.recount()
   core.calibrate(ghost.state)
 end
 
 -- Commands from outside the game (outbox/agent_command.json: {"id": n, "at": unix seconds,
--- "command": "ai_laps" | "calibrate" | "stop"}), read every COMMAND_POLL_S. Each id is acted on once,
+-- "command": "ai_laps" | "ai_laps_fixed" | "calibrate" | "stop"}, and for ai_laps_fixed an optional
+-- "ai_hint_share"), read every COMMAND_POLL_S. Each id is acted on once,
 -- and only within COMMAND_TTL_S of `at`, so a reloaded agent never replays an old command.
 ghost.COMMAND_POLL_S, ghost.COMMAND_TTL_S = 2, 60
 local nextCommand, lastCommand = 0, nil
@@ -124,7 +142,8 @@ function ghost.pollCommands(now)
   if not ok or type(cmd) ~= "table" or cmd.id == nil or cmd.id == lastCommand then return end
   lastCommand = cmd.id
   if type(cmd.at) ~= "number" or math.abs(os.time() - cmd.at) > ghost.COMMAND_TTL_S then return end
-  local run = { ai_laps = ghost.lap, calibrate = ghost.calibrate, stop = ghost.stop }
+  local run = { ai_laps = ghost.lap, calibrate = ghost.calibrate, stop = ghost.stop,
+    ai_laps_fixed = function() ghost.lapFixed(cmd.ai_hint_share) end }
   if run[cmd.command] then run[cmd.command]() end
 end
 function ghost.reset() core.reset(ghost.state) end

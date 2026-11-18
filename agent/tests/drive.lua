@@ -35,6 +35,16 @@ local function apply(s)
   end
   c.wheelsOutside = s.out
   c.rideHeight[0], c.rideHeight[1] = s.rh_f, s.rh_r
+  -- the channels of docs/adr/0028: wheel speed from road speed, a body slip from yaw, the line
+  for i = 0, 3 do
+    local w = c.wheels[i]
+    w.ndSlip, w.angularSpeed = math.abs(s["sa_" .. names[i]]) / 6, s.v / 0.33
+    w.suspensionTravel = 0.05 + 0.002 * s.lat_g
+  end
+  c.localVelocity.x, c.localVelocity.z = -0.05 * s.yaw, s.v
+  local world = ac.trackProgressToWorldCoordinate(c.splinePosition, true)
+  c.position.x, c.position.z = world.x, world.z
+  c.rpm, c.absInAction = 4000 + 40 * s.v, s.brake > 0.8
   if c.kersPresent then
     -- a hybrid deploys on full throttle and harvests under braking
     c.kersInput = s.gas >= 0.99 and 1 or 0
@@ -44,6 +54,7 @@ end
 
 local function frame()
   M.now = M.now + DT
+  M.car.timestamp = 1000 + M.now * 1000  -- CSP's physics time, ms
   local started = os.clock()
   script.update(DT)
   local took = os.clock() - started

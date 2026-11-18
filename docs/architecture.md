@@ -93,13 +93,16 @@ Rules that hold everywhere:
    (`core/spool_lines.lua`), with the conditions at that moment: fuel, tyre temperatures,
    pressures, wear, track grip, air and road temperature, wall clock, lap, setup hash; on a
    car with KERS/ERS also the battery charge at the start and end of the pass and the mean
-   deployment ([ADR 0024](adr/0024-ers-state-per-pass.md)).
+   deployment ([ADR 0024](adr/0024-ers-state-per-pass.md)); and its run context: the tyre hint
+   the AI was given, damage, resets, how much of it ABS, TC and DRS acted, and the clock of `t`
+   (CSP's physics time when the car has one). The session line names the agent's build, CSP's
+   version and the AI's settings ([ADR 0028](adr/0028-run-context-and-ai-provenance.md)).
 3. `core/spool.lua` queues lines; the shell writes every waiting line as a new chunk file, at
    most five times per second.
 4. `core/internal/ingest` scans the spool every second, validates each line against the
    contract, writes the raw samples of a chunk as one Parquet part and its passes as
-   `corner_pass` rows, and records the file as ingested, all idempotent on
-   (session, corner, t_start).
+   `corner_pass` rows, the session's and each block's `run_context`, and records the file as
+   ingested, all idempotent on (session, corner, t_start).
 
 The agent records facts only. Whether a pass is usable (off track, cold tyres, traffic) is the
 engine's call in phase 2; `corner_pass.valid` stays true until then.
@@ -261,8 +264,11 @@ flowchart LR
    as an `ai` session, and lowers the grip the AI assumes (its tyre hint) after every lap
    where it went off, until two laps are clean.
 3. An experiment with `driver: ai`: core writes the car's run plan; for every block the
-   agent teleports to the pit box, repairs, sets the first block's fuel, loads the setup
-   with read-back, and hands the car to the AI with the caps frozen.
+   agent teleports to the pit box, repairs, sets the first block's fuel and reads it back, loads
+   the setup with read-back, and hands the car to the AI with its tyre hint frozen: the share the
+   experiment pins (`ai_hint_share`), else the learned one. A pinned run never touches the
+   calibration file and stops when the hint given is another
+   ([ADR 0028](adr/0028-run-context-and-ai-provenance.md)).
 4. Passes are tagged by block as for a human; core and the engine judge them the same way.
 
 Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
@@ -291,7 +297,7 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 | Piece | State |
 | --- | --- |
 | Contracts: health, spool lines (session, catalog, setup, pass), run plan, session summary, setup item, experiment and its requests, features, plan, evaluate and diagnose requests and responses, the diagnosis and the explain reply, sensitivity request, response and profile, propose request, proposals, scorecard, base setup request, response and reply; generators and drift check | Working, checked in CI |
-| agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 151 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
+| agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 226 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
 | engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 187 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
 | web: one workspace (session rail, overview grid, overlaid telemetry per corner, diagnosis, experiments with propose panel and scorecard, garage); a read-only build | Working, 186 tests |
@@ -306,6 +312,7 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 | Corners weighted by their own scatter (inverse residual variance, floor 1.5x typical, cap 10:1), named in the verdict reason ([ADR 0023](adr/0023-corners-weighted-by-their-own-scatter.md)) | Tested (pytest incl. hypothesis, coverage simulations, replay of experiments 5 to 10's real rows offline); unverified in game |
 | Hybrid battery per pass: `ers` on the pass line (CSP `kersCharge`, `kersInput`, only with `kersPresent`), `corner_pass.ers_*` (migration 00010), the start charge sent as covariate `ers_charge_start` ([ADR 0024](adr/0024-ers-state-per-pass.md)) | Tested offline (agent pytest on the mocked CSP API, Go ingest against PostgreSQL, pytest simulation); **unverified in game** |
 | A lap counts once finished (every corner, next block, or 15 minutes quiet); plans sized for lap noise (`stats/lap_noise.py`, four to eight blocks, target of four bands, `sigma_lap` and `target_met` on the plan) ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)) | Tested (Go table-driven and against PostgreSQL, pytest incl. hypothesis and simulations, Vitest, offline replay of experiments 5 and 7 to 10's baselines); **unverified in game** |
+| Run context and AI provenance: the session line's `context` (CSP version and build, cars, the AI's hints, learned and pinned share, level, aggression), the agent build in `agent_version` (`tools/install_agent.py` writes `src/build.lua`), per pass `context` (hint given, damage, resets, ABS/TC/DRS share, clock) and optional sample columns `nd_*`, `w_*`, `st_*`, `vx`, `vz`, `x`, `z`, `gear`, `rpm`; `ai_hint_share` pinned per experiment and in the run plan, `ai_laps_fixed`, fuel read back; migration 00011 (`experiment.ai_hint_share`, `corner_pass` context columns, `run_context`) ([ADR 0028](adr/0028-run-context-and-ai-provenance.md)) | Tested offline (agent pytest on the mocked CSP API, Go ingest and experiments against PostgreSQL, the end-to-end test); **unverified in game** |
 | Linked setup items are one setting: detected per car (same label and range, equal in every setup read back from the car, at least 3, and moved) or declared (`setups.DeclaredLinks`: FH26 `WING_1` + `WING_9`); experiments, base setups, setup items, ranking and training treat a group as one item, labelled `Rear Wing (WING_1 + WING_9)` ([ADR 0026](adr/0026-linked-setup-items.md)) | Tested (Go table-driven and against PostgreSQL, Vitest; detection run read-only on the real rows: FH26 rear wing found, nothing on the Ferrari 488 GT3); **unverified in game** |
 | AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |

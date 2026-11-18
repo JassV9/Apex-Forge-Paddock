@@ -56,6 +56,12 @@ class RunPlan(BaseModel):
         "human",
         description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
     )
+    ai_hint_share: float | None = Field(
+        None,
+        description="Share of the car's own AI tyre hint the AI drives every block with, instead of the share its calibration learned (docs/adr/0028-run-context-and-ai-provenance.md). Absent: the learned share.",
+        ge=0.5,
+        le=1.5,
+    )
     from_order: int | None = Field(
         None,
         description="Set once the experiment was stopped (aborted, rejected or reverted): the blocks before this one are abandoned and the agent goes straight to it, a block that puts the baseline back.",

@@ -186,6 +186,62 @@
         }
       }
     },
+    "context": {
+      "title": "PassContext",
+      "description": "What the pass was driven under (docs/adr/0028-run-context-and-ai-provenance.md).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock",
+        "damage_max",
+        "resets",
+        "abs_share",
+        "tc_share",
+        "drs_share"
+      ],
+      "properties": {
+        "clock": {
+          "description": "Clock of the t column: CSP's physics time (car.timestamp) or the app's.",
+          "type": "string",
+          "enum": [
+            "physics",
+            "app"
+          ]
+        },
+        "ai_hint": {
+          "description": "Tyre hint the AI was given when the pass ended; only while the AI drives.",
+          "type": "number"
+        },
+        "damage_max": {
+          "description": "Largest damage zone when the pass ended (AC's units).",
+          "type": "number",
+          "minimum": 0
+        },
+        "resets": {
+          "description": "The car's reset counter when the pass ended.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "abs_share": {
+          "description": "Share of the pass's samples with ABS acting, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tc_share": {
+          "description": "Share of the pass's samples with traction control acting, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "drs_share": {
+          "description": "Share of the pass's samples with DRS open, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
     "samples": {
       "title": "PassSamples",
       "description": "Raw channels at up to 60 Hz as column arrays of equal length n.",
@@ -395,6 +451,132 @@
             },
             "rh_r": {
               "description": "Rear ride height, m.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "nd_fl": {
+              "description": "Normalised slip FL (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "nd_fr": {
+              "description": "Normalised slip FR (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "nd_rl": {
+              "description": "Normalised slip RL (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "nd_rr": {
+              "description": "Normalised slip RR (CSP ndSlip; 1 is the peak of the tyre's grip). Optional, docs/adr/0028.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "w_fl": {
+              "description": "Wheel angular speed FL, rad/s (CSP angularSpeed). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "w_fr": {
+              "description": "Wheel angular speed FR, rad/s (CSP angularSpeed). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "w_rl": {
+              "description": "Wheel angular speed RL, rad/s (CSP angularSpeed). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "w_rr": {
+              "description": "Wheel angular speed RR, rad/s (CSP angularSpeed). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "st_fl": {
+              "description": "Suspension travel FL, as CSP reports it (suspensionTravel). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "st_fr": {
+              "description": "Suspension travel FR, as CSP reports it (suspensionTravel). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "st_rl": {
+              "description": "Suspension travel RL, as CSP reports it (suspensionTravel). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "st_rr": {
+              "description": "Suspension travel RR, as CSP reports it (suspensionTravel). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "vx": {
+              "description": "Velocity sideways in the car's frame, m/s (CSP localVelocity.x). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "vz": {
+              "description": "Velocity forwards in the car's frame, m/s (CSP localVelocity.z). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "x": {
+              "description": "World position x, m (CSP position.x). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "z": {
+              "description": "World position z, m (CSP position.z). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "gear": {
+              "description": "Gear, 0 neutral, -1 reverse (CSP gear). Optional.",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "rpm": {
+              "description": "Engine rpm (CSP rpm). Optional.",
               "type": "array",
               "items": {
                 "type": "number"

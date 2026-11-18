@@ -133,6 +133,6 @@ Same car, track and CSP.
 
 - Other cars and tracks. The AI's quality depends on the car's AI data and the layout's AI line.
 - Whether an effect measured with the AI predicts the effect for a human driver: the AI drives
-  at 88.5 % of its planned grip, below the limit where a human finds the last tenths.
+  planning with 88.5 % of its tyre hint (this car and layout; real grip 100 %), below the limit where a human finds the last tenths.
 - The window's look in the game was seen once, from a screenshot taken inside the game; its
   buttons were not clicked in the game.

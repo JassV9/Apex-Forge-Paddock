@@ -61,7 +61,7 @@ everything is read from `session`, `corner_pass` and `setup_version`.
 
 ## Limits
 
-- **The AI drives below the limit.** Calibrated, it drives with 88.5 % of the tyre hint
+- **The AI drives below the limit.** Calibrated, it plans with a per-car, per-layout share of the tyre hint (88.5 % for the 488 GT3 at COTA, 94.1 % for the Formula Hybrid 2026 at the Hungaroring; real grip stays 100 %, see docs/investigations/2026-11-18-ghost-driver-reliability.md)
   (2:15.8 against the owner's 2:12.65 on COTA). "You are faster than the AI" is expected in
   many corners and says nothing about the driver; it is classed car. The rule can only find
   corners where the driver is slower than a cautious, repeatable driver, which are the ones

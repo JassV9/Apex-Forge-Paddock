@@ -284,7 +284,7 @@ Why, and what it does not measure: [ADR 0014](adr/0014-ghost-driver.md),
    that setup and layout, never a variant's (no AI times in the game on an original layout); the hotlap window (`agent/src/core/hotlap.lua`, `agent/src/game/hotlap.lua`)
    shows each pass against them.
 
-The rule and its limits (the AI drives at 88.5 % of its grip): [ADR 0019](adr/0019-ai-reference-driver.md).
+The rule and its limits (the AI plans with a calibrated share of the car's tyre hint, per car and layout, on real grip: 88.5 % for the 488 GT3 at COTA, 94.1 % for the Formula Hybrid 2026 at the Hungaroring): [ADR 0019](adr/0019-ai-reference-driver.md).
 
 ## What exists today (after phase 7)
 

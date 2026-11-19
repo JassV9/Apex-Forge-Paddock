@@ -182,6 +182,11 @@ without a sweep around it: the same never-promote rule, so a hand-run series tha
 sweep (the grip-hint sweep of the reliability investigation, one hint per experiment) keeps one
 baseline. Experiment 20 showed the need: accepted at look 3, it became the champion.
 
+A measure-only experiment may also have 0 clicks: a repeatability (A/A) check, both arms on the
+baseline setup itself, filed under the item named (experiment A of the reliability investigation).
+Zero clicks without `measure_only` is refused, and the sensitivity profile never reads a 0-click
+experiment (`e.clicks <> 0`).
+
 ## Not verified
 
 - **Unverified in game.** No sweep has been driven in Assetto Corsa. The loop is tested against a

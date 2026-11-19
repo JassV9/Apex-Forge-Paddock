@@ -24,7 +24,7 @@
       "minLength": 1
     },
     "clicks": {
-      "description": "Clicks to move it; negative is down. Never 0.",
+      "description": "Clicks to move it; negative is down. 0 only for a measure-only repeatability (A/A) check.",
       "type": "integer"
     },
     "statement": {

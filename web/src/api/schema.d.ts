@@ -1559,7 +1559,7 @@ export interface components {
       session_id: number;
       /** @description Setup item to change. */
       parameter: string;
-      /** @description Clicks to move it; negative is down. Never 0. */
+      /** @description Clicks to move it; negative is down. 0 only for a measure-only repeatability (A/A) check. */
       clicks: number;
       /** @description The hypothesis in words. */
       statement: string;

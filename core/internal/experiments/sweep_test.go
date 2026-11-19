@@ -1,6 +1,7 @@
 package experiments
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -84,6 +85,30 @@ func TestEveryExperimentSaysWhyItWasDriven(t *testing.T) {
 	}
 	if got := purposeOf(draft{kind: contracts.ExperimentKindRecheck}); got != contracts.ExperimentPurposeRecheck {
 		t.Errorf("a re-check's purpose = %s", got)
+	}
+}
+
+func TestZeroClicksIsAnAAOnlyWhenMeasureOnly(t *testing.T) {
+	f := newFixture(t, "exp_aa")
+	request := contracts.ExperimentCreate{
+		SessionId: f.sessionID, Parameter: "ARB_FRONT", Clicks: 0, Statement: "A/A repeatability.",
+		Predictions: []contracts.PredictionSpec{},
+	}
+	if _, err := f.service.Create(t.Context(), request); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("0 clicks, not measure-only: err = %v, want ErrInvalid", err)
+	}
+
+	request.MeasureOnly = true
+	exp, err := f.service.Create(t.Context(), request)
+	if err != nil {
+		t.Fatalf("A/A: %v", err)
+	}
+
+	if len(exp.Arms) != 2 || exp.Arms[0].SetupVersionId != exp.Arms[1].SetupVersionId {
+		t.Errorf("arms %+v, want both on the baseline setup", exp.Arms)
+	}
+	if exp.Purpose == nil || *exp.Purpose != contracts.ExperimentPurposeSweep {
+		t.Errorf("purpose = %v, want sweep", exp.Purpose)
 	}
 }
 

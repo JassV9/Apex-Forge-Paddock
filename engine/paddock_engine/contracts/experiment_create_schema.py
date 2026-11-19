@@ -46,7 +46,10 @@ class ExperimentCreate(BaseModel):
         ..., description="Core's id of the session whose latest setup is the baseline.", ge=1
     )
     parameter: str = Field(..., description="Setup item to change.", min_length=1)
-    clicks: int = Field(..., description="Clicks to move it; negative is down. Never 0.")
+    clicks: int = Field(
+        ...,
+        description="Clicks to move it; negative is down. 0 only for a measure-only repeatability (A/A) check.",
+    )
     statement: str = Field(..., description="The hypothesis in words.", min_length=1)
     predictions: list[PredictionSpec]
     driver: Driver | None = Field(

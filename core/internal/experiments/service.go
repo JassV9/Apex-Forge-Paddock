@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
@@ -113,7 +114,8 @@ func (s *Service) create(ctx context.Context, request contracts.ExperimentCreate
 
 // oneSetting is the variant of a one-factor experiment and the id of the item it is filed
 // under. A linked item moves with its group, which is filed under its leader, whichever member
-// was asked for (docs/adr/0026-linked-setup-items.md).
+// was asked for (docs/adr/0026-linked-setup-items.md). Zero clicks is a repeatability (A/A)
+// check: the variant is the baseline itself, filed under the item named.
 func oneSetting(ctx context.Context, q querier, base baseline, name string, clicks int) (setups.Values, int64, error) {
 	catalog, ids, err := loadCatalog(ctx, q, base.carID)
 	if err != nil {
@@ -122,6 +124,12 @@ func oneSetting(ctx context.Context, q querier, base baseline, name string, clic
 	links, err := loadLinks(ctx, q, base.carID, catalog)
 	if err != nil {
 		return nil, 0, err
+	}
+	if clicks == 0 {
+		if _, known := catalog[name]; !known {
+			return nil, 0, fmt.Errorf("%w: %s: %w", ErrInvalid, name, setups.ErrUnknownItem)
+		}
+		return maps.Clone(base.values), ids[links.Leader(name)], nil
 	}
 	variant, err := setups.Step(catalog, links, base.values, name, clicks)
 	if err != nil {
@@ -136,6 +144,9 @@ func checkRequest(request contracts.ExperimentCreate) error {
 	}
 	if err := checkHintPin(request.AiHintShare, request.Driver); err != nil {
 		return err
+	}
+	if request.Clicks == 0 && !request.MeasureOnly {
+		return fmt.Errorf("0 clicks is a repeatability (A/A) check and must be measure-only: %w", ErrInvalid)
 	}
 	for _, prediction := range request.Predictions {
 		if prediction.Low > prediction.High {

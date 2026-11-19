@@ -3411,7 +3411,8 @@ type ExperimentCreate struct {
 	// (docs/adr/0028-run-context-and-ai-provenance.md).
 	AiHintShare *float64 `json:"ai_hint_share,omitempty,omitzero"`
 
-	// Clicks to move it; negative is down. Never 0.
+	// Clicks to move it; negative is down. 0 only for a measure-only repeatability
+	// (A/A) check.
 	Clicks int `json:"clicks"`
 
 	// Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver,

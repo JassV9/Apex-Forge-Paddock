@@ -21,6 +21,7 @@ from paddock_engine.contracts.proposals_schema import Proposals
 from paddock_engine.contracts.propose_request_schema import ProposeRequest
 from paddock_engine.contracts.response_request_schema import ResponseRequest
 from paddock_engine.contracts.response_response_schema import ResponseResponse
+from paddock_engine.contracts.sensitivity_measure_schema import SensitivityMeasure
 from paddock_engine.contracts.sensitivity_request_schema import SensitivityRequest
 from paddock_engine.contracts.sensitivity_response_schema import SensitivityResponse
 from paddock_engine.diagnosis.report import report
@@ -31,6 +32,7 @@ from paddock_engine.features.session import session_features
 from paddock_engine.optimize.base_setup import base_setup
 from paddock_engine.optimize.rank import propose
 from paddock_engine.response.service import load_samples, response
+from paddock_engine.sensitivity.measure import measure
 from paddock_engine.sensitivity.profile import update
 
 
@@ -63,9 +65,13 @@ def create_app(llm: Choice | None = None) -> FastAPI:
     def diagnose_session(request: DiagnoseRequest) -> Diagnosis:
         return report(request, writer)
 
-    @app.post("/sensitivity/update")
+    @app.post("/sensitivity/update", response_model_exclude_none=True)
     def sensitivity(request: SensitivityRequest) -> SensitivityResponse:
         return update(request)
+
+    @app.post("/sensitivity/measure")
+    def rederive(request: EvaluateRequest) -> SensitivityMeasure:
+        return measure(request)
 
     @app.post("/propose")
     def next_experiments(request: ProposeRequest) -> Proposals:

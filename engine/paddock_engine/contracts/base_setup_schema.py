@@ -13,6 +13,17 @@ class EffectClass(StrEnum):
     inconclusive = "inconclusive"
 
 
+class KnowledgeLevel(StrEnum):
+    """
+    What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.
+    """
+
+    confirmed = "confirmed"
+    preliminary = "preliminary"
+    neutral = "neutral"
+    insufficient = "insufficient"
+
+
 class BaseSetupChange(BaseModel):
     """
     One change that goes into the base setup, with the measurement it rests on.
@@ -35,6 +46,30 @@ class BaseSetupChange(BaseModel):
     effect_class: EffectClass
     experiment_ids: list[int] = Field(
         ..., description="The experiments the measurement is pooled from."
+    )
+    shrunk_estimate: float = Field(
+        ...,
+        description="The estimate shrunk towards zero (empirical Bayes across the car's measured items): what the base setup predicts for it.",
+    )
+    knowledge_level: KnowledgeLevel = Field(
+        ...,
+        description="What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.",
+    )
+    p_value: float = Field(
+        ...,
+        description="One-sided p-value of the change being no better; it passed Benjamini-Hochberg across every measured change of the car.",
+        ge=0.0,
+        le=1.0,
+    )
+    track: str = Field(
+        ...,
+        description="The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track.",
+        min_length=1,
+    )
+    hint_bucket: str = Field(
+        ...,
+        description="The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver.",
+        min_length=1,
     )
 
 
@@ -68,6 +103,11 @@ class BaseSetupMeasured(BaseModel):
     ci_high: float
     n_passes: int = Field(..., ge=0)
     effect_class: EffectClass
+    knowledge_level: KnowledgeLevel = Field(
+        ...,
+        description="What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.",
+    )
+    experiments: int = Field(..., ge=1)
 
 
 class BaseSetupPrediction(BaseModel):
@@ -84,6 +124,7 @@ class BaseSetupPrediction(BaseModel):
     ci_high: float
     level: float
     note: str = Field(..., description="What the prediction assumes.")
+    raw_estimate: float = Field(..., description="Sum of the measured estimates before shrinkage.")
 
 
 class BaseSetup(BaseModel):

@@ -58,7 +58,12 @@
         "ci_high",
         "n_passes",
         "effect_class",
-        "experiment_ids"
+        "experiment_ids",
+        "shrunk_estimate",
+        "knowledge_level",
+        "p_value",
+        "track",
+        "hint_bucket"
       ],
       "properties": {
         "parameter": {
@@ -110,6 +115,36 @@
           "items": {
             "type": "integer"
           }
+        },
+        "shrunk_estimate": {
+          "description": "The estimate shrunk towards zero (empirical Bayes across the car's measured items): what the base setup predicts for it.",
+          "type": "number"
+        },
+        "knowledge_level": {
+          "description": "What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.",
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "preliminary",
+            "neutral",
+            "insufficient"
+          ]
+        },
+        "p_value": {
+          "description": "One-sided p-value of the change being no better; it passed Benjamini-Hochberg across every measured change of the car.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "track": {
+          "description": "The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track.",
+          "type": "string",
+          "minLength": 1
+        },
+        "hint_bucket": {
+          "description": "The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver.",
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -155,7 +190,9 @@
         "ci_low",
         "ci_high",
         "n_passes",
-        "effect_class"
+        "effect_class",
+        "knowledge_level",
+        "experiments"
       ],
       "properties": {
         "parameter": {
@@ -190,6 +227,20 @@
             "negligible",
             "inconclusive"
           ]
+        },
+        "knowledge_level": {
+          "description": "What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.",
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "preliminary",
+            "neutral",
+            "insufficient"
+          ]
+        },
+        "experiments": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -204,7 +255,8 @@
         "ci_low",
         "ci_high",
         "level",
-        "note"
+        "note",
+        "raw_estimate"
       ],
       "properties": {
         "channel": {
@@ -228,6 +280,10 @@
         "note": {
           "description": "What the prediction assumes.",
           "type": "string"
+        },
+        "raw_estimate": {
+          "description": "Sum of the measured estimates before shrinkage.",
+          "type": "number"
         }
       }
     }

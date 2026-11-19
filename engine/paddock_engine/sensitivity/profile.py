@@ -1,127 +1,127 @@
-"""A car's sensitivity profile: POST /sensitivity/update.
+"""A car's sensitivity profile: POST /sensitivity/update (ADR 0011, 0033).
 
-One row per item, clicks, channel and corner class. A row is either pooled from the car's own
-finished experiments or a prior from another car, flagged as one. The profile is rebuilt
-from the experiments' results every time, so it can always be re-derived when the method
-changes; `MODEL_VERSION` says which method made the rows.
+One measured row per stratum (sensitivity/strata.py): the car's own experiments pooled by random
+effects (sensitivity/pooling.py), with an explicit knowledge level (sensitivity/knowledge.py) and
+its provenance (experiments, engine versions, stale or not). Priors from other cars come back in
+their own list, without a class, only for changes the car has not measured in any stratum.
+Experiments that were not pooled are listed with the reason. `MODEL_VERSION` says which method
+made the rows.
 """
 
 from collections import defaultdict
-from collections.abc import Sequence
 
-from paddock_engine.contracts.sensitivity_request_schema import (
-    Measurement,
-    SensitivityRequest,
-    Transfer,
-)
+from paddock_engine.config.margins import margins
+from paddock_engine.contracts.sensitivity_request_schema import SensitivityRequest
 from paddock_engine.contracts.sensitivity_response_schema import (
     CornerClass,
+    Driver,
     EffectClass,
     SensitivityEffect,
+    SensitivityPrior,
     SensitivityResponse,
 )
 from paddock_engine.sensitivity import priors
-from paddock_engine.sensitivity.pooling import Estimate, from_interval, pool
+from paddock_engine.sensitivity.knowledge import combine, knowledge
+from paddock_engine.sensitivity.pooling import Estimate, Pooled
 from paddock_engine.sensitivity.shape import nonlinearity
+from paddock_engine.sensitivity.strata import Group, Stratum, estimate_of, group
 from paddock_engine.stats.rope import classify
 
-MODEL_VERSION = "inverse-variance-pool-1"
+MODEL_VERSION = "random-effects-hksj-1"
+STALE_NOTE = (
+    "Not re-derived by the current engine (the ledger's numbers): never more than insufficient."
+)
 
-Key = tuple[str, int, str, str]  # parameter, clicks, channel, corner class
+
+def _margin(stratum: Stratum, request: SensitivityRequest) -> float | None:
+    frozen = request.ropes.get(stratum.channel, 0.0)
+    return margins().margin(stratum.channel, stratum.parameter, frozen)
 
 
-def _row(key: Key, estimate: Estimate, level: float, rope: float) -> dict[str, object]:
-    low, high = estimate.interval(level)
-    parameter, clicks, channel, corner_class = key
+def _pooled(groups: list[Group], request: SensitivityRequest) -> dict[Stratum, Pooled]:
     return {
-        "parameter": parameter,
-        "clicks": clicks,
-        "channel": channel,
-        "corner_class": CornerClass(corner_class),
-        "estimate": estimate.mean,
-        "ci_low": low,
-        "ci_high": high,
-        "effect_class": EffectClass(classify(low, high, rope).value),
-    }
-
-
-def _measured(request: SensitivityRequest) -> dict[Key, tuple[Estimate, list[Measurement]]]:
-    groups: dict[Key, list[Measurement]] = defaultdict(list)
-    for item in request.measurements:
-        if item.clicks != 0:
-            key = (item.parameter, item.clicks, item.channel, item.corner_class.value)
-            groups[key].append(item)
-    return {
-        key: (
-            pool([from_interval(m.estimate, m.ci_low, m.ci_high, request.level) for m in items]),
-            items,
+        g.stratum: combine(
+            [estimate_of(m, request.level) for m in g.measurements],
+            _margin(g.stratum, request),
+            request.level,
         )
-        for key, items in groups.items()
+        for g in groups
     }
 
 
-def _measured_rows(request: SensitivityRequest) -> list[SensitivityEffect]:
-    measured = _measured(request)
-    by_item: dict[tuple[str, str, str], dict[int, Estimate]] = defaultdict(dict)
-    for (parameter, clicks, channel, corner_class), (estimate, _) in measured.items():
-        by_item[(parameter, channel, corner_class)][clicks] = estimate
+def _row(g: Group, pooled: Pooled, margin: float | None, curve: str) -> SensitivityEffect:
+    """`curve` says why the item's response is not a straight line; empty when it is."""
+    s = g.stratum
+    note = " ".join(text for text in (STALE_NOTE if g.stale else "", curve) if text)
+    versions = sorted({m.engine_version for m in g.measurements if m.engine_version})
+    prediction = pooled.prediction or (None, None)
+    return SensitivityEffect(
+        parameter=s.parameter,
+        clicks=s.clicks,
+        channel=s.channel,
+        corner_class=CornerClass(s.corner_class),
+        phase=s.phase,
+        track=s.track,
+        track_name=g.track_name,
+        driver=Driver(s.driver),
+        hint_bucket=s.hint_bucket,
+        baseline_value=s.baseline_value,
+        click_step=s.click_step,
+        estimate=pooled.estimate.mean,
+        ci_low=pooled.low,
+        ci_high=pooled.high,
+        standard_error=pooled.estimate.se,
+        p_increase=min(max(pooled.p(), 0.0), 1.0),
+        pi_low=prediction[0],
+        pi_high=prediction[1],
+        tau=pooled.tau,
+        method=pooled.method,
+        experiments=pooled.experiments,
+        knowledge_level=knowledge(pooled, margin, g.stale),
+        effect_class=EffectClass(classify(pooled.low, pooled.high, margin or 0.0).value),
+        margin=margin,
+        n_passes=sum(m.n_passes for m in g.measurements),
+        nonlinear=curve != "",
+        note=note,
+        stale=g.stale,
+        experiment_ids=sorted({m.experiment_id for m in g.measurements}),
+        engine_versions=versions,
+    )
+
+
+def _measured_rows(groups: list[Group], request: SensitivityRequest) -> list[SensitivityEffect]:
+    pooled = _pooled(groups, request)
+    curves: dict[Stratum, dict[int, Estimate]] = defaultdict(dict)
+    for stratum, result in pooled.items():
+        curves[stratum.response()][stratum.clicks] = result.estimate
     rows = []
-    for key in sorted(measured):
-        estimate, items = measured[key]
-        parameter, clicks, channel, corner_class = key
-        rope = request.ropes.get(channel, 0.0)
-        note = nonlinearity(
-            clicks, by_item[(parameter, channel, corner_class)], rope, request.level
-        )
-        rows.append(
-            SensitivityEffect.model_validate(
-                {
-                    **_row(key, estimate, request.level, rope),
-                    "n_passes": sum(m.n_passes for m in items),
-                    "nonlinear": note != "",
-                    "note": note,
-                    "is_prior": False,
-                    "prior_source": "",
-                    "experiment_ids": sorted({m.experiment_id for m in items}),
-                }
-            )
-        )
+    for g in groups:
+        margin = _margin(g.stratum, request)
+        s = g.stratum
+        curve = nonlinearity(s.clicks, curves[s.response()], margin or 0.0, request.level)
+        rows.append(_row(g, pooled[s], margin, curve))
     return rows
 
 
 def _prior_rows(
-    transfers: Sequence[Transfer], taken: set[Key], request: SensitivityRequest
-) -> list[SensitivityEffect]:
-    rows = []
-    for key, transfer in sorted(priors.best_sources(transfers).items()):
-        if key in taken:
-            continue  # the car's own measurement wins
-        weight = priors.similarity(transfer)
-        rope = request.ropes.get(transfer.channel, 0.0)
-        rows.append(
-            SensitivityEffect.model_validate(
-                {
-                    **_row(key, priors.prior(transfer, request.level), request.level, rope),
-                    "n_passes": 0,
-                    "nonlinear": False,
-                    "note": (
-                        f"Prior from {transfer.source_car}, not measured on this car: its "
-                        f"effect times {weight:g}, with the interval widened to match."
-                    ),
-                    "is_prior": True,
-                    "prior_source": transfer.source_car,
-                    "experiment_ids": [],
-                }
-            )
-        )
-    return rows
+    request: SensitivityRequest, measured: set[priors.Change]
+) -> list[SensitivityPrior]:
+    chosen = priors.best_sources(request.transfers)
+    return [
+        priors.prior(chosen[change], request.level)
+        for change in sorted(chosen)
+        if change not in measured  # the car's own measurement, in any stratum, wins
+    ]
 
 
 def update(request: SensitivityRequest) -> SensitivityResponse:
-    """Measurements first, then priors for changes the car has not measured."""
-    measured = _measured_rows(request)
-    taken = {(row.parameter, row.clicks, row.channel, row.corner_class.value) for row in measured}
+    """Measured rows per stratum, then priors for changes the car has not measured."""
+    groups, excluded = group(request.measurements)
+    rows = _measured_rows(groups, request)
+    measured = {g.stratum.change() for g in groups}
     return SensitivityResponse(
         model_version=MODEL_VERSION,
-        effects=measured + _prior_rows(request.transfers, taken, request),
+        effects=rows,
+        priors=_prior_rows(request, measured),
+        excluded=excluded,
     )

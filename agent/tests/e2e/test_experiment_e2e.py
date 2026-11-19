@@ -182,7 +182,7 @@ def check_garage(rig: Rig, session: int) -> None:
     diagnosed session's candidates against it, and the prediction scorecard."""
     backend = rig.backend
     (profile,) = backend.get("/sensitivity")
-    assert profile["experiments"] == 3 and not any(e["is_prior"] for e in profile["effects"])
+    assert profile["experiments"] == 3 and profile["priors"] == [] and profile["excluded"] == []
     on_time = {
         (e["parameter"], e["clicks"]): e
         for e in profile["effects"]
@@ -192,6 +192,9 @@ def check_garage(rig: Rig, session: int) -> None:
     assert on_time[("ARB_FRONT", 1)]["effect_class"] == "positive"
     assert on_time[("ARB_REAR", -1)]["effect_class"] == "inconclusive"
     assert all(len(e["experiment_ids"]) == 1 and e["n_passes"] > 0 for e in on_time.values())
+    # re-derived by the engine (ADR 0033): one experiment each, never a pooled claim
+    assert all(e["method"] == "single" and not e["stale"] for e in on_time.values())
+    assert all(e["knowledge_level"] in ("preliminary", "insufficient") for e in on_time.values())
 
     proposals = backend.get(f"/sessions/{session}/proposals")
     assert proposals["stage"] == "cold_start"

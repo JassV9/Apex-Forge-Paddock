@@ -78,16 +78,36 @@ func (c *Client) BaseSetup(ctx context.Context, request contracts.BaseSetupReque
 	return post[contracts.BaseSetup](ctx, c, "/base-setup", request)
 }
 
+// Measure re-derives a finished experiment for the sensitivity profile: its finding and the
+// block-level estimate, standard error and degrees of freedom per pooled channel (ADR 0033).
+func (c *Client) Measure(ctx context.Context, request contracts.EvaluateRequest) (contracts.SensitivityMeasure, error) {
+	return post[contracts.SensitivityMeasure](ctx, c, "/sensitivity/measure", request)
+}
+
+// Version is the engine's version (GET /health): results computed by another are re-derived.
+func (c *Client) Version(ctx context.Context) (string, error) {
+	health, err := call[contracts.Health](ctx, c, http.MethodGet, "/health", nil)
+	return health.Version, err
+}
+
 func post[T any](ctx context.Context, c *Client, path string, body any) (T, error) {
+	return call[T](ctx, c, http.MethodPost, path, body)
+}
+
+func call[T any](ctx context.Context, c *Client, method, path string, body any) (T, error) {
 	var reply T
 	if c.baseURL == "" {
 		return reply, fmt.Errorf("PADDOCK_ENGINE_URL is not set: %w", ErrUnavailable)
 	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return reply, fmt.Errorf("encode %s request: %w", path, err)
+	var content io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return reply, fmt.Errorf("encode %s request: %w", path, err)
+		}
+		content = bytes.NewReader(encoded)
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(encoded))
+	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, content)
 	if err != nil {
 		return reply, fmt.Errorf("build %s request: %w", path, err)
 	}

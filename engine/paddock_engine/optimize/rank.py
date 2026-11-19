@@ -6,8 +6,10 @@ is ordered by expected gain per lap of driving. Expected gain is the expected im
 beyond the band of practical equivalence, so a wide belief is worth more than a narrow one
 with the same mean: an unknown knob earns a look, a knob known to do nothing does not.
 
-A change this car has measured as negligible, or as clearly worse, is not proposed. A prior
-never rules a change out: what another car did is not a measurement of this one.
+A change this car has measured as neutral, or confirmed worse, is not proposed (the knowledge
+levels of ADR 0033: a pooled claim needs at least 3 experiments). A prior never rules a change
+out: what another car did is not a measurement of this one, and it is read only from the
+request's own list of priors, never from the measured rows.
 
 Not built: the surrogate model with Thompson sampling that docs/design.md names for cars
 with 20 or more experiments. No car has that many; the stage is reported and ranked as
@@ -28,9 +30,11 @@ from paddock_engine.contracts.proposals_schema import (
 from paddock_engine.contracts.propose_request_schema import (
     Better,
     EffectClass,
+    KnowledgeLevel,
     ProposeCandidate,
     ProposeRequest,
     SensitivityEffect,
+    SensitivityPrior,
 )
 from paddock_engine.stats.mde import passes_needed
 
@@ -62,28 +66,46 @@ def _band(request: ProposeRequest) -> float:
     return request.rope if request.rope > 0 else request.sigma
 
 
+def _overall(row: SensitivityEffect | SensitivityPrior) -> bool:
+    return row.corner_class.value == "all" and row.phase == "corner"
+
+
 def _effect_of(candidate: ProposeCandidate, request: ProposeRequest) -> SensitivityEffect | None:
-    """The profile's row for this change on the judged channel over all corners; a
-    measurement before a prior."""
+    """The car's own row for this change on the judged channel over all corners: the one pooled
+    from the most experiments, then the most precise."""
     rows = [
         row
         for row in request.effects
-        if row.parameter == candidate.parameter
-        and row.clicks == candidate.clicks
-        and row.channel == request.channel
-        and row.corner_class.value == "all"
+        if (row.parameter, row.clicks, row.channel)
+        == (candidate.parameter, candidate.clicks, request.channel)
+        and _overall(row)
+        and row.track != "all"
     ]
-    rows.sort(key=lambda row: row.is_prior)
+    rows.sort(key=lambda row: (row.stale, -row.experiments, row.standard_error))
     return rows[0] if rows else None
 
 
-def _belief(effect: SensitivityEffect | None, request: ProposeRequest) -> Belief:
-    if effect is None:
-        return Belief(0.0, UNKNOWN_SD_IN_ROPES * _band(request), Basis.none)
+def _prior_of(candidate: ProposeCandidate, request: ProposeRequest) -> SensitivityPrior | None:
+    for prior in request.priors:
+        if (prior.parameter, prior.clicks, prior.channel) == (
+            candidate.parameter,
+            candidate.clicks,
+            request.channel,
+        ) and _overall(prior):
+            return prior
+    return None
+
+
+def _belief(
+    effect: SensitivityEffect | None, prior: SensitivityPrior | None, request: ProposeRequest
+) -> Belief:
     sign = -1.0 if request.better is Better.lower else 1.0
-    sd = (effect.ci_high - effect.ci_low) / (2.0 * float(norm.ppf(0.5 + LEVEL / 2.0)))
-    basis = Basis.prior if effect.is_prior else Basis.measured
-    return Belief(sign * effect.estimate, sd, basis, effect.prior_source)
+    if effect is not None:  # the row's own interval in normal units: t(df) widths kept
+        sd = (effect.ci_high - effect.ci_low) / (2.0 * float(norm.ppf(0.5 + LEVEL / 2.0)))
+        return Belief(sign * effect.estimate, sd, Basis.measured)
+    if prior is not None:
+        return Belief(sign * prior.estimate, prior.standard_error, Basis.prior, prior.source_car)
+    return Belief(0.0, UNKNOWN_SD_IN_ROPES * _band(request), Basis.none)
 
 
 def expected_gain(belief: Belief, rope: float) -> float:
@@ -104,14 +126,17 @@ def laps_needed(belief: Belief, request: ProposeRequest) -> int:
 
 
 def _why_skipped(effect: SensitivityEffect | None, request: ProposeRequest) -> str:
-    """Only this car's own measurement can rule a change out."""
-    if effect is None or effect.is_prior:
+    """Only this car's own pooled measurement can rule a change out."""
+    if effect is None:
         return ""
-    span = f"{effect.ci_low:+.3f} to {effect.ci_high:+.3f} over {effect.n_passes} passes"
-    if effect.effect_class is EffectClass.negligible:
-        return f"Measured on this car as negligible on {request.channel}: {span}."
+    span = (
+        f"{effect.ci_low:+.3f} to {effect.ci_high:+.3f} over {effect.experiments} experiments, "
+        f"{effect.n_passes} passes"
+    )
+    if effect.knowledge_level is KnowledgeLevel.neutral:
+        return f"Measured on this car as neutral on {request.channel}: {span}."
     worse = EffectClass.positive if request.better is Better.lower else EffectClass.negative
-    if effect.effect_class is worse:
+    if effect.knowledge_level is KnowledgeLevel.confirmed and effect.effect_class is worse:
         return f"Measured on this car as worse on {request.channel}: {span}."
     return ""
 
@@ -150,6 +175,7 @@ def propose(request: ProposeRequest) -> Proposals:
                 )
             )
             continue
-        ranked.append(_proposal(candidate, _belief(effect, request), request))
+        belief = _belief(effect, _prior_of(candidate, request), request)
+        ranked.append(_proposal(candidate, belief, request))
     ranked.sort(key=lambda p: (-p.value_per_lap, p.parameter, p.clicks))
     return Proposals(stage=_stage(request.experiments), ranked=ranked, skipped=skipped)

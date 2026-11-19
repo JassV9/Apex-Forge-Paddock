@@ -1,6 +1,8 @@
 # ADR 0018: A base setup from the car's own measurements, judged as its own experiment
 
-Status: accepted (2026-11-16)
+Status: accepted (2026-11-16). The inclusion rule and the prediction amended by
+[ADR 0033](0033-stratified-vehicle-sensitivity-profile.md) (HKSJ rows, Benjamini-Hochberg,
+shrinkage, this track only).
 
 ## Context
 

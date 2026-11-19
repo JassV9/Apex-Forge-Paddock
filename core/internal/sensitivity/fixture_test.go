@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/engine"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/ingest"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/testdb"
@@ -23,36 +24,85 @@ const sampleSpool = "../ingest/testdata/spool"
 
 const fakeModel = "fake-1"
 
-// fakeEngine echoes: every measurement comes back as a measured effect, every transfer as a
-// prior at half its size. The pooling and the shrinkage themselves are the engine's tests.
+const fakeVersion = "9.9.9"
+
+// fakeEngine echoes: every measurement comes back as a measured row (stale ones keep the ledger's
+// interval, re-derived ones get estimate +- 2 standard errors), every transfer as a prior at half
+// its size. Measure answers `measured` for any replay. The pooling, the strata and the shrinkage
+// themselves are the engine's tests.
 type fakeEngine struct {
 	failure  error
+	measured *contracts.SensitivityMeasure
+	measures int
 	asked    []contracts.SensitivityRequest
 	proposed []contracts.ProposeRequest
 }
 
+func (f *fakeEngine) Version(context.Context) (string, error) { return fakeVersion, f.failure }
+
+func (f *fakeEngine) Measure(context.Context, contracts.EvaluateRequest) (contracts.SensitivityMeasure, error) {
+	f.measures++
+	if f.measured == nil {
+		return contracts.SensitivityMeasure{}, fmt.Errorf("bad request: %w", engine.ErrRejected)
+	}
+	return *f.measured, f.failure
+}
+
 func (f *fakeEngine) Sensitivity(_ context.Context, request contracts.SensitivityRequest) (contracts.SensitivityResponse, error) {
 	f.asked = append(f.asked, request)
-	reply := contracts.SensitivityResponse{ModelVersion: fakeModel, Effects: []contracts.SensitivityEffect{}}
+	reply := contracts.SensitivityResponse{
+		ModelVersion: fakeModel, Effects: []contracts.SensitivityEffect{},
+		Priors: []contracts.SensitivityPrior{}, Excluded: []contracts.ExcludedMeasurement{},
+	}
 	for _, m := range request.Measurements {
-		reply.Effects = append(reply.Effects, contracts.SensitivityEffect{
-			Parameter: m.Parameter, Clicks: m.Clicks, Channel: m.Channel,
-			CornerClass: contracts.SensitivityEffectCornerClass(m.CornerClass),
-			Estimate:    m.Estimate, CiLow: m.CiLow, CiHigh: m.CiHigh, NPasses: m.NPasses,
-			EffectClass:   contracts.SensitivityEffectEffectClassNegative,
-			ExperimentIds: []int{m.ExperimentId},
-		})
+		reply.Effects = append(reply.Effects, echoed(m))
 	}
 	for _, tr := range request.Transfers {
-		reply.Effects = append(reply.Effects, contracts.SensitivityEffect{
+		reply.Priors = append(reply.Priors, contracts.SensitivityPrior{
 			Parameter: tr.Parameter, Clicks: tr.Clicks, Channel: tr.Channel,
-			CornerClass: contracts.SensitivityEffectCornerClass(tr.CornerClass),
-			Estimate:    tr.Estimate / 2, CiLow: tr.CiLow, CiHigh: -tr.CiLow,
-			EffectClass: contracts.SensitivityEffectEffectClassInconclusive,
-			IsPrior:     true, PriorSource: tr.SourceCar, Note: "a prior", ExperimentIds: []int{},
+			CornerClass: contracts.SensitivityPriorCornerClass(tr.CornerClass), Phase: tr.Phase,
+			Estimate: tr.Estimate / 2, CiLow: tr.Estimate, CiHigh: -tr.Estimate,
+			StandardError: tr.StandardError, SourceCar: tr.SourceCar, SourceTrack: tr.SourceTrack,
+			SourceExperiments: tr.SourceExperiments, Weight: 0.5, Note: "a prior",
 		})
 	}
 	return reply, f.failure
+}
+
+func echoed(m contracts.Measurement) contracts.SensitivityEffect {
+	low, high, se := m.Estimate-0.01, m.Estimate+0.01, 0.005
+	if m.CiLow != nil {
+		low, high = *m.CiLow, *m.CiHigh
+	}
+	if m.StandardError != nil {
+		se = *m.StandardError
+		low, high = m.Estimate-2*se, m.Estimate+2*se
+	}
+	return contracts.SensitivityEffect{
+		Parameter: m.Parameter, Clicks: m.Clicks, Channel: m.Channel,
+		CornerClass: contracts.SensitivityEffectCornerClass(m.CornerClass), Phase: m.Phase,
+		Track: m.Track, TrackName: m.TrackName, Driver: contracts.SensitivityEffectDriver(m.Driver),
+		HintBucket: m.HintBucket, BaselineValue: m.BaselineValue, ClickStep: m.ClickStep,
+		Estimate: m.Estimate, CiLow: low, CiHigh: high, StandardError: se, PIncrease: 0.01,
+		Method: contracts.SensitivityEffectMethodSingle, Experiments: 1,
+		KnowledgeLevel: contracts.SensitivityEffectKnowledgeLevelPreliminary,
+		EffectClass:    contracts.SensitivityEffectEffectClassNegative, NPasses: m.NPasses,
+		Note: m.Note, Stale: m.Stale, ExperimentIds: []int{m.ExperimentId}, EngineVersions: []string{},
+	}
+}
+
+// fakeReplays refuses every replay as not fully driven, unless told to build one.
+type fakeReplays struct {
+	ready bool
+	asked []int64
+}
+
+func (r *fakeReplays) ReplayRequest(_ context.Context, id int64) (contracts.EvaluateRequest, error) {
+	r.asked = append(r.asked, id)
+	if !r.ready {
+		return contracts.EvaluateRequest{}, fmt.Errorf("experiment %d: not every block is driven yet: %w", id, experiments.ErrConflict)
+	}
+	return contracts.EvaluateRequest{Passes: []contracts.EvaluatePass{}}, nil
 }
 
 func (f *fakeEngine) Propose(_ context.Context, request contracts.ProposeRequest) (contracts.Proposals, error) {
@@ -81,6 +131,7 @@ func (f fakeDiagnoses) Latest(context.Context, int64) (contracts.Diagnosis, erro
 type fixture struct {
 	database  *sql.DB
 	engine    *fakeEngine
+	replays   *fakeReplays
 	diagnoses *fakeDiagnoses
 	service   *Service
 	sessionID int64
@@ -99,9 +150,9 @@ func newFixture(t *testing.T, schema string) *fixture {
 	if _, err := ingester.ScanOnce(t.Context()); err != nil {
 		t.Fatalf("ScanOnce: %v", err)
 	}
-	f := &fixture{database: database, engine: &fakeEngine{}, diagnoses: &fakeDiagnoses{}}
+	f := &fixture{database: database, engine: &fakeEngine{}, replays: &fakeReplays{}, diagnoses: &fakeDiagnoses{}}
 	f.scan(t, `SELECT id, car_id FROM session`, nil, &f.sessionID, &f.carID)
-	f.service = NewService(database, f.engine, f.diagnoses, logger)
+	f.service = NewService(database, f.engine, f.replays, f.diagnoses, logger)
 	return f
 }
 

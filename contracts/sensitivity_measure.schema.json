@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sensitivity_measure.schema.json",
+  "title": "SensitivityMeasure",
+  "description": "An experiment re-derived by the current engine for the sensitivity profile (POST /sensitivity/measure, ADR 0033): its finding, and per channel and speed class the block-level estimate with its standard error and degrees of freedom.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "engine_version",
+    "finding_class",
+    "reason",
+    "effects"
+  ],
+  "properties": {
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finding_class": {
+      "type": "string",
+      "enum": [
+        "invalid",
+        "confirmed_improvement",
+        "confirmed_regression",
+        "neutral",
+        "context_dependent",
+        "likely_improvement",
+        "likely_regression",
+        "insufficient_evidence"
+      ],
+      "description": "The current engine's finding on the experiment (ADR 0029)."
+    },
+    "reason": {
+      "description": "The verdict's reason, for an invalid finding.",
+      "type": "string"
+    },
+    "effects": {
+      "description": "The primary channel and every guardrail, over all corners and per speed class with at least 3 corners and 3 block degrees of freedom.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/MeasuredEffect"
+      }
+    }
+  },
+  "definitions": {
+    "MeasuredEffect": {
+      "title": "MeasuredEffect",
+      "description": "Variant minus baseline on one channel and speed class.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "corner_class",
+        "estimate",
+        "standard_error",
+        "df",
+        "n_passes",
+        "blocks",
+        "corners"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "estimate": {
+          "description": "Variant minus baseline, in the channel's unit, per corner pass.",
+          "type": "number"
+        },
+        "standard_error": {
+          "description": "Standard error of the estimate.",
+          "type": "number",
+          "minimum": 0
+        },
+        "df": {
+          "description": "Block degrees of freedom (ADR 0029).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "corners": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

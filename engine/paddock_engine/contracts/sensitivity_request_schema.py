@@ -13,30 +13,92 @@ class CornerClass(StrEnum):
     fast = "fast"
 
 
+class Driver(StrEnum):
+    ai = "ai"
+    human = "human"
+
+
+class FindingClass(StrEnum):
+    """
+    The experiment's finding (ADR 0029): the re-derivation's, or the ledger's for a stale row. invalid is never pooled.
+    """
+
+    invalid = "invalid"
+    confirmed_improvement = "confirmed_improvement"
+    confirmed_regression = "confirmed_regression"
+    neutral = "neutral"
+    context_dependent = "context_dependent"
+    likely_improvement = "likely_improvement"
+    likely_regression = "likely_regression"
+    insufficient_evidence = "insufficient_evidence"
+
+
 class Measurement(BaseModel):
     """
-    One channel result of one finished experiment on this car.
+    One channel result of one finished one-item experiment on this car, with the stratum it belongs to.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     experiment_id: int = Field(..., ge=1)
-    parameter: str = Field(..., min_length=1)
+    parameter: str = Field(..., description="Item id in the game's setup.", min_length=1)
     clicks: int = Field(..., description="Signed clicks of the variant against its baseline.")
     channel: str = Field(..., description="Metric id.", min_length=1)
     corner_class: CornerClass
+    phase: str = Field(
+        ...,
+        description="Corner phase the effect is measured over; corner for the whole corner.",
+        min_length=1,
+    )
+    track: str = Field(
+        ...,
+        description="The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track.",
+        min_length=1,
+    )
+    track_name: str = Field(..., description="What the dashboard calls the track.")
+    driver: Driver
+    hint_bucket: str = Field(
+        ...,
+        description="The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver.",
+        min_length=1,
+    )
+    baseline_value: float | None = Field(
+        None, description="Raw value of the item on the experiments' baseline."
+    )
+    click_step: float | None = Field(None, description="Raw size of one click of the item.", gt=0.0)
     estimate: float = Field(
         ..., description="Variant minus baseline, in the channel's unit, per corner pass."
     )
-    ci_low: float
-    ci_high: float
+    ci_low: float | None = Field(
+        None,
+        description="The ledger's interval at the request's level: given (and read) only for a stale row, which has no standard error.",
+    )
+    ci_high: float | None = None
+    standard_error: float | None = Field(
+        None,
+        description="Block-level standard error from the current engine (re-derived); absent for stale rows.",
+        ge=0.0,
+    )
+    df: float | None = Field(None, description="Degrees of freedom of that standard error.", gt=0.0)
     n_passes: int = Field(..., ge=0)
+    stale: bool = Field(
+        ...,
+        description="True when the numbers are the ledger's because the current engine could not re-derive the experiment.",
+    )
+    note: str = Field(..., description="Why a stale row could not be re-derived; empty otherwise.")
+    finding_class: FindingClass | None = Field(
+        None,
+        description="The experiment's finding (ADR 0029): the re-derivation's, or the ledger's for a stale row. invalid is never pooled.",
+    )
+    engine_version: str | None = Field(
+        None, description="Engine version that computed the numbers.", min_length=1
+    )
 
 
 class Transfer(BaseModel):
     """
-    A measured effect of another car's item with the same role and axle, offered as a prior for this car's item.
+    A pooled effect of another car's item with the same role and axle, offered as a prior for this car's item.
     """
 
     model_config = ConfigDict(
@@ -48,31 +110,38 @@ class Transfer(BaseModel):
     clicks: int
     channel: str = Field(..., description="Metric id.", min_length=1)
     corner_class: CornerClass
+    phase: str = Field(
+        ...,
+        description="Corner phase the effect is measured over; corner for the whole corner.",
+        min_length=1,
+    )
     estimate: float = Field(
         ..., description="Variant minus baseline, in the channel's unit, per corner pass."
     )
-    ci_low: float
-    ci_high: float
+    standard_error: float = Field(..., description="Standard error of the estimate.", ge=0.0)
     n_passes: int = Field(..., ge=0)
+    source_track: str
+    source_experiments: int = Field(..., ge=1)
 
 
 class SensitivityRequest(BaseModel):
     """
-    Core asks the engine to rebuild a car's sensitivity profile from its finished experiments (POST /sensitivity/update).
+    Core asks the engine to pool a car's sensitivity profile from its finished experiments (POST /sensitivity/update).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     measurements: list[Measurement] = Field(
-        ..., description="Every channel result of the car's finished one-item experiments."
+        ...,
+        description="Every channel result of the car's finished one-item experiments, with its stratum.",
     )
     transfers: list[Transfer] = Field(
-        ..., description="Measured effects of other cars, for items this car has not measured."
+        ..., description="Pooled effects of other cars, for items this car has not measured."
     )
     ropes: dict[str, float] = Field(
         ...,
-        description="Half-width of the band of practical equivalence per channel; a channel without one is judged against zero.",
+        description="Band of practical equivalence per channel the experiments froze; the engine's margins configuration overrides it per item.",
     )
     level: float = Field(
         ..., description="Confidence level of the intervals, as in the experiments.", gt=0.0, lt=1.0

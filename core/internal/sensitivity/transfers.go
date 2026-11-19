@@ -1,6 +1,11 @@
 package sensitivity
 
-import "github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
+import (
+	"math"
+
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/contracts"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
+)
 
 // transfersFor lists what the other cars measured on an item that does the same job as an
 // item of the target. Item names differ between cars, jobs do not. Whether the borrowed
@@ -13,8 +18,8 @@ func transfersFor(target car, cars []car, measured map[int64]contracts.Sensitivi
 		}
 		for _, effect := range measured[source.id].Effects {
 			from, known := source.knob(effect.Parameter)
-			if !known || len(sameJob(source, from)) != 1 {
-				continue
+			if !known || effect.Stale || len(sameJob(source, from)) != 1 {
+				continue // a stale row is insufficient on its own car; it lends nothing
 			}
 			if matches := sameJob(target, from); len(matches) == 1 {
 				transfers = append(transfers, transfer(effect, source, target, from, matches[0]))
@@ -38,21 +43,23 @@ func sameJob(c car, from knob) []knob {
 	return matches
 }
 
-// transfer restates another car's effect in the target's clicks. Clicks count steps of the
+// transfer restates another car's pooled effect in the target's clicks. Clicks count steps of the
 // raw value; when one car's menu runs the other way (a negative shown scale), a click up on
 // one is a click down on the other.
 func transfer(effect contracts.SensitivityEffect, source, target car, from, to knob) contracts.Transfer {
 	return contracts.Transfer{
-		Parameter:      to.name,
-		SourceCar:      source.label,
-		SameDrivetrain: source.drivetrain != "" && source.drivetrain == target.drivetrain,
-		Clicks:         effect.Clicks * way(from.shownScale) * way(to.shownScale),
-		Channel:        effect.Channel,
-		CornerClass:    contracts.TransferCornerClass(effect.CornerClass),
-		Estimate:       effect.Estimate,
-		CiLow:          effect.CiLow,
-		CiHigh:         effect.CiHigh,
-		NPasses:        effect.NPasses,
+		Parameter:         to.name,
+		SourceCar:         source.label,
+		SameDrivetrain:    source.drivetrain != "" && source.drivetrain == target.drivetrain,
+		Clicks:            effect.Clicks * way(from.shownScale) * way(to.shownScale),
+		Channel:           effect.Channel,
+		CornerClass:       contracts.TransferCornerClass(effect.CornerClass),
+		Phase:             effect.Phase,
+		Estimate:          effect.Estimate,
+		StandardError:     normalError(effect),
+		NPasses:           effect.NPasses,
+		SourceTrack:       effect.Track,
+		SourceExperiments: effect.Experiments,
 	}
 }
 
@@ -61,4 +68,12 @@ func way(shownScale float64) int {
 		return -1
 	}
 	return 1
+}
+
+// normalError is the lender's interval in normal units: the error a normal needs to give that
+// interval at the profile's level. A row's own standard error comes with few degrees of freedom
+// (a t interval); lending the raw error would make the prior narrower than the measurement.
+func normalError(effect contracts.SensitivityEffect) float64 {
+	z := math.Sqrt2 * math.Erfinv(experiments.DefaultTest().Level)
+	return (effect.CiHigh - effect.CiLow) / (2 * z)
 }

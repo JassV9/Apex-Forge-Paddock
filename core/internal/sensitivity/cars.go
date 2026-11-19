@@ -129,37 +129,3 @@ func fileUnderLeaders(cars []car, measurements map[int64][]contracts.Measurement
 		}
 	}
 }
-
-// A measurement is one current result (the latest verdict's, ADR 0030) of a finished one-factor
-// experiment. An experiment that is
-// still being driven, was aborted, or re-checks a champion says nothing about one item. The
-// intervals must all be at the level the engine is told, so an experiment judged at another
-// level is left out rather than misread.
-const measurementsSQL = `
-SELECT h.car_id, e.id, sp.name, e.clicks, r.channel, r.corner_class, r.estimate, r.ci_low,
-       r.ci_high, r.n_passes
-FROM current_result r
-JOIN experiment e ON e.id = r.experiment_id
-JOIN hypothesis h ON h.id = e.hypothesis_id
-JOIN setup_parameter sp ON sp.id = e.parameter_id
-WHERE e.kind = 'ofat' AND e.clicks <> 0
-  AND e.state IN ('accepted', 'rejected', 'tradeoff', 'inconclusive', 'reverted')
-  AND (e.success_test->>'level')::float8 = $1
-  AND r.corner_class IN ('all', 'slow', 'medium', 'fast')
-ORDER BY e.id, r.id`
-
-func readMeasurements(ctx context.Context, database *sql.DB, level float64) (map[int64][]contracts.Measurement, error) {
-	byCar := map[int64][]contracts.Measurement{}
-	_, err := queryAll(ctx, database, measurementsSQL, func(rows *sql.Rows) (contracts.Measurement, error) {
-		var carID int64
-		var m contracts.Measurement
-		err := rows.Scan(&carID, &m.ExperimentId, &m.Parameter, &m.Clicks, &m.Channel,
-			&m.CornerClass, &m.Estimate, &m.CiLow, &m.CiHigh, &m.NPasses)
-		byCar[carID] = append(byCar[carID], m)
-		return m, err
-	}, level)
-	if err != nil {
-		return nil, fmt.Errorf("read measured effects: %w", err)
-	}
-	return byCar, nil
-}

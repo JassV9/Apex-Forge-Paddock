@@ -101,7 +101,7 @@ func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logg
 		logger.Error("run plans not written again", "error", err)
 	}
 	diagnoses := diagnosis.NewService(database, analysis, ledger, logger)
-	garage := sensitivity.NewService(database, analysis, diagnoses, logger)
+	garage := sensitivity.NewService(database, analysis, ledger, diagnoses, logger)
 	trainer := training.NewService(database, ledger, garage, diagnoses, logger)
 	return api.Deps{
 		Logger: logger, Version: version, Database: database,

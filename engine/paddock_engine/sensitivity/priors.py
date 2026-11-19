@@ -1,10 +1,13 @@
-"""Priors from other cars: shrunk, widened and never passed off as measurements.
+"""Priors from other cars: shrunk, widened and never passed off as measurements (ADR 0011, 0033).
 
-A car that has not measured a change may borrow what a similar car measured for the item
-with the same role and axle. The borrowed effect is pulled towards zero by how alike the
+A car that has not measured a change in any stratum may borrow what a similar car measured for
+the item with the same role and axle. The borrowed effect is pulled towards zero by how alike the
 cars are, and its uncertainty grows by how far it was pulled: the interval of a prior always
 admits both "about what the other car showed" and "much less". The car's own data replaces a
 prior the moment it exists.
+
+A prior is a `SensitivityPrior`: its own type and its own table (`sensitivity_prior`), with no
+effect class and no knowledge level, so no consumer can read it as a measurement (finding I11).
 
 The similarity weights are judgement. The only thing known about a car today is its
 drivetrain; aero level, weight distribution and tyre model (docs/design.md) are not recorded.
@@ -14,12 +17,13 @@ import math
 from collections.abc import Iterable
 
 from paddock_engine.contracts.sensitivity_request_schema import Transfer
-from paddock_engine.sensitivity.pooling import Estimate, from_interval
+from paddock_engine.contracts.sensitivity_response_schema import CornerClass, SensitivityPrior
+from paddock_engine.sensitivity.pooling import Estimate
 
 SAME_DRIVETRAIN = 0.5
 OTHER_DRIVETRAIN = 0.25
 
-Key = tuple[str, int, str, str]  # parameter, clicks, channel, corner class
+Change = tuple[str, int, str, str, str]  # parameter, clicks, channel, corner class, phase
 
 
 def similarity(transfer: Transfer) -> float:
@@ -32,23 +36,55 @@ def shrink(source: Estimate, weight: float) -> Estimate:
     return Estimate(mean=weight * source.mean, se=math.hypot(source.se, moved))
 
 
-def key_of(transfer: Transfer) -> Key:
-    return (transfer.parameter, transfer.clicks, transfer.channel, transfer.corner_class.value)
+def change_of(transfer: Transfer) -> Change:
+    return (
+        transfer.parameter,
+        transfer.clicks,
+        transfer.channel,
+        transfer.corner_class.value,
+        transfer.phase,
+    )
 
 
-def best_sources(transfers: Iterable[Transfer]) -> dict[Key, Transfer]:
-    """One source per change: the most similar car, then the one with the most passes."""
-    chosen: dict[Key, Transfer] = {}
+def best_sources(transfers: Iterable[Transfer]) -> dict[Change, Transfer]:
+    """One source per change: the most similar car, then the one with the most experiments,
+    then the most passes."""
+    chosen: dict[Change, Transfer] = {}
     for transfer in transfers:
         if transfer.clicks == 0:
             continue
-        current = chosen.get(key_of(transfer))
-        rank = (similarity(transfer), transfer.n_passes)
-        if current is None or rank > (similarity(current), current.n_passes):
-            chosen[key_of(transfer)] = transfer
+        current = chosen.get(change_of(transfer))
+        rank = (similarity(transfer), transfer.source_experiments, transfer.n_passes)
+        if current is None or rank > (
+            similarity(current),
+            current.source_experiments,
+            current.n_passes,
+        ):
+            chosen[change_of(transfer)] = transfer
     return chosen
 
 
-def prior(transfer: Transfer, level: float) -> Estimate:
-    source = from_interval(transfer.estimate, transfer.ci_low, transfer.ci_high, level)
-    return shrink(source, similarity(transfer))
+def prior(transfer: Transfer, level: float) -> SensitivityPrior:
+    """The lender's pooled effect, shrunk by similarity and widened by the distance moved."""
+    weight = similarity(transfer)
+    shrunk = shrink(Estimate(mean=transfer.estimate, se=transfer.standard_error), weight)
+    low, high = shrunk.interval(level)
+    return SensitivityPrior(
+        parameter=transfer.parameter,
+        clicks=transfer.clicks,
+        channel=transfer.channel,
+        corner_class=CornerClass(transfer.corner_class.value),
+        phase=transfer.phase,
+        estimate=shrunk.mean,
+        ci_low=low,
+        ci_high=high,
+        standard_error=shrunk.se,
+        source_car=transfer.source_car,
+        source_track=transfer.source_track,
+        source_experiments=transfer.source_experiments,
+        weight=weight,
+        note=(
+            f"Prior from {transfer.source_car}, not measured on this car: its effect times "
+            f"{weight:g}, with the interval widened to match."
+        ),
+    )

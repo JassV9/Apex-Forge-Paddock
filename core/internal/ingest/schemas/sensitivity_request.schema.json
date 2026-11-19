@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "sensitivity_request.schema.json",
   "title": "SensitivityRequest",
-  "description": "Core asks the engine to rebuild a car's sensitivity profile from its finished experiments (POST /sensitivity/update).",
+  "description": "Core asks the engine to pool a car's sensitivity profile from its finished experiments (POST /sensitivity/update).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,21 +13,21 @@
   ],
   "properties": {
     "measurements": {
-      "description": "Every channel result of the car's finished one-item experiments.",
+      "description": "Every channel result of the car's finished one-item experiments, with its stratum.",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Measurement"
       }
     },
     "transfers": {
-      "description": "Measured effects of other cars, for items this car has not measured.",
+      "description": "Pooled effects of other cars, for items this car has not measured.",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Transfer"
       }
     },
     "ropes": {
-      "description": "Half-width of the band of practical equivalence per channel; a channel without one is judged against zero.",
+      "description": "Band of practical equivalence per channel the experiments froze; the engine's margins configuration overrides it per item.",
       "type": "object",
       "additionalProperties": {
         "type": "number"
@@ -43,7 +43,7 @@
   "definitions": {
     "Measurement": {
       "title": "Measurement",
-      "description": "One channel result of one finished experiment on this car.",
+      "description": "One channel result of one finished one-item experiment on this car, with the stratum it belongs to.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -52,10 +52,15 @@
         "clicks",
         "channel",
         "corner_class",
+        "phase",
+        "track",
+        "track_name",
+        "driver",
+        "hint_bucket",
         "estimate",
-        "ci_low",
-        "ci_high",
-        "n_passes"
+        "n_passes",
+        "stale",
+        "note"
       ],
       "properties": {
         "experiment_id": {
@@ -63,6 +68,7 @@
           "minimum": 1
         },
         "parameter": {
+          "description": "Item id in the game's setup.",
           "type": "string",
           "minLength": 1
         },
@@ -84,25 +90,98 @@
             "fast"
           ]
         },
+        "phase": {
+          "description": "Corner phase the effect is measured over; corner for the whole corner.",
+          "type": "string",
+          "minLength": 1
+        },
+        "track": {
+          "description": "The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track.",
+          "type": "string",
+          "minLength": 1
+        },
+        "track_name": {
+          "description": "What the dashboard calls the track.",
+          "type": "string"
+        },
+        "driver": {
+          "type": "string",
+          "enum": [
+            "ai",
+            "human"
+          ]
+        },
+        "hint_bucket": {
+          "description": "The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver.",
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_value": {
+          "description": "Raw value of the item on the experiments' baseline.",
+          "type": "number"
+        },
+        "click_step": {
+          "description": "Raw size of one click of the item.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "estimate": {
           "description": "Variant minus baseline, in the channel's unit, per corner pass.",
           "type": "number"
         },
         "ci_low": {
+          "description": "The ledger's interval at the request's level: given (and read) only for a stale row, which has no standard error.",
           "type": "number"
         },
         "ci_high": {
           "type": "number"
         },
+        "standard_error": {
+          "description": "Block-level standard error from the current engine (re-derived); absent for stale rows.",
+          "type": "number",
+          "minimum": 0
+        },
+        "df": {
+          "description": "Degrees of freedom of that standard error.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "n_passes": {
           "type": "integer",
           "minimum": 0
+        },
+        "stale": {
+          "description": "True when the numbers are the ledger's because the current engine could not re-derive the experiment.",
+          "type": "boolean"
+        },
+        "note": {
+          "description": "Why a stale row could not be re-derived; empty otherwise.",
+          "type": "string"
+        },
+        "finding_class": {
+          "type": "string",
+          "enum": [
+            "invalid",
+            "confirmed_improvement",
+            "confirmed_regression",
+            "neutral",
+            "context_dependent",
+            "likely_improvement",
+            "likely_regression",
+            "insufficient_evidence"
+          ],
+          "description": "The experiment's finding (ADR 0029): the re-derivation's, or the ledger's for a stale row. invalid is never pooled."
+        },
+        "engine_version": {
+          "description": "Engine version that computed the numbers.",
+          "type": "string",
+          "minLength": 1
         }
       }
     },
     "Transfer": {
       "title": "Transfer",
-      "description": "A measured effect of another car's item with the same role and axle, offered as a prior for this car's item.",
+      "description": "A pooled effect of another car's item with the same role and axle, offered as a prior for this car's item.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -112,10 +191,12 @@
         "clicks",
         "channel",
         "corner_class",
+        "phase",
         "estimate",
-        "ci_low",
-        "ci_high",
-        "n_passes"
+        "standard_error",
+        "n_passes",
+        "source_track",
+        "source_experiments"
       ],
       "properties": {
         "parameter": {
@@ -148,19 +229,30 @@
             "fast"
           ]
         },
+        "phase": {
+          "description": "Corner phase the effect is measured over; corner for the whole corner.",
+          "type": "string",
+          "minLength": 1
+        },
         "estimate": {
           "description": "Variant minus baseline, in the channel's unit, per corner pass.",
           "type": "number"
         },
-        "ci_low": {
-          "type": "number"
-        },
-        "ci_high": {
-          "type": "number"
+        "standard_error": {
+          "description": "Standard error of the estimate.",
+          "type": "number",
+          "minimum": 0
         },
         "n_passes": {
           "type": "integer",
           "minimum": 0
+        },
+        "source_track": {
+          "type": "string"
+        },
+        "source_experiments": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }

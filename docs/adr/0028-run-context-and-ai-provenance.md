@@ -75,6 +75,14 @@ with the fuel it set; more than 0.5 L off stops the run ("the car has 24.0 L aft
 block 1, the plan wants 30.0 L"). The fuel asked for is never more than `car.maxFuel`, so a
 small tank does not fail every block.
 
+*Amended 2026-11-19 (after experiment 20).* The setup's own `[FUEL] VALUE` can land after the
+set, so an off read-back first sets the fuel again, up to three times a second apart, during the
+out-lap; only then does the run stop ("... (set 4 times)"). And the fuel is one constant,
+`BLOCK_FUEL_L` = 30 L (or a full tank if smaller), for every block of every AI experiment. It
+was the car's fuel when the AI first took it, at least 30 L: experiment 20 ran all ten blocks on
+30 L, but its block 9, after a relaunch, asked for 50 L. Arms inside one experiment were always
+equal; experiments compared across sessions (the hint sweep) were not.
+
 **Core stores it.** Migration 00011: `experiment.ai_hint_share`; `corner_pass.ai_hint`,
 `damage_max`, `reset_counter`, `abs_share`, `tc_share`, `drs_share`, `clock`; and `run_context`,
 one row per session with its session line's settings (`block_id` NULL) and one row per session

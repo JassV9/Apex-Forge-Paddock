@@ -1,6 +1,6 @@
 -- Ghost Driver, level 2 (docs/adr/0014-ghost-driver.md): AC's own AI drives the run plan's
 -- blocks on the player's car. For every block the car is put in its pit box, repaired, given
--- the same fuel as the first block, gets the block's setup (read back like a human load), and
+-- the same fuel (BLOCK_FUEL_L), gets the block's setup (read back like a human load), and
 -- is handed to the AI. The run plan counts the laps and tags the passes exactly as for a human.
 --
 -- This file only decides; game/ghost.lua performs the actions. Pure Lua: no CSP calls.
@@ -32,7 +32,7 @@ local ghost = {
   SETTLE_S = 2,       -- parked this long after a teleport before the setup is loaded
   TELEPORT_RETRY_S = 10,
   MAX_RETRIES = 3,
-  MIN_FUEL_L = 30,    -- every block starts with the first block's fuel, but never less than this
+  BLOCK_FUEL_L = 30,  -- every block of every AI experiment starts with this (or a full tank)
   RESERVE_L = 4,      -- free laps go in to refuel below this; a dry car heads for the pits
   FUEL_CHECK_S = 1,   -- the fuel is read back this long after the block was handed to the AI
   FUEL_TOLERANCE_L = 0.5,
@@ -77,9 +77,11 @@ local function holdBack(s, o)
   return {}
 end
 
--- the first block's fuel, never less than MIN_FUEL_L, never more than the tank holds
+-- one fuel for every block of every experiment, never more than the tank holds. It was the
+-- fuel the car had when the AI first took it (at least 30 L): 30 L in one game, 50 L in the
+-- next, so experiments compared across sessions (a hint sweep) ran on different fuel
 local function fuelTarget(o)
-  local liters = math.max(o.fuel or 0, ghost.MIN_FUEL_L)
+  local liters = ghost.BLOCK_FUEL_L
   if o.maxFuel and o.maxFuel > 0 then liters = math.min(liters, o.maxFuel) end
   return liters
 end

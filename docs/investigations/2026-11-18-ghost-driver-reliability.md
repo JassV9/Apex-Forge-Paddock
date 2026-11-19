@@ -217,5 +217,19 @@ written for a large balance change and the change was not large on this car. Not
 the time gain survives looks 2 and 3 (the time-since-start confounder is open), and whether the
 response is monotonic in clicks (experiment D).
 
+**Look 2 (10 blocks; blocks 9 and 10 in a second game session):** corner time -9.6 ms [-15.8, -3.5],
+still *likely improvement*: the interval excludes zero but not the 5 ms margin, so the decision stays
+inconclusive and the policy continues to look 3 (12 blocks). Time since start is left out of the model
+(collinear with the session term, ADR 0022); the session term is flagged as between blocks. By class:
+medium -14.9 ms [-19.5, -10.3], fast -7.1 [-9.8, -4.5], slow -12.0 [-26.8, +2.8].
+
+**Fuel:** every block, both sessions, started its out-lap on 29.6 L and burned about 1.45 L a lap
+(push lap 1 at 27.3 to 28.6 L in all ten blocks): the arms are equal. But not the 50 L the design
+named: the agent took "the first block's fuel" from whatever the car held when the AI first took it
+(at least 30 L), and block 9, after the relaunch, asked for 50 L and stopped on 26 L (the setup's own
+`[FUEL] VALUE` landing after the set). Fixed in the agent: one fuel, 30 L, for every block of every
+AI experiment, and an off read-back sets the fuel again during the out-lap before stopping (ADR 0028
+amendment). Experiments before this change compared across sessions may differ in fuel.
+
 Process gaps seen: the prediction was recorded only as event text (`predictions` empty, not
 machine-checked), and the verdict's driver check still uses the apex-relative pair.

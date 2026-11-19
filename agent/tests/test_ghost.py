@@ -33,7 +33,7 @@ def obs(rt: Any, **changes: Any) -> Any:
         "onTrack": True,
         "speedKmh": 150,
         "ai": True,
-        "fuel": 40,
+        "fuel": 30,
         "damage": 0,
     }
     return rt.table_from(base | changes)
@@ -60,7 +60,7 @@ def test_a_plan_for_the_ai_sends_the_car_to_the_pits_then_loads_and_hands_it_ove
     ghost, state = machine(rt)
 
     assert names(ghost.step(state, obs(rt))) == ["autopilot_off", "teleport_pits"]
-    assert state.phase == "to_pits" and state.fuel == 40
+    assert state.phase == "to_pits" and state.fuel == 30
     seen = run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, fuel=12)
     assert seen == ["repair", "set_fuel", "load"]
     handed_over = to_py(ghost.loaded(state, True, "ok"))
@@ -75,7 +75,7 @@ def test_the_fuel_is_set_again_after_the_reset_has_taken_effect(rt):
     ghost.step(state, obs(rt))
     run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, fuel=12)
     handed_over = to_py(ghost.loaded(state, True, "ok"))
-    assert handed_over[0] == {"name": "set_fuel", "liters": 40}
+    assert handed_over[0] == {"name": "set_fuel", "liters": 30}
 
 
 def test_a_fuel_read_back_that_is_off_sets_the_fuel_again_and_the_block_goes_on(rt):
@@ -86,7 +86,7 @@ def test_a_fuel_read_back_that_is_off_sets_the_fuel_again_and_the_block_goes_on(
 
     seen = run_for(rt, ghost, state, ghost.FUEL_CHECK_S + 0.1, fuel=26)
     assert seen == ["set_fuel"] and state.phase == "driving"
-    assert run_for(rt, ghost, state, ghost.FUEL_CHECK_S * 3, fuel=40) == []
+    assert run_for(rt, ghost, state, ghost.FUEL_CHECK_S * 3, fuel=30) == []
     assert state.phase == "driving"
 
 
@@ -109,7 +109,7 @@ def test_every_block_gets_the_fuel_of_the_first(rt):
     for _ in range(round((ghost.SETTLE_S + 0.1) / FRAME)):
         actions += to_py(ghost.step(state, obs(rt, block=2, parked=True, onTrack=False))) or []
     fuel = [a for a in actions if a["name"] == "set_fuel"]
-    assert fuel == [{"name": "set_fuel", "liters": 40}]
+    assert fuel == [{"name": "set_fuel", "liters": 30}]
 
 
 def test_a_finished_plan_stops_the_ai_and_parks_the_car(rt):
@@ -212,11 +212,19 @@ def test_brushing_the_pit_wall_on_the_way_out_is_repaired_in_place_not_retried(r
     assert names(ghost.step(state, obs(rt, damage=8.8))) == ["autopilot_off", "teleport_pits"]
 
 
-def test_a_run_never_starts_on_an_almost_empty_tank(rt):
+def test_every_experiment_starts_on_the_same_fuel_whatever_the_car_had(rt):
+    # the car's own fuel when the AI took it gave 30 L in one game and 50 L in the next
+    for had in (2, 50, 90):
+        ghost, state = machine(rt)
+        ghost.step(state, obs(rt, fuel=had))
+        assert state.fuel == ghost.BLOCK_FUEL_L
+
+
+def test_the_fuel_is_never_more_than_the_tank_holds(rt):
     ghost, state = machine(rt)
 
-    ghost.step(state, obs(rt, fuel=2))
-    assert state.fuel == ghost.MIN_FUEL_L
+    ghost.step(state, obs(rt, maxFuel=20))
+    assert state.fuel == 20
 
 
 FREE = {"block": None, "planId": None}
@@ -264,7 +272,7 @@ def test_free_laps_go_in_to_refuel_without_counting_a_retry(rt):
         actions += (
             to_py(ghost.step(state, obs(rt, parked=True, onTrack=False, fuel=3, **FREE))) or []
         )
-    assert {"name": "set_fuel", "liters": 40} in actions
+    assert {"name": "set_fuel", "liters": 30} in actions
 
 
 def test_free_laps_allow_three_retries_between_two_laps_not_three_ever(rt):

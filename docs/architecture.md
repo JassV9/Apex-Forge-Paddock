@@ -305,7 +305,7 @@ flowchart LR
    as an `ai` session, and lowers the grip the AI assumes (its tyre hint) after every lap
    where it went off, until two laps are clean.
 3. An experiment with `driver: ai`: core writes the car's run plan; for every block the
-   agent teleports to the pit box, repairs, sets the first block's fuel and reads it back, loads
+   agent teleports to the pit box, repairs, sets the fuel (30 L for every block) and reads it back, loads
    the setup with read-back, and hands the car to the AI with its tyre hint frozen: the share the
    experiment pins (`ai_hint_share`), else the learned one. A pinned run never touches the
    calibration file and stops when the hint given is another

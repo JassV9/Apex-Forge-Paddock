@@ -179,8 +179,8 @@ Not seen in game yet: anything in this section.
 | More than 5 units of damage in any zone on track | Back to the pits, repaired, the block is retried |
 | Any damage in the pit lane on the way out (brushing the pit wall) | Repaired on the spot, the AI drives on |
 | Reset by the game, or no lap counted for 10 minutes | Back to the pits, the block is retried |
-| Less than 30 L at the start | Every block starts with 30 L (or the first block's fuel, if more), never more than the tank holds |
-| The fuel read back 1 s after the refuel is more than 0.5 L off | The run stops: "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L" |
+| Any fuel at the start | Every block of every AI experiment starts with 30 L, never more than the tank holds |
+| The fuel read back 1 s after the refuel is more than 0.5 L off | The fuel is set again, up to three times a second apart, on the out-lap; then the run stops: "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L (set 4 times)" |
 | A plan pins the AI's tyre hint and the hint given is another (or CSP refused it) | The run stops, naming both hints; the `ai_tune` file is never written during a pinned run |
 | Free laps below 4 L | Back to the pits to refuel; not a retry |
 | Free laps while a plan for a human is open on the car | The AI laps the car's own setup (block 0) and the laps count for no experiment; the plan's blocks stay for the driver |

@@ -4,6 +4,22 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Engine, core and web (ADR 0029, 0030): verdicts are block-level. The interval comes from the
+  spread of the run blocks' means (blocks - 2 degrees of freedom, less one per covariate that
+  changes between blocks) instead of laps resampled within blocks; every plan is 8 blocks, the
+  first of three pre-registered looks (8, 10, 12) that spend the one-sided 5 % by
+  O'Brien-Fleming (70 % of it, calibrated by simulation). Each verdict carries one of eight
+  findings (invalid, confirmed improvement or regression, neutral, context-dependent, likely
+  improvement or regression, insufficient evidence) and what to do next, beside the unchanged
+  decision; margins per metric and setup item are in `engine/paddock_engine/config/margins.toml`.
+  Driver inputs and speed-class interactions are Holm-corrected; a speed class with fewer than
+  3 corners is not stored. Core judges only fully driven plans, leaves out (and counts) passes
+  on another setup or from another driver, sends off-track passes as an `offtrack_rate`
+  guardrail, and sends time since the experiment started plus a term per game session.
+  Results are kept for every verdict with the engine version (migration 00012); old verdicts
+  get a derived finding. Training extends when the engine recommends it. The dashboard shows
+  the finding and the next step. Replayed offline, experiments 11, 12 and 15 to 19 all stay
+  inconclusive; 15 and 19 are context-dependent. Unverified in game.
 - Core and web (ADR 0027): a layout and its test copy are one track in the web app. A session
   on an original layout (e.g. `fn_cota / layout_f1_2026`) is now compared, in "Against the AI"
   and the AI overlay, with the AI's sessions on `<layout>_paddock`, labelled "AI on COTA F1 2026

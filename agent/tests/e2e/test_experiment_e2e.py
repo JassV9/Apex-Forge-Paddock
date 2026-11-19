@@ -104,10 +104,10 @@ class Rig:
         number = exp["id"]
         assert exp["state"] == "proposed"
         planned = self.backend.post(f"/experiments/{number}/plan")
-        assert planned["state"] == "planned" and len(planned["blocks"]) == 4
+        assert planned["state"] == "planned" and len(planned["blocks"]) == 8  # the first look
         assert planned["plan"]["mde_decide"] > planned["plan"]["mde_detect"] > 0
         assert self.backend.post(f"/experiments/{number}/start")["state"] == "running"
-        assert len(self.follow_plan()) == 4
+        assert len(self.follow_plan()) == 8
 
         def driven() -> bool:
             blocks = self.backend.get(f"/experiments/{number}")["blocks"]
@@ -120,7 +120,9 @@ class Rig:
             assert status in (200, 409), f"evaluate -> {status}: {body}\n{self.backend.tail()}"
             return body if status == 200 else None
 
-        return dict(self.wait(f"the verdict on experiment {number}", judged))
+        # Eight blocks are twice the passes whose features the engine computes one spool file
+        # at a time (ADR 0029): the verdict can take a few minutes on a slow machine.
+        return dict(self.wait(f"the verdict on experiment {number}", judged, timeout=360))
 
 
 @pytest.fixture(scope="module")
@@ -249,13 +251,19 @@ def test_three_experiments_through_the_whole_stack(rig: Rig) -> None:
     rig.follow_plan()
     assert rig.bar() == BASELINE_BAR, "the baseline is back on the car"
 
-    # 3. A knob that does nothing in this simulation: unclear, and the baseline is kept.
+    # 3. A knob that does nothing in this simulation: unclear at the first look (its 98 % interval
+    # is wider than the 5 ms band, ADR 0029), and the baseline is kept.
     nothing = rig.run_experiment("ARB_REAR", -1, "A softer rear bar calms the rear.")
     assert nothing["state"] == "inconclusive", nothing["verdict"]
+    assert nothing["verdict"]["look"] == 1 and nothing["verdict"]["finding_class"] in (
+        "insufficient_evidence",
+        "likely_improvement",
+    ), nothing["verdict"]
     unclear = result(nothing, "corner_time_s")
-    assert unclear["ci_low"] < 0 < unclear["ci_high"]
+    assert unclear["ci_low"] < 0.005 and unclear["ci_high"] > -0.005, "not beyond the band"
     reverted = backend.post(f"/experiments/{nothing['id']}/revert")
     assert reverted["state"] == "reverted" and reverted["verdict"]["decided_by"] == "driver"
+    assert reverted["verdict"]["finding_class"] == nothing["verdict"]["finding_class"]
     rig.follow_plan()
     assert to_py(rig.agent.mock["setup"])["ARB_REAR"] == 1
 

@@ -27,6 +27,63 @@ describe("VerdictSection", () => {
   });
 });
 
+describe("VerdictSection finding", () => {
+  const verdict = tradeoff.verdict;
+  if (verdict === undefined) throw new Error("the fixture has a verdict");
+
+  it("shows the finding, the look and the next step in plain words", () => {
+    const judged = {
+      ...tradeoff,
+      verdict: {
+        ...verdict,
+        decision: "inconclusive" as const,
+        finding_class: "context_dependent" as const,
+        finding_derived: false,
+        recommendation: "investigate_context" as const,
+        look: 1,
+        flags: [],
+        confounders: [
+          { kind: "speed_class_interaction" as const, name: "fast vs medium" },
+          { kind: "setup_mismatch" as const, name: "setup mismatch", count: 3 },
+        ],
+      },
+    };
+
+    render(<VerdictSection experiment={judged} />);
+
+    const finding = screen.getByRole("group", { name: "Finding" });
+    expect(finding).toHaveTextContent("Depends on the corner: better in some, worse in others");
+    expect(finding).toHaveTextContent("Judged at look 1 of 3.");
+    expect(finding).toHaveTextContent("Next: Look at the speed classes");
+    expect(finding).toHaveTextContent("effect differs between: fast vs medium");
+    expect(finding).toHaveTextContent("passes on another setup left out: setup mismatch (3)");
+  });
+
+  it("says when a finding was read from an old verdict, and shows none for a confirmed one's next step", () => {
+    const old = {
+      ...tradeoff,
+      verdict: {
+        ...verdict,
+        finding_class: "confirmed_improvement" as const,
+        finding_derived: true,
+      },
+    };
+
+    render(<VerdictSection experiment={old} />);
+
+    const finding = screen.getByRole("group", { name: "Finding" });
+    expect(finding).toHaveTextContent("Confirmed improvement");
+    expect(finding).toHaveTextContent("judged before findings existed");
+    expect(finding).not.toHaveTextContent("Next:");
+  });
+
+  it("shows nothing when the verdict has no finding", () => {
+    render(<VerdictSection experiment={tradeoff} />);
+
+    expect(screen.queryByRole("group", { name: "Finding" })).toBeNull();
+  });
+});
+
 describe("PlanSection", () => {
   it("says how much whole laps scatter and when the longest plan falls short", () => {
     const plan = {

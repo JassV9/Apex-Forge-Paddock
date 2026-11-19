@@ -111,8 +111,38 @@ class EvaluatePass(BaseModel):
     )
     covariates: dict[str, float] = Field(
         ...,
-        description="Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and ers_charge_start on a car with a hybrid battery.",
+        description="Conditions to adjust for: fuel_l, tyre_core_c, time_since_start_s (from the experiment's first push pass), ers_charge_start on a car with a hybrid battery, and session_<n> = 1 on the passes of the experiment's n-th game session (n >= 2), else 0.",
     )
+
+
+class ExcludedPasses(BaseModel):
+    """
+    Passes core left out before the engine saw them (ADR 0029).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    setup_mismatch: int = Field(
+        ..., description="Driven on a setup that is not the block's arm.", ge=0
+    )
+    source_mismatch: int = Field(
+        ..., description="From a session whose driver is not the experiment's.", ge=0
+    )
+
+
+class OfftrackBlock(BaseModel):
+    """
+    One run block's push-lap passes on the arm's setup and its own driver.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    block: int = Field(..., ge=1)
+    arm: Arm
+    passes: int = Field(..., description="All of them, valid or not.", ge=0)
+    offtrack: int = Field(..., description="Those marked invalid (off track).", ge=0)
 
 
 class EvaluateRequest(BaseModel):
@@ -131,3 +161,21 @@ class EvaluateRequest(BaseModel):
         description="Driver-input metrics; a shift in them means the driver adapted to the setup.",
     )
     passes: list[EvaluatePass]
+    parameter: str | None = Field(
+        None,
+        description="Setup item the experiment changes; picks its margins from the engine's configuration.",
+    )
+    look: int | None = Field(
+        None,
+        description="Pre-registered look (ADR 0029): 0 before the first (fewer than 8 planned blocks), 1, 2 and 3 at 8, 10 and 12. Absent: counted from the passes' blocks.",
+        ge=0,
+        le=3,
+    )
+    extensions_left: int | None = Field(
+        None, description="How many more times the experiment may be extended. Absent: none.", ge=0
+    )
+    excluded: ExcludedPasses | None = None
+    offtrack: list[OfftrackBlock] | None = Field(
+        None,
+        description="Push-lap passes per block and how many of them were off track (ADR 0029).",
+    )

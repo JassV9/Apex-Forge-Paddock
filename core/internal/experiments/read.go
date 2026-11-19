@@ -149,10 +149,11 @@ func readPredictions(ctx context.Context, q querier, id int64) ([]contracts.Pred
 		}, id)
 }
 
+// readResults are the effects of the latest verdict that measured any (ADR 0030).
 func readResults(ctx context.Context, q querier, id int64) ([]contracts.ExperimentResult, error) {
 	return queryAll(ctx, q,
 		`SELECT channel, role, corner_class, estimate, ci_low, ci_high, n_passes, effect_class
-		 FROM result WHERE experiment_id = $1 ORDER BY id`,
+		 FROM current_result WHERE experiment_id = $1 ORDER BY id`,
 		func(rows *sql.Rows) (contracts.ExperimentResult, error) {
 			var r contracts.ExperimentResult
 			return r, rows.Scan(&r.Channel, &r.Role, &r.CornerClass, &r.Estimate, &r.CiLow,
@@ -171,26 +172,6 @@ func readEvents(ctx context.Context, q querier, id int64) ([]contracts.Experimen
 			event.At = at.UTC().Format(time.RFC3339)
 			return event, err
 		}, id)
-}
-
-// readVerdict is the latest verdict: an extended experiment is judged more than once, and the
-// driver's decision on a trade-off comes after the engine's.
-func readVerdict(ctx context.Context, q querier, id int64) (*contracts.VerdictSummary, error) {
-	var verdict contracts.VerdictSummary
-	var decidedAt time.Time
-	err := q.QueryRowContext(ctx,
-		`SELECT decision, reason, decided_by, decided_at, prediction_hits, prediction_total
-		 FROM verdict WHERE experiment_id = $1 ORDER BY id DESC LIMIT 1`, id).
-		Scan(&verdict.Decision, &verdict.Reason, &verdict.DecidedBy, &decidedAt,
-			&verdict.PredictionHits, &verdict.PredictionTotal)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil //nolint:nilnil // no verdict yet is not an error
-	}
-	if err != nil {
-		return nil, err
-	}
-	verdict.DecidedAt = decidedAt.UTC().Format(time.RFC3339)
-	return &verdict, nil
 }
 
 // listIDs is every experiment, newest first.

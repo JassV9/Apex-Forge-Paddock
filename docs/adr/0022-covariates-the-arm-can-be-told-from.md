@@ -1,6 +1,6 @@
 # ADR 0022: The model adjusts only for covariates the setup change can be told from
 
-Status: accepted (2026-11-17). Amends the covariate rule of [ADR 0008](0008-effect-model.md).
+Status: accepted (2026-11-17). Amends the covariate rule of [ADR 0008](0008-effect-model.md). Amended by [ADR 0029](0029-block-level-inference-and-finding-classes.md): session terms (`session_<n>`) are never left out; time runs from the experiment's first pass.
 
 ## Context
 

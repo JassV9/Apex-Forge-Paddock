@@ -1,227 +1,192 @@
-"""Judge a driven experiment: the primary effect, the guardrails, whether the driver adapted,
-and which predictions came true. The work behind POST /evaluate.
+"""Judge a driven experiment: the primary effect at the pre-registered look, the speed classes,
+the guardrails, whether the driver adapted, which predictions came true, the finding and what to
+do next. The work behind POST /evaluate.
 
-The decision follows from the numbers and the test fixed before driving, nothing else:
-
-| Primary effect | Guardrails | Decision |
-| --- | --- | --- |
-| better, beyond the equivalence band | all hold | accepted |
-| better, beyond the band | one moved or broke | tradeoff (the driver decides) |
-| worse, beyond the band | any | rejected |
-| inside the band (negligible) | any | rejected: nothing to gain, the baseline stays |
-| unclear | one broke | rejected |
-| unclear | otherwise | inconclusive: drive more or revert |
-
-Ties go to the baseline.
+Every interval is block-level (ADR 0029). The primary channel is judged with the repeated
+confidence interval of its look (stats/sequential.py) against its margin (config/margins.py);
+the finding and the decision follow experiments/finding.py. Nothing but the numbers and the test
+fixed before driving enters.
 """
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 
-from paddock_engine.contracts.evaluate_request_schema import (
-    Better,
-    Direction,
-    EvaluatePass,
-    EvaluateRequest,
-    GuardrailSpec,
-    PredictionSpec,
-    Worse,
-)
+from paddock_engine import __version__
+from paddock_engine.config.margins import margins
+from paddock_engine.contracts.evaluate_request_schema import Better, EvaluatePass, EvaluateRequest
 from paddock_engine.contracts.evaluate_response_schema import (
     ChannelResult,
+    Confounder,
     Decision,
     EvaluateResponse,
-    GuardrailResult,
+    FindingClass,
+    Flag,
+    Kind,
+    Recommendation,
     Role,
-    Status,
 )
-from paddock_engine.experiments.channel_effects import channel_effect, per_speed_class, to_result
+from paddock_engine.experiments.channel_effects import (
+    BASELINE,
+    channel_effect,
+    observations,
+    per_speed_class,
+    to_result,
+)
+from paddock_engine.experiments.context import interactions, reportable_classes
+from paddock_engine.experiments.finding import Evidence, classify, decide, recommend
+from paddock_engine.experiments.reasons import confounders, finding_reason, notes
+from paddock_engine.experiments.secondary import Secondary, secondary
 from paddock_engine.stats.effects import Effect
-from paddock_engine.stats.rope import EffectClass
+from paddock_engine.stats.observations import build_design
+from paddock_engine.stats.sequential import interval_level, look_of
 
-NAMED_BELOW_WEIGHT = 0.5  # corners that counted less than half are named in the reason
-NAMED_CORNERS = 3  # at most, the least-weighted first
+# An experiment with more than this share of its push-lap passes on the wrong setup or from
+# another driver is invalid: the comparison is not the one that was planned.
+MAX_EXCLUDED_SHARE = 0.05
 
 
 @dataclass(frozen=True)
-class _Judgement:
-    decision: Decision
-    reason: str
+class _Request:
+    used: list[EvaluatePass]
+    missing: int  # passes without the primary channel
+    mismatched: tuple[int, int]  # setup, source
+    look: int
+    margin: float | None
 
 
-def _span(effect: Effect) -> str:
-    return f"{effect.estimate:+.4g} [{effect.ci_low:+.4g}, {effect.ci_high:+.4g}]"
+def _prepare(request: EvaluateRequest) -> _Request:
+    test = request.success_test
+    used = [p for p in request.passes if p.metrics.get(test.channel) is not None]
+    excluded = request.excluded
+    mismatched = (excluded.setup_mismatch, excluded.source_mismatch) if excluded else (0, 0)
+    look = request.look
+    if look is None:
+        look = look_of(len({p.block for p in request.passes}))
+    margin = margins().margin(test.channel, request.parameter, test.rope)
+    return _Request(used, len(request.passes) - len(used), mismatched, look, margin)
 
 
-def _guardrail_status(effect: Effect | None, spec: GuardrailSpec) -> Status:
-    if effect is None:
-        return Status.unknown
-    sign = 1.0 if spec.worse is Worse.higher else -1.0
-    bad_estimate = sign * effect.estimate
-    bad_low = sign * (effect.ci_low if sign > 0 else effect.ci_high)
-    if bad_low > spec.tolerance:
-        return Status.broke
-    return Status.moved if bad_estimate > spec.tolerance else Status.holds
+def _sessions_tangled(passes: list[EvaluatePass], channel: str) -> bool:
+    try:
+        return build_design(observations(passes, channel), BASELINE).session_confounded
+    except ValueError:
+        return False
 
 
-def _judge(
-    primary: Effect, better: Better, channel: str, guardrails: list[GuardrailResult]
-) -> _Judgement:
-    improved_class = EffectClass.NEGATIVE if better is Better.lower else EffectClass.POSITIVE
-    worse_class = EffectClass.POSITIVE if better is Better.lower else EffectClass.NEGATIVE
-    broke = [g.channel for g in guardrails if g.status is Status.broke]
-    moved = [g.channel for g in guardrails if g.status is Status.moved]
-    unchecked = [g.channel for g in guardrails if g.status is Status.unknown]
-    measured = f"{channel} {_span(primary)}"
-    if primary.effect_class is improved_class:
-        if broke or moved:
-            return _Judgement(
-                Decision.tradeoff,
-                f"Better on {measured}, but {', '.join(broke + moved)} got worse.",
-            )
-        note = f" Not checked: {', '.join(unchecked)}." if unchecked else ""
-        return _Judgement(Decision.accepted, f"Better on {measured}; guardrails hold.{note}")
-    if primary.effect_class is worse_class:
-        return _Judgement(Decision.rejected, f"Worse on {measured}.")
-    if primary.effect_class is EffectClass.NEGLIGIBLE:
-        return _Judgement(
-            Decision.rejected, f"No meaningful effect on {measured}; the baseline stays."
+def _invalid(
+    request: EvaluateRequest, prepared: _Request, primary: Effect | None, tangled: bool
+) -> str | None:
+    """Why the experiment cannot be judged, or None."""
+    if tangled:
+        return "The game sessions cannot be told apart from the setups (ADR 0029)."
+    if primary is None:
+        return "Not enough passes on both setups to estimate the effect."
+    if prepared.margin is None:
+        return f"No margin is configured for {request.success_test.channel}."
+    offtrack = sum(block.passes for block in request.offtrack or [])
+    total = len(request.passes) + sum(prepared.mismatched) + offtrack
+    if total and sum(prepared.mismatched) / total > MAX_EXCLUDED_SHARE:
+        return (
+            f"{sum(prepared.mismatched)} of {total} passes were driven on another setup or by "
+            "another driver (ADR 0029)."
         )
-    if broke:
-        return _Judgement(
-            Decision.rejected, f"No clear gain on {measured}, and {', '.join(broke)} got worse."
-        )
-    return _Judgement(
-        Decision.inconclusive, f"Unclear on {measured}: drive more laps or keep the baseline."
+    return None
+
+
+def _gain(primary: Effect, better: Better) -> tuple[float, float, float]:
+    if better is Better.lower:
+        return -primary.estimate, -primary.ci_high, -primary.ci_low
+    return primary.estimate, primary.ci_low, primary.ci_high
+
+
+def _evidence(
+    request: EvaluateRequest,
+    prepared: _Request,
+    primary: Effect,
+    invalid: bool,
+    context: bool,
+    side: Secondary,
+) -> Evidence:
+    gain, low, high = _gain(primary, request.success_test.better)
+    return Evidence(
+        gain=gain,
+        gain_low=low,
+        gain_high=high,
+        margin=prepared.margin or 0.0,
+        blocks=primary.blocks,
+        look=prepared.look,
+        extensions_left=request.extensions_left or 0,
+        invalid=invalid,
+        context=context,
+        response_moved=bool(side.moved),
     )
 
 
-def _prediction_hit(effect: Effect, direction: Direction) -> bool:
-    """A prediction comes true when the interval excludes zero on the predicted side."""
-    if direction is Direction.decrease:
-        return effect.ci_high < 0
-    return effect.ci_low > 0
-
-
-def _check_guardrails(
-    passes: Sequence[EvaluatePass], specs: Sequence[GuardrailSpec], level: float
-) -> tuple[list[GuardrailResult], list[ChannelResult]]:
-    statuses, results = [], []
-    for spec in specs:
-        effect = channel_effect(passes, spec.channel, spec.tolerance, level)
-        statuses.append(
-            GuardrailResult(channel=spec.channel, status=_guardrail_status(effect, spec))
-        )
-        if effect is not None:
-            results.append(to_result(effect, spec.channel, Role.guardrail))
-    return statuses, results
-
-
-def _shifted_driver_inputs(
-    passes: Sequence[EvaluatePass], channels: Sequence[str], level: float
-) -> tuple[list[str], list[ChannelResult]]:
-    """Driver-input channels whose interval excludes zero: the setups were driven differently."""
-    shifted, results = [], []
-    for channel in channels:
-        effect = channel_effect(passes, channel, 0.0, level)
-        if effect is None:
-            continue
-        results.append(to_result(effect, channel, Role.driver_input))
-        if effect.effect_class in (EffectClass.POSITIVE, EffectClass.NEGATIVE):
-            shifted.append(channel)
-    return shifted, results
-
-
-def _score_predictions(
-    passes: Sequence[EvaluatePass],
-    predictions: Sequence[PredictionSpec],
-    level: float,
-    reported: set[str],
-) -> tuple[int, int, list[ChannelResult]]:
-    """Hits, checkable predictions, and results for channels not reported in another role."""
-    hits, total, results = 0, 0, []
-    for prediction in predictions:
-        effect = channel_effect(passes, prediction.channel, 0.0, level)
-        if effect is None:
-            continue
-        total += 1
-        hits += _prediction_hit(effect, prediction.direction)
-        if prediction.channel not in reported:
-            results.append(to_result(effect, prediction.channel, Role.prediction))
-    return hits, total, results
-
-
-def _weighting_note(primary: Effect) -> str:
-    """Which corners counted least (ADR 0023); nothing when every corner counted fully."""
-    weights = primary.corner_weights
-    if all(weight == 1.0 for weight in weights.values()):
-        return ""
-    light = sorted(
-        (corner for corner, weight in weights.items() if weight < NAMED_BELOW_WEIGHT),
-        key=lambda corner: (weights[corner], corner),
-    )
-    least = (
-        f"least weight: {', '.join(str(corner) for corner in light[:NAMED_CORNERS])}"
-        if light
-        else "none counted below half"
-    )
-    return f" Corners weighted by their own scatter (ADR 0023); {least}."
-
-
-def _notes(primary: Effect, shifted: Sequence[str]) -> str:
-    """What the driver should know about how the number was reached, appended to the reason."""
-    notes = ""
-    if primary.dropped_covariates:
-        notes += (
-            " Not adjusted for "
-            f"{', '.join(primary.dropped_covariates)}: too entangled with which setup was on the "
-            "car (see ADR 0022)."
-        )
-    notes += _weighting_note(primary)
-    if shifted:
-        notes += f" Driver inputs shifted ({', '.join(shifted)}): part of this may be the driver."
-    return notes
-
-
-def _not_estimable(used: int, excluded: int) -> EvaluateResponse:
+def _not_estimable(prepared: _Request, reason: str, tangled: bool) -> EvaluateResponse:
+    tangles = [Confounder(kind=Kind.session_tangled, name="session terms")] if tangled else []
     return EvaluateResponse(
         decision=Decision.inconclusive,
-        reason="Not enough passes on both setups to estimate the effect.",
+        reason=reason,
         results=[],
         guardrails=[],
         prediction_hits=0,
         prediction_total=0,
         driver_adapted=False,
-        passes_used=used,
-        passes_excluded=excluded,
+        passes_used=len(prepared.used),
+        passes_excluded=prepared.missing + sum(prepared.mismatched),
+        finding_class=FindingClass.invalid,
+        flags=[],
+        recommendation=Recommendation.stop_invalid,
+        look=prepared.look,
+        confounders=tangles + confounders(None, [], [], prepared.mismatched),
+        engine_version=__version__,
     )
+
+
+def _primary_results(
+    request: EvaluateRequest, prepared: _Request, primary: Effect
+) -> list[ChannelResult]:
+    """The primary effect over all corners, then per speed class where a class is worth it."""
+    test = request.success_test
+    margin = prepared.margin or 0.0
+    classes = per_speed_class(prepared.used, test.channel, margin, test.level, Role.primary)
+    return [
+        to_result(primary, test.channel, Role.primary),
+        *reportable_classes(classes, prepared.used, primary),
+    ]
 
 
 def evaluate(request: EvaluateRequest) -> EvaluateResponse:
     test = request.success_test
-    used = [p for p in request.passes if p.metrics.get(test.channel) is not None]
-    excluded = len(request.passes) - len(used)
-    primary = channel_effect(used, test.channel, test.rope, test.level)
-    if primary is None:
-        return _not_estimable(len(used), excluded)
-    results = [to_result(primary, test.channel, Role.primary)]
-    results += per_speed_class(used, test.channel, test.rope, test.level, Role.primary)
-    guardrails, guardrail_results = _check_guardrails(used, request.guardrails, test.level)
-    driver_channels = [channel.root for channel in request.driver_channels]
-    shifted, driver_results = _shifted_driver_inputs(used, driver_channels, test.level)
-    results += guardrail_results + driver_results
-    hits, total, prediction_results = _score_predictions(
-        used, request.predictions, test.level, {result.channel for result in results}
+    prepared = _prepare(request)
+    level = interval_level(prepared.look, test.level)
+    primary = channel_effect(prepared.used, test.channel, prepared.margin or 0.0, level)
+    tangled = primary is None and _sessions_tangled(prepared.used, test.channel)
+    invalid = _invalid(request, prepared, primary, tangled)
+    if primary is None or prepared.margin is None:
+        return _not_estimable(prepared, invalid or "", tangled)
+    side = secondary(request, prepared.used)
+    found = [] if invalid else interactions(prepared.used, test.channel)
+    evidence = _evidence(request, prepared, primary, invalid is not None, bool(found), side)
+    finding, flags = classify(evidence)
+    decision = decide(finding, side.guardrails)
+    reason = invalid or finding_reason(
+        finding, decision, test.channel, primary, prepared.look, side.guardrails
     )
-    judgement = _judge(primary, test.better, test.channel, guardrails)
     return EvaluateResponse(
-        decision=judgement.decision,
-        reason=judgement.reason + _notes(primary, shifted),
-        results=results + prediction_results,
-        guardrails=guardrails,
-        prediction_hits=hits,
-        prediction_total=total,
-        driver_adapted=bool(shifted),
-        passes_used=len(used),
-        passes_excluded=excluded,
+        decision=decision,
+        reason=reason + notes(primary, side.shifted, Flag.few_blocks in flags),
+        results=[*_primary_results(request, prepared, primary), *side.results],
+        guardrails=side.guardrails,
+        prediction_hits=side.prediction_hits,
+        prediction_total=side.prediction_total,
+        driver_adapted=bool(side.shifted),
+        passes_used=len(prepared.used),
+        passes_excluded=prepared.missing + sum(prepared.mismatched),
+        finding_class=finding,
+        flags=flags,
+        recommendation=recommend(finding, evidence),
+        look=prepared.look,
+        margin=prepared.margin,
+        confounders=confounders(primary, side.shifted, found, prepared.mismatched),
+        engine_version=__version__,
     )

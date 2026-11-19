@@ -1,6 +1,6 @@
 # ADR 0025: A lap counts once it is finished, and plans count the noise of whole laps
 
-Status: accepted (2026-11-17). Amends the plan of [ADR 0008](0008-effect-model.md) and the
+Status: accepted (2026-11-17). The sizing is amended by [ADR 0029](0029-block-level-inference-and-finding-classes.md): every plan is 8 blocks, the first pre-registered look, and says what that look decides. Amends the plan of [ADR 0008](0008-effect-model.md) and the
 "every block driven" trigger of [ADR 0020](0020-ai-training-program.md). (0024 is taken by a
 change written in parallel.)
 
@@ -172,7 +172,8 @@ experiment 9's 1.7 ms is too low for the +-20 ms it gave.
   sharper meaning.
 - A noisy car drives up to twice as long: 8 blocks of 3 laps plus out-laps, about 40 minutes on
   a 1:15 Hungaroring lap. An 8-block plan can still be extended. Extensions are counted, not
-  capped by length, so a human can take it to 12 blocks; a training program extends once, to 10.
+  capped by length, so a human can take it to 12 blocks; a training program extends once, to 10 (since ADR 0029: every plan is 8 blocks, and a
+  program extends to 10 and 12 when the engine recommends it).
 - Past plans and verdicts are not changed. The ledger keeps "decides 0.0232" for experiment 7.
 - The ranking's `laps_needed` (`optimize/rank.py`) still uses the pass formula; it ranks by
   value per lap and is not a plan.

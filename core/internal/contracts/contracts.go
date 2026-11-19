@@ -1107,6 +1107,85 @@ func (j *ChannelResult) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// Something besides the setup that may be in the number, named for the reader.
+type Confounder struct {
+	// Passes concerned, for the exclusions.
+	Count *int `json:"count,omitempty,omitzero"`
+
+	// Kind corresponds to the JSON schema field "kind".
+	Kind ConfounderKind `json:"kind"`
+
+	// The covariate, channel, speed classes or reason it is about.
+	Name string `json:"name"`
+}
+
+type ConfounderKind string
+
+const ConfounderKindCovariateBetweenBlocks ConfounderKind = "covariate_between_blocks"
+const ConfounderKindCovariateLeftOut ConfounderKind = "covariate_left_out"
+const ConfounderKindDriverInputShifted ConfounderKind = "driver_input_shifted"
+const ConfounderKindSessionTangled ConfounderKind = "session_tangled"
+const ConfounderKindSetupMismatch ConfounderKind = "setup_mismatch"
+const ConfounderKindSourceMismatch ConfounderKind = "source_mismatch"
+const ConfounderKindSpeedClassInteraction ConfounderKind = "speed_class_interaction"
+
+var enumValues_ConfounderKind = []interface{}{
+	"covariate_left_out",
+	"covariate_between_blocks",
+	"driver_input_shifted",
+	"session_tangled",
+	"setup_mismatch",
+	"source_mismatch",
+	"speed_class_interaction",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ConfounderKind) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ConfounderKind {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ConfounderKind, v)
+	}
+	*j = ConfounderKind(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Confounder) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["kind"]; raw != nil && !ok {
+		return fmt.Errorf("field kind in Confounder: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in Confounder: required")
+	}
+	type Plain Confounder
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.Count != nil && 0 > *plain.Count {
+		return fmt.Errorf("field %s: must be >= %v", "count", 0)
+	}
+	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
+	}
+	*j = Confounder(plain)
+	return nil
+}
+
 type ControlsCheck struct {
 	// When the state was reached.
 	At time.Time `json:"at"`
@@ -1696,8 +1775,10 @@ type EvaluatePass struct {
 	// Corner corresponds to the JSON schema field "corner".
 	Corner int `json:"corner"`
 
-	// Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and
-	// ers_charge_start on a car with a hybrid battery.
+	// Conditions to adjust for: fuel_l, tyre_core_c, time_since_start_s (from the
+	// experiment's first push pass), ers_charge_start on a car with a hybrid battery,
+	// and session_<n> = 1 on the passes of the experiment's n-th game session (n >=
+	// 2), else 0.
 	Covariates EvaluatePassCovariates `json:"covariates"`
 
 	// Lap within the session; passes of one lap share their errors.
@@ -1740,8 +1821,10 @@ func (j *EvaluatePassArm) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-// Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and
-// ers_charge_start on a car with a hybrid battery.
+// Conditions to adjust for: fuel_l, tyre_core_c, time_since_start_s (from the
+// experiment's first push pass), ers_charge_start on a car with a hybrid battery,
+// and session_<n> = 1 on the passes of the experiment's n-th game session (n >=
+// 2), else 0.
 type EvaluatePassCovariates map[string]float64
 
 // Metric id to value; null when it could not be measured on this pass.
@@ -1823,8 +1906,25 @@ type EvaluateRequest struct {
 	// Driver-input metrics; a shift in them means the driver adapted to the setup.
 	DriverChannels []string `json:"driver_channels"`
 
+	// Excluded corresponds to the JSON schema field "excluded".
+	Excluded *ExcludedPasses `json:"excluded,omitempty,omitzero"`
+
+	// How many more times the experiment may be extended. Absent: none.
+	ExtensionsLeft *int `json:"extensions_left,omitempty,omitzero"`
+
 	// Guardrails corresponds to the JSON schema field "guardrails".
 	Guardrails []GuardrailSpec `json:"guardrails"`
+
+	// Pre-registered look (ADR 0029): 0 before the first (fewer than 8 planned
+	// blocks), 1, 2 and 3 at 8, 10 and 12. Absent: counted from the passes' blocks.
+	Look *int `json:"look,omitempty,omitzero"`
+
+	// Push-lap passes per block and how many of them were off track (ADR 0029).
+	Offtrack []OfftrackBlock `json:"offtrack,omitempty,omitzero"`
+
+	// Setup item the experiment changes; picks its margins from the engine's
+	// configuration.
+	Parameter *string `json:"parameter,omitempty,omitzero"`
 
 	// Passes corresponds to the JSON schema field "passes".
 	Passes []EvaluatePass `json:"passes"`
@@ -1862,12 +1962,24 @@ func (j *EvaluateRequest) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
+	if plain.ExtensionsLeft != nil && 0 > *plain.ExtensionsLeft {
+		return fmt.Errorf("field %s: must be >= %v", "extensions_left", 0)
+	}
+	if plain.Look != nil && 3 < *plain.Look {
+		return fmt.Errorf("field %s: must be <= %v", "look", 3)
+	}
+	if plain.Look != nil && 0 > *plain.Look {
+		return fmt.Errorf("field %s: must be >= %v", "look", 0)
+	}
 	*j = EvaluateRequest(plain)
 	return nil
 }
 
 // The engine's verdict on an experiment, with the numbers behind it.
 type EvaluateResponse struct {
+	// Confounders corresponds to the JSON schema field "confounders".
+	Confounders []Confounder `json:"confounders,omitempty,omitzero"`
+
 	// Decision corresponds to the JSON schema field "decision".
 	Decision EvaluateResponseDecision `json:"decision"`
 
@@ -1875,10 +1987,33 @@ type EvaluateResponse struct {
 	// the driver, not the car.
 	DriverAdapted bool `json:"driver_adapted"`
 
+	// Version of the engine that computed the numbers (ADR 0030).
+	EngineVersion *string `json:"engine_version,omitempty,omitzero"`
+
+	// What the experiment found on the primary channel (ADR 0029), orthogonal to the
+	// decision: invalid, confirmed improvement or regression (the whole interval
+	// beyond the margin, at least 8 blocks), neutral (the interval inside the
+	// margin), context-dependent (the effect differs between speed classes), likely
+	// improvement or regression (the interval excludes zero), insufficient evidence.
+	FindingClass *EvaluateResponseFindingClass `json:"finding_class,omitempty,omitzero"`
+
+	// few_blocks: fewer than 8 blocks, never a confirmed finding. uninformative: the
+	// interval is more than twice the margin wide on each side.
+	Flags []EvaluateResponseFlagsElem `json:"flags,omitempty,omitzero"`
+
 	// Guardrails corresponds to the JSON schema field "guardrails".
 	Guardrails []GuardrailResult `json:"guardrails"`
 
-	// Passes left out: not valid, or missing the primary channel.
+	// The look this verdict was judged at (ADR 0029).
+	Look *int `json:"look,omitempty,omitzero"`
+
+	// Margin of practical equivalence the finding was judged against, in the primary
+	// channel's unit.
+	Margin *float64 `json:"margin,omitempty,omitzero"`
+
+	// Passes left out: missing the primary channel, plus those core excluded (setup
+	// or driver mismatch). Off-track passes are counted in the offtrack_rate
+	// guardrail instead.
 	PassesExcluded int `json:"passes_excluded"`
 
 	// PassesUsed corresponds to the JSON schema field "passes_used".
@@ -1892,6 +2027,12 @@ type EvaluateResponse struct {
 
 	// One sentence a person can read.
 	Reason string `json:"reason"`
+
+	// What to do next (ADR 0029): continue to the next look, test a larger step,
+	// investigate a speed class, switch the primary metric (time neutral, response
+	// moved), stop (nothing to gain), stop (invalid). Absent when the finding is
+	// confirmed.
+	Recommendation *EvaluateResponseRecommendation `json:"recommendation,omitempty,omitzero"`
 
 	// Results corresponds to the JSON schema field "results".
 	Results []ChannelResult `json:"results"`
@@ -1931,6 +2072,78 @@ func (j *EvaluateResponseDecision) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type EvaluateResponseFindingClass string
+
+const EvaluateResponseFindingClassConfirmedImprovement EvaluateResponseFindingClass = "confirmed_improvement"
+const EvaluateResponseFindingClassConfirmedRegression EvaluateResponseFindingClass = "confirmed_regression"
+const EvaluateResponseFindingClassContextDependent EvaluateResponseFindingClass = "context_dependent"
+const EvaluateResponseFindingClassInsufficientEvidence EvaluateResponseFindingClass = "insufficient_evidence"
+const EvaluateResponseFindingClassInvalid EvaluateResponseFindingClass = "invalid"
+const EvaluateResponseFindingClassLikelyImprovement EvaluateResponseFindingClass = "likely_improvement"
+const EvaluateResponseFindingClassLikelyRegression EvaluateResponseFindingClass = "likely_regression"
+const EvaluateResponseFindingClassNeutral EvaluateResponseFindingClass = "neutral"
+
+var enumValues_EvaluateResponseFindingClass = []interface{}{
+	"invalid",
+	"confirmed_improvement",
+	"confirmed_regression",
+	"neutral",
+	"context_dependent",
+	"likely_improvement",
+	"likely_regression",
+	"insufficient_evidence",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *EvaluateResponseFindingClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_EvaluateResponseFindingClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_EvaluateResponseFindingClass, v)
+	}
+	*j = EvaluateResponseFindingClass(v)
+	return nil
+}
+
+type EvaluateResponseFlagsElem string
+
+const EvaluateResponseFlagsElemFewBlocks EvaluateResponseFlagsElem = "few_blocks"
+const EvaluateResponseFlagsElemUninformative EvaluateResponseFlagsElem = "uninformative"
+
+var enumValues_EvaluateResponseFlagsElem = []interface{}{
+	"few_blocks",
+	"uninformative",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *EvaluateResponseFlagsElem) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_EvaluateResponseFlagsElem {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_EvaluateResponseFlagsElem, v)
+	}
+	*j = EvaluateResponseFlagsElem(v)
+	return nil
+}
+
 type EvaluateResponseGuardrailsElemStatus string
 
 const EvaluateResponseGuardrailsElemStatusBroke EvaluateResponseGuardrailsElemStatus = "broke"
@@ -1962,6 +2175,44 @@ func (j *EvaluateResponseGuardrailsElemStatus) UnmarshalJSON(value []byte) error
 		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_EvaluateResponseGuardrailsElemStatus, v)
 	}
 	*j = EvaluateResponseGuardrailsElemStatus(v)
+	return nil
+}
+
+type EvaluateResponseRecommendation string
+
+const EvaluateResponseRecommendationContinue EvaluateResponseRecommendation = "continue"
+const EvaluateResponseRecommendationInvestigateContext EvaluateResponseRecommendation = "investigate_context"
+const EvaluateResponseRecommendationLargerPerturbation EvaluateResponseRecommendation = "larger_perturbation"
+const EvaluateResponseRecommendationStopInvalid EvaluateResponseRecommendation = "stop_invalid"
+const EvaluateResponseRecommendationStopNeutral EvaluateResponseRecommendation = "stop_neutral"
+const EvaluateResponseRecommendationSwitchMetric EvaluateResponseRecommendation = "switch_metric"
+
+var enumValues_EvaluateResponseRecommendation = []interface{}{
+	"continue",
+	"larger_perturbation",
+	"investigate_context",
+	"switch_metric",
+	"stop_neutral",
+	"stop_invalid",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *EvaluateResponseRecommendation) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_EvaluateResponseRecommendation {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_EvaluateResponseRecommendation, v)
+	}
+	*j = EvaluateResponseRecommendation(v)
 	return nil
 }
 
@@ -2002,6 +2253,18 @@ func (j *EvaluateResponse) UnmarshalJSON(value []byte) error {
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
+	}
+	if plain.EngineVersion != nil && utf8.RuneCountInString(string(*plain.EngineVersion)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "engine_version", 1)
+	}
+	if plain.Look != nil && 3 < *plain.Look {
+		return fmt.Errorf("field %s: must be <= %v", "look", 3)
+	}
+	if plain.Look != nil && 0 > *plain.Look {
+		return fmt.Errorf("field %s: must be >= %v", "look", 0)
+	}
+	if plain.Margin != nil && 0 > *plain.Margin {
+		return fmt.Errorf("field %s: must be >= %v", "margin", 0)
 	}
 	if 0 > plain.PassesExcluded {
 		return fmt.Errorf("field %s: must be >= %v", "passes_excluded", 0)
@@ -2111,6 +2374,42 @@ func (j *Evidence) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s: must be >= %v", "passes", 1)
 	}
 	*j = Evidence(plain)
+	return nil
+}
+
+// Passes core left out before the engine saw them (ADR 0029).
+type ExcludedPasses struct {
+	// Driven on a setup that is not the block's arm.
+	SetupMismatch int `json:"setup_mismatch"`
+
+	// From a session whose driver is not the experiment's.
+	SourceMismatch int `json:"source_mismatch"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ExcludedPasses) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["setup_mismatch"]; raw != nil && !ok {
+		return fmt.Errorf("field setup_mismatch in ExcludedPasses: required")
+	}
+	if _, ok := raw["source_mismatch"]; raw != nil && !ok {
+		return fmt.Errorf("field source_mismatch in ExcludedPasses: required")
+	}
+	type Plain ExcludedPasses
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.SetupMismatch {
+		return fmt.Errorf("field %s: must be >= %v", "setup_mismatch", 0)
+	}
+	if 0 > plain.SourceMismatch {
+		return fmt.Errorf("field %s: must be >= %v", "source_mismatch", 0)
+	}
+	*j = ExcludedPasses(plain)
 	return nil
 }
 
@@ -4334,6 +4633,87 @@ func (j *Measurement) UnmarshalJSON(value []byte) error {
 		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)
 	}
 	*j = Measurement(plain)
+	return nil
+}
+
+// One run block's push-lap passes on the arm's setup and its own driver.
+type OfftrackBlock struct {
+	// Arm corresponds to the JSON schema field "arm".
+	Arm OfftrackBlockArm `json:"arm"`
+
+	// Block corresponds to the JSON schema field "block".
+	Block int `json:"block"`
+
+	// Those marked invalid (off track).
+	Offtrack int `json:"offtrack"`
+
+	// All of them, valid or not.
+	Passes int `json:"passes"`
+}
+
+type OfftrackBlockArm string
+
+const OfftrackBlockArmBaseline OfftrackBlockArm = "baseline"
+const OfftrackBlockArmVariant OfftrackBlockArm = "variant"
+
+var enumValues_OfftrackBlockArm = []interface{}{
+	"baseline",
+	"variant",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *OfftrackBlockArm) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_OfftrackBlockArm {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_OfftrackBlockArm, v)
+	}
+	*j = OfftrackBlockArm(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *OfftrackBlock) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["arm"]; raw != nil && !ok {
+		return fmt.Errorf("field arm in OfftrackBlock: required")
+	}
+	if _, ok := raw["block"]; raw != nil && !ok {
+		return fmt.Errorf("field block in OfftrackBlock: required")
+	}
+	if _, ok := raw["offtrack"]; raw != nil && !ok {
+		return fmt.Errorf("field offtrack in OfftrackBlock: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in OfftrackBlock: required")
+	}
+	type Plain OfftrackBlock
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Block {
+		return fmt.Errorf("field %s: must be >= %v", "block", 1)
+	}
+	if 0 > plain.Offtrack {
+		return fmt.Errorf("field %s: must be >= %v", "offtrack", 0)
+	}
+	if 0 > plain.Passes {
+		return fmt.Errorf("field %s: must be >= %v", "passes", 0)
+	}
+	*j = OfftrackBlock(plain)
 	return nil
 }
 
@@ -8682,6 +9062,9 @@ func (j *Transfer) UnmarshalJSON(value []byte) error {
 
 // How the experiment ended.
 type VerdictSummary struct {
+	// Confounders corresponds to the JSON schema field "confounders".
+	Confounders []Confounder `json:"confounders,omitempty,omitzero"`
+
 	// RFC 3339, UTC.
 	DecidedAt string `json:"decided_at"`
 
@@ -8692,6 +9075,40 @@ type VerdictSummary struct {
 	// Decision corresponds to the JSON schema field "decision".
 	Decision VerdictSummaryDecision `json:"decision"`
 
+	// DriverAdapted corresponds to the JSON schema field "driver_adapted".
+	DriverAdapted *bool `json:"driver_adapted,omitempty,omitzero"`
+
+	// EngineVersion corresponds to the JSON schema field "engine_version".
+	EngineVersion *string `json:"engine_version,omitempty,omitzero"`
+
+	// What the experiment found on the primary channel (ADR 0029), orthogonal to the
+	// decision: invalid, confirmed improvement or regression (the whole interval
+	// beyond the margin, at least 8 blocks), neutral (the interval inside the
+	// margin), context-dependent (the effect differs between speed classes), likely
+	// improvement or regression (the interval excludes zero), insufficient evidence.
+	// From the latest verdict the engine gave.
+	FindingClass *VerdictSummaryFindingClass `json:"finding_class,omitempty,omitzero"`
+
+	// True when the finding was derived from an old verdict's decision and reason
+	// (judged before ADR 0029, by another method).
+	FindingDerived *bool `json:"finding_derived,omitempty,omitzero"`
+
+	// few_blocks: fewer than 8 blocks, never a confirmed finding. uninformative: the
+	// interval is more than twice the margin wide on each side.
+	Flags []VerdictSummaryFlagsElem `json:"flags,omitempty,omitzero"`
+
+	// Look corresponds to the JSON schema field "look".
+	Look *int `json:"look,omitempty,omitzero"`
+
+	// Margin corresponds to the JSON schema field "margin".
+	Margin *float64 `json:"margin,omitempty,omitzero"`
+
+	// PassesExcluded corresponds to the JSON schema field "passes_excluded".
+	PassesExcluded *int `json:"passes_excluded,omitempty,omitzero"`
+
+	// PassesUsed corresponds to the JSON schema field "passes_used".
+	PassesUsed *int `json:"passes_used,omitempty,omitzero"`
+
 	// PredictionHits corresponds to the JSON schema field "prediction_hits".
 	PredictionHits int `json:"prediction_hits"`
 
@@ -8700,6 +9117,12 @@ type VerdictSummary struct {
 
 	// Reason corresponds to the JSON schema field "reason".
 	Reason string `json:"reason"`
+
+	// What to do next (ADR 0029): continue to the next look, test a larger step,
+	// investigate a speed class, switch the primary metric (time neutral, response
+	// moved), stop (nothing to gain), stop (invalid). Absent when the finding is
+	// confirmed.
+	Recommendation *VerdictSummaryRecommendation `json:"recommendation,omitempty,omitzero"`
 }
 
 type VerdictSummaryDecidedBy string
@@ -8772,6 +9195,116 @@ func (j *VerdictSummaryDecision) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type VerdictSummaryFindingClass string
+
+const VerdictSummaryFindingClassConfirmedImprovement VerdictSummaryFindingClass = "confirmed_improvement"
+const VerdictSummaryFindingClassConfirmedRegression VerdictSummaryFindingClass = "confirmed_regression"
+const VerdictSummaryFindingClassContextDependent VerdictSummaryFindingClass = "context_dependent"
+const VerdictSummaryFindingClassInsufficientEvidence VerdictSummaryFindingClass = "insufficient_evidence"
+const VerdictSummaryFindingClassInvalid VerdictSummaryFindingClass = "invalid"
+const VerdictSummaryFindingClassLikelyImprovement VerdictSummaryFindingClass = "likely_improvement"
+const VerdictSummaryFindingClassLikelyRegression VerdictSummaryFindingClass = "likely_regression"
+const VerdictSummaryFindingClassNeutral VerdictSummaryFindingClass = "neutral"
+
+var enumValues_VerdictSummaryFindingClass = []interface{}{
+	"invalid",
+	"confirmed_improvement",
+	"confirmed_regression",
+	"neutral",
+	"context_dependent",
+	"likely_improvement",
+	"likely_regression",
+	"insufficient_evidence",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *VerdictSummaryFindingClass) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_VerdictSummaryFindingClass {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_VerdictSummaryFindingClass, v)
+	}
+	*j = VerdictSummaryFindingClass(v)
+	return nil
+}
+
+type VerdictSummaryFlagsElem string
+
+const VerdictSummaryFlagsElemFewBlocks VerdictSummaryFlagsElem = "few_blocks"
+const VerdictSummaryFlagsElemUninformative VerdictSummaryFlagsElem = "uninformative"
+
+var enumValues_VerdictSummaryFlagsElem = []interface{}{
+	"few_blocks",
+	"uninformative",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *VerdictSummaryFlagsElem) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_VerdictSummaryFlagsElem {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_VerdictSummaryFlagsElem, v)
+	}
+	*j = VerdictSummaryFlagsElem(v)
+	return nil
+}
+
+type VerdictSummaryRecommendation string
+
+const VerdictSummaryRecommendationContinue VerdictSummaryRecommendation = "continue"
+const VerdictSummaryRecommendationInvestigateContext VerdictSummaryRecommendation = "investigate_context"
+const VerdictSummaryRecommendationLargerPerturbation VerdictSummaryRecommendation = "larger_perturbation"
+const VerdictSummaryRecommendationStopInvalid VerdictSummaryRecommendation = "stop_invalid"
+const VerdictSummaryRecommendationStopNeutral VerdictSummaryRecommendation = "stop_neutral"
+const VerdictSummaryRecommendationSwitchMetric VerdictSummaryRecommendation = "switch_metric"
+
+var enumValues_VerdictSummaryRecommendation = []interface{}{
+	"continue",
+	"larger_perturbation",
+	"investigate_context",
+	"switch_metric",
+	"stop_neutral",
+	"stop_invalid",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *VerdictSummaryRecommendation) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_VerdictSummaryRecommendation {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_VerdictSummaryRecommendation, v)
+	}
+	*j = VerdictSummaryRecommendation(v)
+	return nil
+}
+
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *VerdictSummary) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
@@ -8800,6 +9333,21 @@ func (j *VerdictSummary) UnmarshalJSON(value []byte) error {
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
+	}
+	if plain.Look != nil && 3 < *plain.Look {
+		return fmt.Errorf("field %s: must be <= %v", "look", 3)
+	}
+	if plain.Look != nil && 0 > *plain.Look {
+		return fmt.Errorf("field %s: must be >= %v", "look", 0)
+	}
+	if plain.Margin != nil && 0 > *plain.Margin {
+		return fmt.Errorf("field %s: must be >= %v", "margin", 0)
+	}
+	if plain.PassesExcluded != nil && 0 > *plain.PassesExcluded {
+		return fmt.Errorf("field %s: must be >= %v", "passes_excluded", 0)
+	}
+	if plain.PassesUsed != nil && 0 > *plain.PassesUsed {
+		return fmt.Errorf("field %s: must be >= %v", "passes_used", 0)
 	}
 	if 0 > plain.PredictionHits {
 		return fmt.Errorf("field %s: must be >= %v", "prediction_hits", 0)

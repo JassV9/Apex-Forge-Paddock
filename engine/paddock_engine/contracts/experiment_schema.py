@@ -237,6 +237,80 @@ class DecidedBy(StrEnum):
     training = "training"
 
 
+class FindingClass(StrEnum):
+    """
+    What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence. From the latest verdict the engine gave.
+    """
+
+    invalid = "invalid"
+    confirmed_improvement = "confirmed_improvement"
+    confirmed_regression = "confirmed_regression"
+    neutral = "neutral"
+    context_dependent = "context_dependent"
+    likely_improvement = "likely_improvement"
+    likely_regression = "likely_regression"
+    insufficient_evidence = "insufficient_evidence"
+
+
+class Flag(StrEnum):
+    few_blocks = "few_blocks"
+    uninformative = "uninformative"
+
+
+class Recommendation(StrEnum):
+    """
+    What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.
+    """
+
+    continue_ = "continue"
+    larger_perturbation = "larger_perturbation"
+    investigate_context = "investigate_context"
+    switch_metric = "switch_metric"
+    stop_neutral = "stop_neutral"
+    stop_invalid = "stop_invalid"
+
+
+class ExperimentEvent(BaseModel):
+    """
+    One state transition.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    from_: str = Field(..., alias="from", description="State before; empty for the creation.")
+    to: str
+    reason: str
+    at: str = Field(..., description="RFC 3339, UTC.")
+
+
+class Kind3(StrEnum):
+    covariate_left_out = "covariate_left_out"
+    covariate_between_blocks = "covariate_between_blocks"
+    driver_input_shifted = "driver_input_shifted"
+    session_tangled = "session_tangled"
+    setup_mismatch = "setup_mismatch"
+    source_mismatch = "source_mismatch"
+    speed_class_interaction = "speed_class_interaction"
+
+
+class Confounder(BaseModel):
+    """
+    Something besides the setup that may be in the number, named for the reader.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Kind3
+    name: str = Field(
+        ...,
+        description="The covariate, channel, speed classes or reason it is about.",
+        min_length=1,
+    )
+    count: int | None = Field(None, description="Passes concerned, for the exclusions.", ge=0)
+
+
 class VerdictSummary(BaseModel):
     """
     How the experiment ended.
@@ -254,20 +328,29 @@ class VerdictSummary(BaseModel):
     decided_at: str = Field(..., description="RFC 3339, UTC.")
     prediction_hits: int = Field(..., ge=0)
     prediction_total: int = Field(..., ge=0)
-
-
-class ExperimentEvent(BaseModel):
-    """
-    One state transition.
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
+    finding_class: FindingClass | None = Field(
+        None,
+        description="What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence. From the latest verdict the engine gave.",
     )
-    from_: str = Field(..., alias="from", description="State before; empty for the creation.")
-    to: str
-    reason: str
-    at: str = Field(..., description="RFC 3339, UTC.")
+    finding_derived: bool | None = Field(
+        None,
+        description="True when the finding was derived from an old verdict's decision and reason (judged before ADR 0029, by another method).",
+    )
+    flags: list[Flag] | None = Field(
+        None,
+        description="few_blocks: fewer than 8 blocks, never a confirmed finding. uninformative: the interval is more than twice the margin wide on each side.",
+    )
+    recommendation: Recommendation | None = Field(
+        None,
+        description="What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.",
+    )
+    confounders: list[Confounder] | None = None
+    driver_adapted: bool | None = None
+    engine_version: str | None = None
+    passes_used: int | None = Field(None, ge=0)
+    passes_excluded: int | None = Field(None, ge=0)
+    look: int | None = Field(None, ge=0, le=3)
+    margin: float | None = Field(None, ge=0.0)
 
 
 class Experiment(BaseModel):

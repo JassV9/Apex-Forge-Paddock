@@ -9,6 +9,9 @@ from paddock_engine.io.samples import FloatArray
 from paddock_engine.stats.model import IntArray
 
 MAX_VARIANCE_INFLATION = 10.0  # of any column: 1 / (1 - R^2) on the other columns of the design
+# A session term: 1 on the passes of the experiment's n-th game session (n >= 2), else 0. A new
+# session restarts the game, refuels and resets the track; the term absorbs that step (ADR 0029).
+SESSION_PREFIX = "session_"
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,7 @@ class Design:
     arms: list[str]  # the non-baseline arms, in column order
     covariates: list[str]  # covariates that were usable, in column order
     dropped: list[str] = field(default_factory=list)  # covariates too tangled with the rest
+    session_confounded: bool = False  # a session term is too tangled with the arm to keep apart
 
 
 def _centre_within(values: FloatArray, groups: IntArray) -> FloatArray:
@@ -52,26 +56,32 @@ def _variance_inflation(columns: FloatArray) -> FloatArray:
     return inflation
 
 
-def _untangled(arms: FloatArray, covariates: FloatArray) -> tuple[list[int], list[int]]:
-    """Indices of the covariate columns to keep and to drop (ADR 0022).
+def _untangled(
+    arms: FloatArray, covariates: FloatArray, protected: list[bool]
+) -> tuple[list[int], list[int], bool]:
+    """Indices of the covariate columns to keep and to drop (ADR 0022), and whether a protected
+    column (a session term) stays tangled with the arm.
 
     While any column of arm indicators and covariates has a variance inflation above the limit,
-    the covariate with the highest one goes (the last of equals, so the alphabetically first
-    name stays). The arm is never dropped.
+    the unprotected covariate with the highest one goes (the last of equals, so the
+    alphabetically first name stays). The arm and the session terms are never dropped: an
+    experiment over several sessions is judged with its session terms or not at all.
     """
     kept, dropped = list(range(covariates.shape[1])), []
-    while kept:
-        inflation = _variance_inflation(np.column_stack([arms, covariates[:, kept]]))
-        if inflation.max() <= MAX_VARIANCE_INFLATION:
+    inflation = _variance_inflation(np.column_stack([arms, covariates]))
+    while inflation.max() > MAX_VARIANCE_INFLATION:
+        droppable = [i for i in range(len(kept)) if not protected[kept[i]]]
+        if not droppable:
             break
-        worst = max(range(len(kept)), key=lambda i: (inflation[arms.shape[1] + i], i))
+        worst = max(droppable, key=lambda i: (inflation[arms.shape[1] + i], i))
         dropped.append(kept.pop(worst))
-    return kept, dropped
+        inflation = _variance_inflation(np.column_stack([arms, covariates[:, kept]]))
+    return kept, dropped, bool(inflation.max() > MAX_VARIANCE_INFLATION)
 
 
 def _usable_covariates(
     observations: Sequence[Observation], groups: IntArray, arms: FloatArray
-) -> tuple[list[str], list[str], FloatArray]:
+) -> tuple[list[str], list[str], FloatArray, bool]:
     """Covariates present on every pass and varying within corners, then untangled from the arms.
 
     `arms` holds the arm indicators centred within corners, as the covariates are.
@@ -88,11 +98,13 @@ def _usable_covariates(
             candidates.append(name)
             columns.append(centred)
     matrix = np.column_stack(columns) if columns else np.empty((len(observations), 0))
-    kept, dropped = _untangled(arms, matrix)
+    protected = [name.startswith(SESSION_PREFIX) for name in candidates]
+    kept, dropped, confounded = _untangled(arms, matrix, protected)
     return (
         [candidates[i] for i in kept],
         [candidates[i] for i in sorted(dropped)],
         matrix[:, kept],
+        confounded,
     )
 
 
@@ -110,7 +122,9 @@ def build_design(observations: Sequence[Observation], baseline_arm: str) -> Desi
     centred_arms = np.column_stack(
         [_centre_within(indicators[:, i], groups) for i in range(len(arms))]
     )
-    covariates, dropped, covariate_columns = _usable_covariates(observations, groups, centred_arms)
+    covariates, dropped, covariate_columns, confounded = _usable_covariates(
+        observations, groups, centred_arms
+    )
     return Design(
         y=np.array([o.value for o in observations], dtype=np.float64),
         x=np.column_stack([indicators, covariate_columns]),
@@ -119,4 +133,5 @@ def build_design(observations: Sequence[Observation], baseline_arm: str) -> Desi
         arms=arms,
         covariates=covariates,
         dropped=dropped,
+        session_confounded=confounded,
     )

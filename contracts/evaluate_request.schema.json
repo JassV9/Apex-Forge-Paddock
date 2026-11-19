@@ -41,6 +41,31 @@
       "items": {
         "$ref": "#/definitions/EvaluatePass"
       }
+    },
+    "parameter": {
+      "description": "Setup item the experiment changes; picks its margins from the engine's configuration.",
+      "type": "string"
+    },
+    "look": {
+      "description": "Pre-registered look (ADR 0029): 0 before the first (fewer than 8 planned blocks), 1, 2 and 3 at 8, 10 and 12. Absent: counted from the passes' blocks.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "extensions_left": {
+      "description": "How many more times the experiment may be extended. Absent: none.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded": {
+      "$ref": "#/definitions/ExcludedPasses"
+    },
+    "offtrack": {
+      "description": "Push-lap passes per block and how many of them were off track (ADR 0029).",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/OfftrackBlock"
+      }
     }
   },
   "definitions": {
@@ -202,11 +227,68 @@
           }
         },
         "covariates": {
-          "description": "Conditions to adjust for: fuel_l, tyre_core_c, time_in_session_s, and ers_charge_start on a car with a hybrid battery.",
+          "description": "Conditions to adjust for: fuel_l, tyre_core_c, time_since_start_s (from the experiment's first push pass), ers_charge_start on a car with a hybrid battery, and session_<n> = 1 on the passes of the experiment's n-th game session (n >= 2), else 0.",
           "type": "object",
           "additionalProperties": {
             "type": "number"
           }
+        }
+      }
+    },
+    "ExcludedPasses": {
+      "title": "ExcludedPasses",
+      "description": "Passes core left out before the engine saw them (ADR 0029).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setup_mismatch",
+        "source_mismatch"
+      ],
+      "properties": {
+        "setup_mismatch": {
+          "description": "Driven on a setup that is not the block's arm.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_mismatch": {
+          "description": "From a session whose driver is not the experiment's.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "OfftrackBlock": {
+      "title": "OfftrackBlock",
+      "description": "One run block's push-lap passes on the arm's setup and its own driver.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block",
+        "arm",
+        "passes",
+        "offtrack"
+      ],
+      "properties": {
+        "block": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "arm": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "variant"
+          ]
+        },
+        "passes": {
+          "description": "All of them, valid or not.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "offtrack": {
+          "description": "Those marked invalid (off track).",
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

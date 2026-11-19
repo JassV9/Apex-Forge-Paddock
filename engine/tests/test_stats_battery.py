@@ -41,7 +41,13 @@ def test_adjusting_for_the_battery_narrows_the_interval(seed: int) -> None:
 
     assert adjusted.covariates == [BATTERY] and not adjusted.dropped_covariates
     assert _width(adjusted) < 0.5 * _width(unadjusted)
-    assert adjusted.ci_low < EFFECT_S < adjusted.ci_high
+
+
+def test_the_adjusted_intervals_cover_the_effect() -> None:
+    """90 % intervals: at most one miss in eight would be unremarkable, two would not."""
+    effects = [_effect(simulate_battery_abab(np.random.default_rng(s), EFFECT_S)) for s in range(8)]
+
+    assert sum(e.ci_low < EFFECT_S < e.ci_high for e in effects) >= 7
 
 
 def test_a_car_without_a_battery_has_nothing_to_adjust_for() -> None:

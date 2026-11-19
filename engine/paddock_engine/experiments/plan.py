@@ -1,15 +1,14 @@
 """Run plans: A-B-A-B blocks and what they can answer, known before a lap is driven.
 
-The plan is sized for the noise it will meet (ADR 0025): the scatter of single passes and the
-error a whole lap shares across its corners. A lap's error averages out over laps only, so a
-car whose laps scatter as a whole gets more blocks, up to MAX_BLOCKS. A plan that cannot reach
-its target within that says so instead of promising what it cannot decide.
+Every plan is 8 blocks, the first pre-registered look (ADR 0029): fewer blocks are never a
+confirmed finding, and the extensions to 10 and 12 blocks are the later looks. The plan says what
+that first look can decide for the noise it will meet (ADR 0025): the scatter of single passes
+and the error a whole lap shares across its corners. A plan that cannot reach its target at the
+first look says so instead of promising what it cannot decide.
 """
 
 import math
 from dataclasses import dataclass
-
-from scipy import stats
 
 from paddock_engine.contracts.plan_request_schema import PlanRequest
 from paddock_engine.contracts.plan_response_schema import (
@@ -20,20 +19,21 @@ from paddock_engine.contracts.plan_response_schema import (
     SigmaLapSource,
     SigmaSource,
 )
+from paddock_engine.stats.effects import t_quantile
 from paddock_engine.stats.lap_noise import LapPass, lap_scatter
 from paddock_engine.stats.mde import lap_inclusive_sigma, minimum_detectable_effect
 from paddock_engine.stats.noise import NoiseModel, noise_model
 from paddock_engine.stats.observations import Observation
+from paddock_engine.stats.sequential import FIRST_LOOK_BLOCKS, interval_level, look_of
 
 # Without earlier passes there is no measured scatter. 28 ms of corner-time scatter against a
 # 5 ms equivalence band is what the real FA26 COTA session showed; the same ratio is assumed
 # for any channel, and the plan says "assumed".
 ASSUMED_SIGMA_PER_ROPE = 5.6
 POWER_Z = 0.84  # z for 80 % power
-STANDARD_BLOCKS = 4  # A-B-A-B, the plan the statistics were validated on (ADR 0008)
-# The longest run the ledger already lets an experiment drive: four blocks and two extensions
-# of two blocks each (core's MaxExtensions).
-MAX_BLOCKS = 8
+# Time since the experiment started changes between blocks and costs the verdict one block
+# degree of freedom (ADR 0029).
+BLOCK_VARYING_COVARIATES = 1
 # A plan should decide an effect of four equivalence bands: the brief's 20 ms of corner time
 # against its 5 ms band (ADR 0008). See `target`.
 TARGET_IN_ROPES = 4
@@ -70,16 +70,16 @@ def decision_effect(
     """Smallest effect that clears the equivalence band with 80 % power.
 
     A decision needs the whole interval beyond the band, so the effect must exceed the band by
-    the interval's half-width plus the power margin. With few laps the interval uses a wide
-    Student's t (laps - blocks - 1 degrees of freedom, as the verdict does).
+    the interval's half-width plus the power margin. The interval is the verdict's: Student's t
+    with blocks - 2 - 1 degrees of freedom, at the level of the look the blocks make (ADR 0029).
     """
     passes_per_arm = laps_per_block * blocks // 2
     effective = lap_inclusive_sigma(sigma, sigma_lap, corners)
     standard_error = (
         time_inflation(blocks) * effective * math.sqrt(2.0 / (passes_per_arm * corners))
     )
-    degrees = max(1, laps_per_block * blocks - blocks - 1)
-    quantile = float(stats.t.ppf(1.0 - (1.0 - level) / 2.0, degrees))
+    degrees = max(1, blocks - 2 - BLOCK_VARYING_COVARIATES)
+    quantile = t_quantile(interval_level(look_of(blocks), level), degrees)
     return rope + (quantile + POWER_Z) * standard_error
 
 
@@ -87,9 +87,9 @@ def target(standard: float, rope: float) -> float:
     """The decision effect a plan is sized for, a whole number of equivalence bands.
 
     Four bands, or, for a car whose passes alone scatter more, the fewest whole bands that cover
-    what the standard plan decides on pass scatter alone (`standard`). Without lap noise every
-    plan is then the standard one, and lap noise worth less than the rest of a band adds no
-    blocks. Without a band the target is `standard` itself.
+    what the first look decides on pass scatter alone (`standard`). Without lap noise every plan
+    then meets its target, and lap noise worth less than the rest of a band does not break it.
+    Without a band the target is `standard` itself.
     """
     if rope <= 0:
         return standard
@@ -100,14 +100,11 @@ def target(standard: float, rope: float) -> float:
 def size(
     sigma: float, sigma_lap: float, corners: int, laps_per_block: int, rope: float, level: float
 ) -> Sizing:
-    """The fewest blocks (in pairs, from four up to MAX_BLOCKS) that decide the target."""
-    standard = decision_effect(sigma, 0.0, corners, laps_per_block, STANDARD_BLOCKS, rope, level)
+    """What the first look (FIRST_LOOK_BLOCKS blocks) detects and decides, against the target."""
+    blocks = FIRST_LOOK_BLOCKS
+    standard = decision_effect(sigma, 0.0, corners, laps_per_block, blocks, rope, level)
     goal = target(standard, rope)
-    blocks = STANDARD_BLOCKS
     decide = decision_effect(sigma, sigma_lap, corners, laps_per_block, blocks, rope, level)
-    while decide > goal and blocks < MAX_BLOCKS:
-        blocks += 2
-        decide = decision_effect(sigma, sigma_lap, corners, laps_per_block, blocks, rope, level)
     effective = lap_inclusive_sigma(sigma, sigma_lap, corners)
     detect = minimum_detectable_effect(effective, laps_per_block * blocks // 2, corners)
     return Sizing(blocks, detect, decide, goal, decide <= goal)

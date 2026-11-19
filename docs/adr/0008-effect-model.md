@@ -1,6 +1,6 @@
 # ADR 0008: How a setup effect is estimated and judged
 
-Status: accepted (2026-11-12)
+Status: accepted (2026-11-12). The interval and the judgement are replaced by [ADR 0029](0029-block-level-inference-and-finding-classes.md): the standard error comes from the run blocks (blocks - 2 degrees of freedom, less one per covariate that changes between blocks), the bootstrap is gone, and the eight findings replace the four classes as what an experiment found.
 
 ## Context
 

@@ -489,6 +489,76 @@
         "prediction_total": {
           "type": "integer",
           "minimum": 0
+        },
+        "finding_class": {
+          "description": "What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence. From the latest verdict the engine gave.",
+          "type": "string",
+          "enum": [
+            "invalid",
+            "confirmed_improvement",
+            "confirmed_regression",
+            "neutral",
+            "context_dependent",
+            "likely_improvement",
+            "likely_regression",
+            "insufficient_evidence"
+          ]
+        },
+        "finding_derived": {
+          "description": "True when the finding was derived from an old verdict's decision and reason (judged before ADR 0029, by another method).",
+          "type": "boolean"
+        },
+        "flags": {
+          "description": "few_blocks: fewer than 8 blocks, never a confirmed finding. uninformative: the interval is more than twice the margin wide on each side.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "few_blocks",
+              "uninformative"
+            ]
+          }
+        },
+        "recommendation": {
+          "description": "What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.",
+          "type": "string",
+          "enum": [
+            "continue",
+            "larger_perturbation",
+            "investigate_context",
+            "switch_metric",
+            "stop_neutral",
+            "stop_invalid"
+          ]
+        },
+        "confounders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Confounder"
+          }
+        },
+        "driver_adapted": {
+          "type": "boolean"
+        },
+        "engine_version": {
+          "type": "string"
+        },
+        "passes_used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passes_excluded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "look": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "margin": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },
@@ -517,6 +587,40 @@
         "at": {
           "description": "RFC 3339, UTC.",
           "type": "string"
+        }
+      }
+    },
+    "Confounder": {
+      "title": "Confounder",
+      "description": "Something besides the setup that may be in the number, named for the reader.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "covariate_left_out",
+            "covariate_between_blocks",
+            "driver_input_shifted",
+            "session_tangled",
+            "setup_mismatch",
+            "source_mismatch",
+            "speed_class_interaction"
+          ]
+        },
+        "name": {
+          "description": "The covariate, channel, speed classes or reason it is about.",
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "description": "Passes concerned, for the exclusions.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

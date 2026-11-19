@@ -56,7 +56,7 @@ func TestAProgramDrivesTheBestRankedChangeWithTheAI(t *testing.T) {
 	}
 }
 
-func TestAPromisingInconclusiveIsExtendedOnceThenTheNextItemIsTested(t *testing.T) {
+func TestAnInconclusiveIsExtendedWhileTheEngineSaysContinueThenTheNextItemIsTested(t *testing.T) {
 	f := newFixture(t, "training_extend")
 	f.ranker.ranked = []contracts.Proposal{proposal("ARB_FRONT", -1), proposal("ARB_REAR", 1)}
 	program := f.start(3)
@@ -69,12 +69,12 @@ func TestAPromisingInconclusiveIsExtendedOnceThenTheNextItemIsTested(t *testing.
 	}
 	f.ledger.drive(first)
 	f.service.AdvanceAll(ctx)
-	f.ledger.judge(first, experiments.Inconclusive, -0.0068, -0.0016)
-	f.service.AdvanceAll(ctx) // extend
+	f.ledger.judge(first, experiments.Inconclusive, contracts.VerdictSummaryRecommendationContinue)
+	f.service.AdvanceAll(ctx) // extend: the next look
 	f.ledger.drive(first)
 	f.service.AdvanceAll(ctx) // evaluate again
-	f.ledger.judge(first, experiments.Inconclusive, -0.006, 0.001)
-	f.service.AdvanceAll(ctx) // revert: extended once already
+	f.ledger.judge(first, experiments.Inconclusive, contracts.VerdictSummaryRecommendationLargerPerturbation)
+	f.service.AdvanceAll(ctx) // revert: the engine does not expect more blocks to settle it
 	f.service.AdvanceAll(ctx) // next
 
 	want := []string{"create 1", "plan 1", "start 1", "evaluate 1", "extend 1", "evaluate 1", "revert 1",
@@ -96,7 +96,7 @@ func TestARejectedChangeIsRevertedAndTheProgramEndsAtItsTarget(t *testing.T) {
 	program := f.start(1)
 	first := newest(program)
 
-	f.ledger.judge(first, experiments.Rejected, 0.01, 0.03)
+	f.ledger.judge(first, experiments.Rejected, contracts.VerdictSummaryRecommendationStopNeutral)
 	f.service.AdvanceAll(context.Background())
 	f.service.AdvanceAll(context.Background())
 
@@ -116,10 +116,10 @@ func TestAProgramWaitsForTheDriver(t *testing.T) {
 		want    string
 	}{
 		{"a trade-off is the driver's call", func(f *fixture, first int64) {
-			f.ledger.judge(first, experiments.Tradeoff, -0.01, -0.002)
+			f.ledger.judge(first, experiments.Tradeoff, "")
 		}, "trade-off"},
 		{"another experiment is on the car", func(f *fixture, first int64) {
-			f.ledger.judge(first, experiments.Accepted, -0.01, -0.006)
+			f.ledger.judge(first, experiments.Accepted, "")
 			f.ledger.occupied = true
 		}, "Waiting to start"},
 	}
@@ -145,7 +145,7 @@ func TestAnOpenAIExperimentIsTakenOverAndAHumansIsLeftAlone(t *testing.T) {
 	f.ranker.ranked = []contracts.Proposal{proposal("ARB_FRONT", -1), proposal("ARB_REAR", 1)}
 	open := f.experimentRow(experiments.Inconclusive, "ai")
 	f.ledger.put(open, experiments.Inconclusive, "ARB_FRONT")
-	f.ledger.judge(open, experiments.Inconclusive, -0.0068, -0.0016)
+	f.ledger.judge(open, experiments.Inconclusive, contracts.VerdictSummaryRecommendationContinue)
 
 	program := f.start(2)
 
@@ -196,24 +196,26 @@ func TestNothingLeftToTestEndsTheProgram(t *testing.T) {
 	}
 }
 
-func TestPromisingMeansTheWholeIntervalIsBetter(t *testing.T) {
+func TestTheProgramExtendsOnlyToTheNextLookTheEngineRecommends(t *testing.T) {
+	cont := contracts.VerdictSummaryRecommendationContinue
+	stop := contracts.VerdictSummaryRecommendationStopNeutral
 	tests := []struct {
-		better        contracts.SuccessTestBetter
-		ciLow, ciHigh float64
-		cornerClass   contracts.ExperimentResultCornerClass
-		wantPromising bool
+		name       string
+		verdict    *contracts.VerdictSummary
+		extensions int
+		want       bool
 	}{
-		{contracts.SuccessTestBetterLower, -0.0068, -0.0016, contracts.ExperimentResultCornerClassAll, true},
-		{contracts.SuccessTestBetterLower, -0.006, 0.001, contracts.ExperimentResultCornerClassAll, false},
-		{contracts.SuccessTestBetterHigher, 0.001, 0.004, contracts.ExperimentResultCornerClassAll, true},
-		{contracts.SuccessTestBetterLower, -0.0068, -0.0016, contracts.ExperimentResultCornerClassSlow, false},
+		{"continue", &contracts.VerdictSummary{Recommendation: &cont}, 0, true},
+		{"continue to the last look", &contracts.VerdictSummary{Recommendation: &cont}, 1, true},
+		{"no look left", &contracts.VerdictSummary{Recommendation: &cont}, experiments.MaxExtensions, false},
+		{"stop", &contracts.VerdictSummary{Recommendation: &stop}, 0, false},
+		{"judged before ADR 0029", &contracts.VerdictSummary{}, 0, false},
+		{"no verdict", nil, 0, false},
 	}
 	for _, tt := range tests {
-		exp := contracts.Experiment{SuccessTest: contracts.SuccessTest{Better: tt.better},
-			Results: []contracts.ExperimentResult{{Role: contracts.ExperimentResultRolePrimary,
-				CornerClass: tt.cornerClass, CiLow: tt.ciLow, CiHigh: tt.ciHigh}}}
-		if got := promising(exp); got != tt.wantPromising {
-			t.Errorf("%s [%v, %v] %s: promising %v", tt.better, tt.ciLow, tt.ciHigh, tt.cornerClass, got)
+		exp := contracts.Experiment{Verdict: tt.verdict, Extensions: tt.extensions}
+		if got := continues(exp) && exp.Extensions < experiments.MaxExtensions; got != tt.want {
+			t.Errorf("%s: extend %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }

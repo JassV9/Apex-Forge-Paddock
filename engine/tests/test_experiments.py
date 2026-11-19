@@ -32,13 +32,14 @@ TEST = {"channel": TIME, "rope": 0.005, "level": 0.9, "better": "lower"}
 
 
 def experiment_passes(
-    effects: dict[str, tuple[float, float]], seed: int = 7
+    effects: dict[str, tuple[float, float]], seed: int = 7, blocks: int = 8
 ) -> list[dict[str, Any]]:
-    """Passes of an A-B-A-B experiment; `effects` maps a channel to (variant effect, sigma)."""
+    """Passes of an A-B-A-B... experiment of `blocks` blocks (8: the first look, ADR 0029);
+    `effects` maps a channel to (variant effect, sigma)."""
     rng = np.random.default_rng(seed)
     passes: list[dict[str, Any]] = []
     for channel, (effect, sigma) in effects.items():
-        rows = simulate_abab(rng, effect, CORNERS, sigma=sigma)
+        rows = simulate_abab(rng, effect, CORNERS, sigma=sigma, blocks=blocks)
         if not passes:
             passes = [
                 {
@@ -48,7 +49,7 @@ def experiment_passes(
                     "lap": row.lap,
                     "speed_class": SPEED_CLASSES[row.corner % 3],
                     "metrics": {},
-                    "covariates": {"time_in_session_s": float(row.lap or 0) * 100.0},
+                    "covariates": {"time_since_start_s": float(row.lap or 0) * 100.0},
                 }
                 for row in rows
             ]
@@ -112,7 +113,7 @@ def test_results_carry_the_primary_effect_overall_and_per_speed_class() -> None:
     ]
     overall = primary[0]
     assert overall.ci_low < -0.060 < overall.ci_high
-    assert overall.n_passes == CORNERS * 12
+    assert overall.n_passes == CORNERS * 24
     assert sum(r.n_passes for r in primary[1:]) == overall.n_passes
 
 
@@ -212,7 +213,7 @@ def plan_request(baseline_passes: list[dict[str, Any]], laps: int = 3) -> PlanRe
     )
 
 
-def test_plan_is_four_blocks_and_says_what_it_can_detect() -> None:
+def test_plan_is_eight_blocks_and_says_what_it_can_detect() -> None:
     rng = np.random.default_rng(3)
     earlier = [
         {"corner": corner, "value": 5.0 + corner + float(rng.normal(0.0, 0.028))}
@@ -227,11 +228,15 @@ def test_plan_is_four_blocks_and_says_what_it_can_detect() -> None:
         (2, Arm.variant, 3),
         (3, Arm.baseline, 3),
         (4, Arm.variant, 3),
+        (5, Arm.baseline, 3),
+        (6, Arm.variant, 3),
+        (7, Arm.baseline, 3),
+        (8, Arm.variant, 3),
     ]
     assert result.sigma_source is SigmaSource.measured
     assert 0.015 < result.sigma < 0.045
-    assert result.passes_per_arm == 6
-    assert result.mde_detect == pytest.approx(minimum_detectable_effect(result.sigma, 6, CORNERS))
+    assert result.passes_per_arm == 12
+    assert result.mde_detect == pytest.approx(minimum_detectable_effect(result.sigma, 12, CORNERS))
     assert result.mde_decide > result.mde_detect > 0
 
 
@@ -263,7 +268,7 @@ def test_plan_and_evaluate_are_served_over_http() -> None:
     )
 
     assert planned.status_code == 200, planned.text
-    assert len(planned.json()["blocks"]) == 4
+    assert len(planned.json()["blocks"]) == 8
     assert judged.status_code == 200, judged.text
     assert judged.json()["decision"] == "accepted"
     assert client.post("/evaluate", json={"passes": []}).status_code == 422

@@ -10,7 +10,8 @@ import (
 
 // Evaluate sends the experiment's push-lap passes to the engine and applies its verdict.
 // The decision is the engine's, from the numbers and the test fixed before driving; core
-// only carries out what follows from it.
+// only carries out what follows from it. An experiment is judged only once every block of its
+// plan is driven, whoever asks (docs/adr/0029-block-level-inference-and-finding-classes.md).
 func (s *Service) Evaluate(ctx context.Context, id int64) (contracts.Experiment, error) {
 	exp, err := loadRecord(ctx, s.database, id, false)
 	if err != nil {
@@ -19,22 +20,11 @@ func (s *Service) Evaluate(ctx context.Context, id int64) (contracts.Experiment,
 	if exp.state != Running {
 		return contracts.Experiment{}, fmt.Errorf("experiment %d is %s, not running: %w", id, exp.state, ErrConflict)
 	}
-	passes, pending, err := blockPasses(ctx, s.database, id)
+	request, err := evaluateRequest(ctx, s.database, exp)
 	if err != nil {
 		return contracts.Experiment{}, err
 	}
-	if pending > 0 {
-		return contracts.Experiment{}, fmt.Errorf(
-			"experiment %d: the features of %d passes are not computed yet: %w", id, pending, ErrConflict)
-	}
-	predictions, err := readPredictions(ctx, s.database, id)
-	if err != nil {
-		return contracts.Experiment{}, fmt.Errorf("read predictions of experiment %d: %w", id, err)
-	}
-	reply, err := s.engine.Evaluate(ctx, contracts.EvaluateRequest{
-		SuccessTest: exp.test, Guardrails: exp.guardrails, Predictions: predictions,
-		DriverChannels: driverChannels, Passes: passes,
-	})
+	reply, err := s.engine.Evaluate(ctx, request)
 	if err != nil {
 		return contracts.Experiment{}, fmt.Errorf("evaluate experiment %d: %w", id, err)
 	}
@@ -43,21 +33,21 @@ func (s *Service) Evaluate(ctx context.Context, id int64) (contracts.Experiment,
 	})
 }
 
-// applyVerdict stores the engine's results and verdict and moves the experiment on.
+// applyVerdict stores the engine's verdict and its results and moves the experiment on.
 func applyVerdict(ctx context.Context, tx *sql.Tx, exp record, reply contracts.EvaluateResponse) error {
 	judged := fmt.Sprintf("%d passes judged, %d left out.", reply.PassesUsed, reply.PassesExcluded)
 	if err := move(ctx, tx, exp.id, exp.state, Evaluating, judged); err != nil {
 		return err
 	}
-	if err := saveResults(ctx, tx, exp.id, reply.Results); err != nil {
-		return err
-	}
-	err := addVerdict(ctx, tx, exp.id, verdict{
+	verdictID, err := addVerdict(ctx, tx, exp.id, verdict{
 		decision: contracts.VerdictSummaryDecision(reply.Decision), reason: reply.Reason,
 		hits: reply.PredictionHits, total: reply.PredictionTotal,
-		decidedBy: contracts.VerdictSummaryDecidedByEngine,
+		decidedBy: contracts.VerdictSummaryDecidedByEngine, finding: &reply,
 	})
 	if err != nil {
+		return err
+	}
+	if err := saveResults(ctx, tx, exp.id, verdictID, reply.EngineVersion, reply.Results); err != nil {
 		return err
 	}
 	decision := State(reply.Decision)

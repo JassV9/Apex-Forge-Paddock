@@ -94,7 +94,7 @@ export interface paths {
     };
     /**
      * The experiments the session's newest diagnosis names, ranked.
-     * @description Each change is ranked by the improvement the car's sensitivity profile expects of it per lap of driving. A change this car measured as negligible or as worse is listed under skipped with the reason; a prior from another car never rules a change out.
+     * @description Each change is ranked by the improvement the car's sensitivity profile expects of it per lap of driving, against the car's own rows on the session's track. A change this car measured as neutral or confirmed worse (pooled from at least three experiments, ADR 0033) is listed under skipped with the reason; a prior from another car is read from the profile's separate prior list and never rules a change out.
      */
     get: operations["getProposals"];
     put?: never;
@@ -118,7 +118,7 @@ export interface paths {
     put?: never;
     /**
      * Build a base setup from what the car measured, and propose the experiment that judges it.
-     * @description The baseline is the setup an experiment on this session would start from. A change goes in when the car's own pooled measurement on corner time over all corners lies wholly on the faster side of zero; never a prior, a row flagged non-linear, a change measured worse on a guardrail, or a paired item; one change per item, within its range. The prediction is the sum of the estimates with the summed variances; interactions were not measured, so the combination is judged as its own experiment (kind base) against the baseline. When nothing qualifies the answer is 409 with what the car measured.
+     * @description The baseline is the setup an experiment on this session would start from. A change goes in when the car's own random-effects row on corner time over all corners, on this track and for this driver, is confirmed or preliminary with its interval wholly on the faster side of zero, and passes Benjamini-Hochberg (q = 0.05) across every measured change of the car (ADR 0033); never a prior, a stale row, a row flagged non-linear, a change measured worse on a guardrail, or a paired item; one change per item, within its range. The prediction is the sum of the estimates shrunk towards zero (empirical Bayes) with the summed measured variances; interactions were not measured, so the combination is judged as its own experiment (kind base) against the baseline. When nothing qualifies the answer is 409 with what the car measured.
      */
     post: operations["buildBaseSetup"];
     delete?: never;
@@ -227,8 +227,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Every car's sensitivity profile, rebuilt from the finished experiments.
-     * @description One row per item, clicks, channel and corner class: pooled from the car's own finished one-factor experiments, or a prior from another car's item with the same job, flagged is_prior. The profiles are rebuilt and stored on every request.
+     * Every car's sensitivity profile, pooled from the finished experiments.
+     * @description Measured rows per item, clicks, channel, corner class, phase and stratum (track, driver, AI hint, baseline value, click size), pooled by random effects from the car's own finished one-factor experiments, each re-derived once per engine version, with a knowledge level and provenance (ADR 0033). Priors from another car's item with the same job are a separate list without a class; experiments not pooled (invalid, stale) are listed with the reason. A car's stored rows are replaced only when its profile changed.
      */
     get: operations["listSensitivity"];
     put?: never;
@@ -1092,7 +1092,7 @@ export interface components {
     };
     /**
      * SensitivityEffect
-     * @description What moving one setup item by some clicks does to one channel on this car: a pooled measurement, or a prior transferred from another car and flagged as one.
+     * @description What moving one setup item by some clicks does to one channel on this car, pooled from the car's own experiments in one stratum (track, driver, AI hint, baseline value, click size). Never a prior: those are SensitivityPrior.
      */
     SensitivityEffect: {
       /** @description Item id in the game's setup. */
@@ -1103,23 +1103,106 @@ export interface components {
       channel: string;
       /** @enum {string} */
       corner_class: "all" | "slow" | "medium" | "fast";
+      /** @description Corner phase the effect is measured over; corner for the whole corner. */
+      phase: string;
+      /** @description The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track. */
+      track: string;
+      /** @description What the dashboard calls the track. */
+      track_name: string;
+      /** @enum {string} */
+      driver: "ai" | "human";
+      /** @description The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver. */
+      hint_bucket: string;
+      /** @description Raw value of the item on the experiments' baseline. */
+      baseline_value?: number;
+      /** @description Raw size of one click of the item. */
+      click_step?: number;
       /** @description Variant minus baseline, in the channel's unit, per corner pass. */
       estimate: number;
       ci_low: number;
       ci_high: number;
-      n_passes: number;
-      /** @enum {string} */
+      /** @description Standard error of the estimate. */
+      standard_error: number;
+      /** @description One-sided p-value (or posterior probability) of an effect at most zero: small when the effect is clearly above zero; 1 - p_increase is the same for a decrease. */
+      p_increase: number;
+      /** @description Prediction interval for the effect in a new experiment (at least 3 experiments). */
+      pi_low?: number;
+      pi_high?: number;
+      /** @description Between-experiment standard deviation (Paule-Mandel; the posterior mean under the half-normal prior for 2 experiments). */
+      tau?: number;
+      /**
+       * @description single: one experiment, its own block-level t interval. half_normal: two experiments, random effects with a half-normal prior on tau scaled to the margin. hksj: three or more, Paule-Mandel tau and the Hartung-Knapp-Sidik-Jonkman interval with t(k-1).
+       * @enum {string}
+       */
+      method: "single" | "half_normal" | "hksj";
+      /** @description Experiments pooled. */
+      experiments: number;
+      /**
+       * @description What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.
+       * @enum {string}
+       */
+      knowledge_level: "confirmed" | "preliminary" | "neutral" | "insufficient";
+      /**
+       * @description The pooled interval against the margin: beyond it (positive, negative), inside it (negligible), or neither.
+       * @enum {string}
+       */
       effect_class: "positive" | "negative" | "negligible" | "inconclusive";
+      /** @description Margin of practical equivalence the row is judged against; absent when the channel has none. */
+      margin?: number;
+      n_passes: number;
       /** @description True when the item's other measured clicks show the response is not a straight line. */
       nonlinear: boolean;
-      /** @description Why it is flagged non-linear, or how a prior was derived; empty otherwise. */
+      /** @description Why it is flagged non-linear or stale; empty otherwise. */
       note: string;
-      /** @description True when this was not measured on this car. */
-      is_prior: boolean;
-      /** @description Name of the car a prior was transferred from; empty for a measurement. */
-      prior_source: string;
-      /** @description The experiments the measurement is pooled from; empty for a prior. */
+      /** @description True when no experiment of the row could be re-derived by the current engine (the ledger's numbers): never confirmed, neutral or preliminary. */
+      stale: boolean;
+      /** @description The experiments the row is pooled from. */
       experiment_ids: number[];
+      /** @description Engine versions that computed the pooled numbers; empty for stale rows judged before versions were recorded. */
+      engine_versions: string[];
+    };
+    /**
+     * SensitivityPrior
+     * @description Another car's measured effect for an item with the same job, shrunk towards zero and widened. A reason to test, never a measurement: it has no class and no knowledge level.
+     */
+    SensitivityPrior: {
+      /** @description This car's item. */
+      parameter: string;
+      /** @description Clicks moved; negative lowers the raw value. Never 0. */
+      clicks: number;
+      /** @description Metric id. */
+      channel: string;
+      /** @enum {string} */
+      corner_class: "all" | "slow" | "medium" | "fast";
+      /** @description Corner phase the effect is measured over; corner for the whole corner. */
+      phase: string;
+      /** @description Variant minus baseline, in the channel's unit, per corner pass. */
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+      /** @description Standard error of the estimate. */
+      standard_error: number;
+      /** @description Name of the car it was measured on. */
+      source_car: string;
+      /** @description Track of the lender's row. */
+      source_track: string;
+      source_experiments: number;
+      /** @description Share of the lender's effect kept (similarity of the cars). */
+      weight: number;
+      note: string;
+    };
+    /**
+     * ExcludedMeasurement
+     * @description An experiment that was not pooled, and why.
+     */
+    ExcludedMeasurement: {
+      experiment_id: number;
+      /**
+       * @description invalid: its finding is invalid. few_blocks: fewer than 3 block degrees of freedom (a 4-block experiment), while other experiments of its stratum have more; its error is too uncertain to weight it. stale: not re-derived by the current engine, while other experiments of its stratum were.
+       * @enum {string}
+       */
+      kind: "invalid" | "few_blocks" | "stale";
+      reason: string;
     };
     /**
      * SensitivityProfile
@@ -1135,8 +1218,12 @@ export interface components {
       labels: {
         [key: string]: string;
       };
-      /** @description Measurements first, then priors. */
+      /** @description The car's own measurements, pooled per stratum. Never a prior. */
       effects: components["schemas"]["SensitivityEffect"][];
+      /** @description Other cars' effects, shown apart and labelled; never a measurement. */
+      priors: components["schemas"]["SensitivityPrior"][];
+      /** @description Experiments that were not pooled. */
+      excluded: components["schemas"]["ExcludedMeasurement"][];
     };
     /**
      * SourceScore

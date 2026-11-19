@@ -33,7 +33,37 @@ class CornerClass(StrEnum):
     fast = "fast"
 
 
+class Driver(StrEnum):
+    ai = "ai"
+    human = "human"
+
+
+class Method(StrEnum):
+    """
+    single: one experiment, its own block-level t interval. half_normal: two experiments, random effects with a half-normal prior on tau scaled to the margin. hksj: three or more, Paule-Mandel tau and the Hartung-Knapp-Sidik-Jonkman interval with t(k-1).
+    """
+
+    single = "single"
+    half_normal = "half_normal"
+    hksj = "hksj"
+
+
+class KnowledgeLevel(StrEnum):
+    """
+    What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.
+    """
+
+    confirmed = "confirmed"
+    preliminary = "preliminary"
+    neutral = "neutral"
+    insufficient = "insufficient"
+
+
 class EffectClass(StrEnum):
+    """
+    The pooled interval against the margin: beyond it (positive, negative), inside it (negligible), or neither.
+    """
+
     positive = "positive"
     negative = "negative"
     negligible = "negligible"
@@ -42,7 +72,7 @@ class EffectClass(StrEnum):
 
 class SensitivityEffect(BaseModel):
     """
-    What moving one setup item by some clicks does to one channel on this car: a pooled measurement, or a prior transferred from another car and flagged as one.
+    What moving one setup item by some clicks does to one channel on this car, pooled from the car's own experiments in one stratum (track, driver, AI hint, baseline value, click size). Never a prior: those are SensitivityPrior.
     """
 
     model_config = ConfigDict(
@@ -52,28 +82,119 @@ class SensitivityEffect(BaseModel):
     clicks: int = Field(..., description="Clicks moved; negative lowers the raw value. Never 0.")
     channel: str = Field(..., description="Metric id.", min_length=1)
     corner_class: CornerClass
+    phase: str = Field(
+        ...,
+        description="Corner phase the effect is measured over; corner for the whole corner.",
+        min_length=1,
+    )
+    track: str = Field(
+        ...,
+        description="The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track.",
+        min_length=1,
+    )
+    track_name: str = Field(..., description="What the dashboard calls the track.")
+    driver: Driver
+    hint_bucket: str = Field(
+        ...,
+        description="The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver.",
+        min_length=1,
+    )
+    baseline_value: float | None = Field(
+        None, description="Raw value of the item on the experiments' baseline."
+    )
+    click_step: float | None = Field(None, description="Raw size of one click of the item.", gt=0.0)
     estimate: float = Field(
         ..., description="Variant minus baseline, in the channel's unit, per corner pass."
     )
     ci_low: float
     ci_high: float
+    standard_error: float = Field(..., description="Standard error of the estimate.", ge=0.0)
+    p_increase: float = Field(
+        ...,
+        description="One-sided p-value (or posterior probability) of an effect at most zero: small when the effect is clearly above zero; 1 - p_increase is the same for a decrease.",
+        ge=0.0,
+        le=1.0,
+    )
+    pi_low: float | None = Field(
+        None,
+        description="Prediction interval for the effect in a new experiment (at least 3 experiments).",
+    )
+    pi_high: float | None = None
+    tau: float | None = Field(
+        None,
+        description="Between-experiment standard deviation (Paule-Mandel; the posterior mean under the half-normal prior for 2 experiments).",
+        ge=0.0,
+    )
+    method: Method = Field(
+        ...,
+        description="single: one experiment, its own block-level t interval. half_normal: two experiments, random effects with a half-normal prior on tau scaled to the margin. hksj: three or more, Paule-Mandel tau and the Hartung-Knapp-Sidik-Jonkman interval with t(k-1).",
+    )
+    experiments: int = Field(..., description="Experiments pooled.", ge=1)
+    knowledge_level: KnowledgeLevel = Field(
+        ...,
+        description="What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.",
+    )
+    effect_class: EffectClass = Field(
+        ...,
+        description="The pooled interval against the margin: beyond it (positive, negative), inside it (negligible), or neither.",
+    )
+    margin: float | None = Field(
+        None,
+        description="Margin of practical equivalence the row is judged against; absent when the channel has none.",
+        gt=0.0,
+    )
     n_passes: int = Field(..., ge=0)
-    effect_class: EffectClass
     nonlinear: bool = Field(
         ...,
         description="True when the item's other measured clicks show the response is not a straight line.",
     )
-    note: str = Field(
+    note: str = Field(..., description="Why it is flagged non-linear or stale; empty otherwise.")
+    stale: bool = Field(
         ...,
-        description="Why it is flagged non-linear, or how a prior was derived; empty otherwise.",
-    )
-    is_prior: bool = Field(..., description="True when this was not measured on this car.")
-    prior_source: str = Field(
-        ..., description="Name of the car a prior was transferred from; empty for a measurement."
+        description="True when no experiment of the row could be re-derived by the current engine (the ledger's numbers): never confirmed, neutral or preliminary.",
     )
     experiment_ids: list[int] = Field(
-        ..., description="The experiments the measurement is pooled from; empty for a prior."
+        ..., description="The experiments the row is pooled from.", min_length=1
     )
+    engine_versions: list[str] = Field(
+        ...,
+        description="Engine versions that computed the pooled numbers; empty for stale rows judged before versions were recorded.",
+    )
+
+
+class SensitivityPrior(BaseModel):
+    """
+    Another car's measured effect for an item with the same job, shrunk towards zero and widened. A reason to test, never a measurement: it has no class and no knowledge level.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    parameter: str = Field(..., description="This car's item.", min_length=1)
+    clicks: int = Field(..., description="Clicks moved; negative lowers the raw value. Never 0.")
+    channel: str = Field(..., description="Metric id.", min_length=1)
+    corner_class: CornerClass
+    phase: str = Field(
+        ...,
+        description="Corner phase the effect is measured over; corner for the whole corner.",
+        min_length=1,
+    )
+    estimate: float = Field(
+        ..., description="Variant minus baseline, in the channel's unit, per corner pass."
+    )
+    ci_low: float
+    ci_high: float
+    standard_error: float = Field(..., description="Standard error of the estimate.", ge=0.0)
+    source_car: str = Field(..., description="Name of the car it was measured on.", min_length=1)
+    source_track: str = Field(..., description="Track of the lender's row.")
+    source_experiments: int = Field(..., ge=1)
+    weight: float = Field(
+        ...,
+        description="Share of the lender's effect kept (similarity of the cars).",
+        gt=0.0,
+        le=1.0,
+    )
+    note: str
 
 
 class ProposeRequest(BaseModel):
@@ -87,7 +208,9 @@ class ProposeRequest(BaseModel):
     candidates: list[ProposeCandidate] = Field(
         ..., description="Candidates of the session's latest diagnosis, one per item and clicks."
     )
-    effects: list[SensitivityEffect] = Field(..., description="The car's sensitivity profile.")
+    effects: list[SensitivityEffect] = Field(
+        ..., description="The car's own measured rows of the session's track and driver."
+    )
     channel: str = Field(..., description="The channel experiments are judged on.", min_length=1)
     better: Better
     rope: float = Field(..., description="Band of practical equivalence of that channel.", ge=0.0)
@@ -95,3 +218,6 @@ class ProposeRequest(BaseModel):
     corners: int = Field(..., ge=1)
     laps_per_block: int = Field(..., ge=1)
     experiments: int = Field(..., description="Finished experiments on this car.", ge=0)
+    priors: list[SensitivityPrior] = Field(
+        ..., description="Other cars' effects, read only as priors."
+    )

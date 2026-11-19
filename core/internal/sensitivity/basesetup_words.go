@@ -58,13 +58,14 @@ func predictionSpec(prediction contracts.BaseSetupPrediction) contracts.Predicti
 // nothingQualifies says why there is no base setup, and what to do about it.
 func nothingQualifies(chosen contracts.BaseSetup) string {
 	const advice = "Train the AI on this car (free laps), then let it drive one-item experiments; " +
-		"a change goes into a base setup once its interval on %s lies wholly on the better side of zero."
+		"a change goes into a base setup once its interval on %s lies wholly on the better side of zero " +
+		"and it holds up against every other measured change (Benjamini-Hochberg)."
 	if len(chosen.Measured) == 0 {
 		return "This car has measured nothing yet. " + fmt.Sprintf(advice, chosen.Channel)
 	}
 	measured := make([]string, len(chosen.Measured))
 	for i, row := range chosen.Measured {
-		measured[i] = fmt.Sprintf("%s %+d %s", row.Label, row.Clicks, row.EffectClass)
+		measured[i] = fmt.Sprintf("%s %+d %s (%d experiments)", row.Label, row.Clicks, row.KnowledgeLevel, row.Experiments)
 	}
 	return fmt.Sprintf("No measured change qualifies. Measured on this car: %s. ", strings.Join(measured, "; ")) +
 		fmt.Sprintf(advice, chosen.Channel)

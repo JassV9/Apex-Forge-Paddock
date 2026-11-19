@@ -1,8 +1,11 @@
-"""Real AI experiments 11, 12 and 15 to 19 (Formula Hybrid 2026, Hungaroring), as core sends them.
+"""Real AI experiments 7, 11, 12 and 15 to 19 (Formula Hybrid 2026, Hungaroring), as core sends
+them.
 
-fixtures/real_experiments.csv.gz holds every push-lap pass of those experiments, exported
-read-only from the ledger on 2026-11-18. `requests` builds the evaluate request the way
-core/internal/experiments/verdict.go does since ADR 0029: valid passes on the arm's setup, laps
+fixtures/real_experiments.csv.gz holds every push-lap pass of 11, 12 and 15 to 19, exported
+read-only from the ledger on 2026-11-18; fixtures/rear_arb_7.csv.gz the same columns for
+experiment 7 (rear ARB +1, four blocks, the first of the four pooled rear ARB runs, ADR 0033).
+`requests` builds the evaluate request the way core/internal/experiments/verdict.go does since
+ADR 0029: valid passes on the arm's setup, laps
 coded per block in the order they were driven, time since the experiment's first push pass, a
 session term per game session after the first, and off-track passes counted per block.
 """
@@ -12,7 +15,10 @@ import gzip
 from pathlib import Path
 from typing import Any
 
-FIXTURE = Path(__file__).parent / "fixtures" / "real_experiments.csv.gz"
+FIXTURES = [
+    Path(__file__).parent / "fixtures" / name
+    for name in ("real_experiments.csv.gz", "rear_arb_7.csv.gz")
+]
 EXPERIMENTS = (11, 12, 15, 16, 17, 18, 19)
 METRICS = (
     "corner_time_s",
@@ -31,8 +37,11 @@ DRIVER_CHANNELS = ["brake_dist_m", "throttle_pickup_m", "steer_corrections_per_s
 
 
 def rows(experiment: int) -> list[dict[str, str]]:
-    with gzip.open(FIXTURE, "rt", encoding="utf-8", newline="") as handle:
-        return [row for row in csv.DictReader(handle) if int(row["experiment"]) == experiment]
+    out = []
+    for fixture in FIXTURES:
+        with gzip.open(fixture, "rt", encoding="utf-8", newline="") as handle:
+            out += [row for row in csv.DictReader(handle) if int(row["experiment"]) == experiment]
+    return out
 
 
 def _number(text: str) -> float | None:

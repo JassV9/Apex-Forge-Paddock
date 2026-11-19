@@ -1,7 +1,7 @@
 # Ghost Driver reliability and vehicle sensitivity: audit, findings and experiment design
 
 Date: 2026-11-18. Status: Phase 1 (audit) and Phase 2 (design) complete; implementation tracked in
-the ADRs this document names. C2, C3, C5, C6, C7, I2, I3, I4 (Holm, classes) and I5 are implemented
+the ADRs this document names. I1, I11, I12 and I13 are implemented in [ADR 0033](../adr/0033-stratified-vehicle-sensitivity-profile.md). C2, C3, C5, C6, C7, I2, I3, I4 (Holm, classes) and I5 are implemented
 in [ADR 0029](../adr/0029-block-level-inference-and-finding-classes.md) and
 [ADR 0030](../adr/0030-append-only-results-and-engine-version.md); the boundaries of section 7
 were recomputed (z = 2.135, 1.926, 1.752) and the verdict spends 70 % of the 5 %. Four independent read-only audits (statistics, AI behaviour,

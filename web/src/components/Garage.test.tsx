@@ -3,22 +3,37 @@ import { describe, expect, it } from "vitest";
 
 import type { SensitivityEffect, SensitivityProfile } from "../api/client";
 import { Garage } from "./Garage";
+import type { SensitivityPrior } from "./GarageRows";
 
 const measured: SensitivityEffect = {
   parameter: "ARB_FRONT",
   clicks: -1,
   channel: "corner_time_s",
   corner_class: "all",
+  phase: "corner",
+  track: "fn_hungaroring/layout_f1_2026",
+  track_name: "Hungaroring F1 2026",
+  driver: "ai",
+  hint_bucket: "0.94",
+  baseline_value: 3,
+  click_step: 1,
   estimate: -0.021,
   ci_low: -0.026,
   ci_high: -0.016,
-  n_passes: 168,
+  standard_error: 0.002,
+  p_increase: 0.999,
+  tau: 0.0012,
+  method: "hksj",
+  experiments: 3,
+  knowledge_level: "confirmed",
   effect_class: "negative",
+  margin: 0.005,
+  n_passes: 168,
   nonlinear: false,
   note: "",
-  is_prior: false,
-  prior_source: "",
-  experiment_ids: [3, 8],
+  stale: false,
+  experiment_ids: [3, 8, 11],
+  engine_versions: ["0.2.0"],
 };
 
 const wing: SensitivityEffect = {
@@ -29,95 +44,131 @@ const wing: SensitivityEffect = {
   ci_low: 0.011,
   ci_high: 0.019,
   n_passes: 84,
+  method: "single",
+  experiments: 1,
+  tau: undefined,
+  knowledge_level: "preliminary",
   effect_class: "positive",
   nonlinear: true,
   note: "+1 and -1 clicks are not mirror images of each other.",
   experiment_ids: [9],
 };
 
-const borrowed: SensitivityEffect = {
+const stale: SensitivityEffect = {
   ...measured,
   parameter: "ARB_REAR",
   clicks: 1,
+  driver: "human",
+  hint_bucket: "none",
+  method: "single",
+  experiments: 1,
+  knowledge_level: "insufficient",
+  effect_class: "inconclusive",
+  stale: true,
+  note: "Not re-derived by the current engine (the ledger's numbers): never more than insufficient.",
+  experiment_ids: [7],
+  engine_versions: [],
+};
+
+const borrowed: SensitivityPrior = {
+  parameter: "CAMBER_F",
+  clicks: 1,
+  channel: "corner_time_s",
+  corner_class: "all",
+  phase: "corner",
   estimate: -0.008,
   ci_low: -0.03,
   ci_high: 0.014,
-  n_passes: 0,
-  effect_class: "inconclusive",
-  is_prior: true,
-  prior_source: "Formula Alpha 2025",
+  standard_error: 0.013,
+  source_car: "Formula Alpha 2025",
+  source_track: "fn_cota/layout_f1_2026",
+  source_experiments: 2,
+  weight: 0.5,
   note: "Prior from Formula Alpha 2025, not measured on this car.",
-  experiment_ids: [],
 };
 
 const mazda: SensitivityProfile = {
   car_id: 1,
   car_name: "Mazda MX-5 Cup",
-  experiments: 3,
-  model_version: "inverse-variance-pool-1",
-  labels: { ARB_FRONT: "Front ARB", ARB_REAR: "Rear ARB" },
-  effects: [measured, wing, borrowed],
+  experiments: 5,
+  model_version: "random-effects-hksj-1",
+  labels: { ARB_FRONT: "Front ARB", ARB_REAR: "Rear ARB", CAMBER_F: "Front camber" },
+  effects: [measured, wing, stale],
+  priors: [borrowed],
+  excluded: [{ experiment_id: 4, kind: "invalid", reason: "Its finding is invalid." }],
 };
 
 const untested: SensitivityProfile = {
   car_id: 2,
   car_name: "Ferrari F2026",
   experiments: 0,
-  model_version: "inverse-variance-pool-1",
+  model_version: "random-effects-hksj-1",
   labels: {},
   effects: [],
+  priors: [],
+  excluded: [],
 };
 
 function rowOf(text: RegExp): HTMLElement {
   return screen.getByText(text).closest("tr") as HTMLElement;
 }
 
+async function show(profiles: SensitivityProfile[], car = "Mazda MX-5 Cup"): Promise<HTMLElement> {
+  render(<Garage carName={car} loadProfiles={() => Promise.resolve(profiles)} />);
+  return screen.findByRole("region", { name: car });
+}
+
 describe("Garage", () => {
-  it("shows a measured effect with its interval and what it rests on", async () => {
-    render(
-      <Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([mazda, untested])} />,
-    );
+  it("shows a measured row with its knowledge level, stratum and provenance", async () => {
+    const car = await show([mazda, untested]);
 
-    const car = await screen.findByRole("region", { name: "Mazda MX-5 Cup" });
-
-    expect(within(car).getByText(/3 judged experiments/)).toBeVisible();
-    expect(within(car).getByText("inverse-variance-pool-1")).toBeVisible();
+    expect(within(car).getByText(/5 judged experiments/)).toBeVisible();
+    expect(within(car).getByText("random-effects-hksj-1")).toBeVisible();
     const row = rowOf(/Front ARB −1 click/);
     expect(within(row).getByText("−0.021 [−0.026, −0.016]")).toBeVisible();
-    expect(within(row).getByText("Lowers it")).toBeVisible();
-    expect(within(row).getByText("Measured: 2 experiments, 168 passes")).toBeVisible();
+    expect(within(row).getByText("Confirmed on this car")).toBeVisible();
+    expect(within(row).getByText("Hungaroring F1 2026, AI, hint 0.94, from 3")).toBeVisible();
+    expect(
+      within(row).getByText(
+        "3 experiments (3, 8, 11), random effects, HKSJ, tau 0.0012; engine 0.2.0; 168 passes",
+      ),
+    ).toBeVisible();
     expect(row).not.toHaveClass("prior");
   });
 
-  it("words a borrowed effect as a prior, never as a measurement", async () => {
-    render(<Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([mazda])} />);
+  it("lists priors apart and labelled, never among the measurements", async () => {
+    const car = await show([mazda]);
 
-    await screen.findByRole("region", { name: "Mazda MX-5 Cup" });
-    const row = rowOf(/Rear ARB \+1 click/);
-
+    const priors = within(car).getByRole("region", { name: "Priors from other cars" });
+    expect(within(priors).getByText(/not measured on this car/, { selector: "h4" })).toBeVisible();
+    const row = within(priors)
+      .getByText(/Front camber \+1 click/)
+      .closest("tr") as HTMLElement;
     expect(row).toHaveClass("prior");
     expect(
-      within(row).getByText("Prior from Formula Alpha 2025, not measured on this car"),
+      within(row).getByText(/Prior from Formula Alpha 2025, not measured on this car/),
     ).toBeVisible();
-    expect(within(row).queryByText(/Measured/)).toBeNull();
-    expect(within(row).getByText("Inconclusive")).toBeVisible();
     expect(row.querySelector("svg")).toHaveClass("interval-prior");
+    expect(within(row).queryByText(/Confirmed|Preliminary|Neutral|Insufficient/)).toBeNull();
+    const [measuredTable] = within(car).getAllByRole("table") as [HTMLElement, ...HTMLElement[]];
+    expect(within(measuredTable).queryByText(/Front camber/)).toBeNull();
   });
 
-  it("flags a response that is not a straight line, and falls back to the item id", async () => {
-    render(<Garage carName="Mazda MX-5 Cup" loadProfiles={() => Promise.resolve([mazda])} />);
+  it("marks a stale row, flags a curve, and names the experiments left out", async () => {
+    const car = await show([mazda]);
 
-    await screen.findByRole("region", { name: "Mazda MX-5 Cup" });
-    const row = rowOf(/WING_REAR \+1 click/);
-
-    expect(within(row).getByText("non-linear")).toBeVisible();
-    expect(within(row).getByText(/not mirror images/)).toBeVisible();
+    const old = rowOf(/Rear ARB \+1 click/);
+    expect(within(old).getByText("stale")).toBeVisible();
+    expect(within(old).getByText("Insufficient evidence")).toBeVisible();
+    expect(within(old).getByText(/ledger numbers, no engine version/)).toBeVisible();
+    const bent = rowOf(/WING_REAR \+1 click/);
+    expect(within(bent).getByText("non-linear")).toBeVisible();
+    expect(within(bent).getByText(/not mirror images/)).toBeVisible();
+    expect(within(car).getByText(/Experiment 4 not pooled \(invalid\)/)).toBeVisible();
   });
 
   it("says so when a car has nothing measured", async () => {
-    render(<Garage carName="Ferrari F2026" loadProfiles={() => Promise.resolve([untested])} />);
-
-    const car = await screen.findByRole("region", { name: "Ferrari F2026" });
+    const car = await show([untested], "Ferrari F2026");
 
     expect(within(car).getByText(/Nothing measured yet/)).toBeVisible();
     expect(within(car).queryByRole("table")).toBeNull();

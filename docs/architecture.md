@@ -243,29 +243,43 @@ The rules, the thresholds and what was rejected are in
 
 ## The learning path (phase 5)
 
-1. **Gather.** `GET /sensitivity`. Core reads the `result` rows of every finished one-factor
-   experiment, per car. Experiments still being driven, aborted ones and champion re-checks
-   are left out.
-2. **Pool.** The engine (`POST /sensitivity/update`) pools repeated experiments on one
-   change by precision, classes the interval against the experiments' band of practical
-   equivalence, and flags a response that is not mirrored or does not double.
-3. **Borrow.** For a car another car can lend to, core asks again with the lender's
-   measured effects on the item that does the same job. The engine returns them shrunk,
-   widened and flagged `is_prior`; the car's own measurement always replaces a prior.
-4. **Keep.** Core replaces the rows of `sensitivity_effect` in one transaction, with the
-   method's `model_version`. The table is a record of the newest derivation, not a source.
+1. **Gather.** `GET /sensitivity`. Every finished one-factor experiment is re-derived once per
+   engine version: core rebuilds the evaluate request its verdict was judged on
+   (`experiments.ReplayRequest`) and the engine (`POST /sensitivity/measure`) returns its finding
+   and, per pooled channel and speed class, the block-level estimate with its standard error and
+   degrees of freedom; core keeps it in `sensitivity_derivation` / `sensitivity_measurement`. An
+   experiment that cannot be replayed is read from the ledger and marked stale. Each experiment
+   carries its stratum: track (a `_paddock` copy is its layout), driver, AI hint bucket (pin or
+   run context), the item's baseline value and click size.
+2. **Pool.** The engine (`POST /sensitivity/update`) pools per stratum by random effects
+   (Paule-Mandel tau and HKSJ with t(k-1) from 3 experiments, a half-normal tau prior for 2, the
+   experiment itself for 1), never pooling an invalid experiment, a 4-block one beside longer
+   ones, or a stale one beside re-derived ones, and gives each row a knowledge level
+   (confirmed, preliminary, neutral, insufficient) and its provenance. Non-linearity is flagged
+   as before.
+3. **Borrow.** For a car another car can lend to, core asks again with the lender's rows on the
+   item that does the same job. The engine returns them as priors in their own list
+   (`SensitivityPrior`, no class, no level); the car's own measurement in any stratum replaces
+   a prior.
+4. **Keep.** Core stores the rows in `sensitivity_effect` and the priors in `sensitivity_prior`,
+   replacing a car's rows only when its pooled profile changed (a hash per car in
+   `sensitivity_profile`). The tables are a record of the newest derivation, not a source.
 5. **Rank.** `GET /sessions/{id}/proposals` sends the candidates of the session's newest
-   diagnosis and the car's profile to `POST /propose`. The engine orders them by expected
-   gain per lap and lists a change the car measured as negligible or worse as skipped.
+   diagnosis, the car's rows on the session's track and, apart, its priors to `POST /propose`.
+   The engine orders them by expected gain per lap and lists a change pooled as neutral or
+   confirmed worse as skipped.
 6. **Score.** `GET /scorecard` counts the predictions that came true, in SQL.
 
-Why it is built this way, and what is missing (the 20+ experiment optimizer, tracks and
-conditions), is in [ADR 0011](adr/0011-sensitivity-and-ranking.md).
+Why it is built this way, and what is missing (the 20+ experiment optimizer, conditions), is in
+[ADR 0011](adr/0011-sensitivity-and-ranking.md) and
+[ADR 0033](adr/0033-stratified-vehicle-sensitivity-profile.md).
 
 7. **Base setup.** `POST /sessions/{id}/base-setup` sends the car's profile and the
    baseline's items (each marked when it is one of a pair) to `POST /base-setup`. The engine
-   takes each change measured on corner time over all corners with its interval wholly
-   below zero, one per item, and predicts the sum with summed variances. Core proposes an
+   takes each change confirmed or preliminary on corner time over all corners on this track
+   with its interval wholly below zero that passes Benjamini-Hochberg (q = 0.05) across the
+   car's measured changes, one per item, and predicts the sum of the estimates shrunk towards
+   zero (empirical Bayes) with the summed measured variances (ADR 0033). Core proposes an
    experiment of kind `base` (baseline against the base setup) with that prediction, or
    answers 409 with what the car measured. Accepted, the base is the champion
    ([ADR 0018](adr/0018-base-setup.md)).

@@ -95,9 +95,10 @@ paths:
       summary: The experiments the session's newest diagnosis names, ranked.
       description: >
         Each change is ranked by the improvement the car's sensitivity profile expects of
-        it per lap of driving. A change this car measured as negligible or as worse is
-        listed under skipped with the reason; a prior from another car never rules a
-        change out.
+        it per lap of driving, against the car's own rows on the session's track. A change
+        this car measured as neutral or confirmed worse (pooled from at least three
+        experiments, ADR 0033) is listed under skipped with the reason; a prior from another
+        car is read from the profile's separate prior list and never rules a change out.
       responses:
         "200":
           description: Ranked and skipped candidates.
@@ -117,13 +118,15 @@ paths:
       summary: Build a base setup from what the car measured, and propose the experiment that judges it.
       description: >
         The baseline is the setup an experiment on this session would start from. A change
-        goes in when the car's own pooled measurement on corner time over all corners lies
-        wholly on the faster side of zero; never a prior, a row flagged non-linear, a change
-        measured worse on a guardrail, or a paired item; one change per item, within its
-        range. The prediction is the sum of the estimates with the summed variances;
-        interactions were not measured, so the combination is judged as its own experiment
-        (kind base) against the baseline. When nothing qualifies the answer is 409 with what
-        the car measured.
+        goes in when the car's own random-effects row on corner time over all corners, on
+        this track and for this driver, is confirmed or preliminary with its interval wholly
+        on the faster side of zero, and passes Benjamini-Hochberg (q = 0.05) across every
+        measured change of the car (ADR 0033); never a prior, a stale row, a row flagged
+        non-linear, a change measured worse on a guardrail, or a paired item; one change per
+        item, within its range. The prediction is the sum of the estimates shrunk towards zero
+        (empirical Bayes) with the summed measured variances; interactions were not measured,
+        so the combination is judged as its own experiment (kind base) against the baseline.
+        When nothing qualifies the answer is 409 with what the car measured.
       requestBody:
         required: true
         content:
@@ -263,11 +266,15 @@ paths:
   /sensitivity:
     get:
       operationId: listSensitivity
-      summary: Every car's sensitivity profile, rebuilt from the finished experiments.
+      summary: Every car's sensitivity profile, pooled from the finished experiments.
       description: >
-        One row per item, clicks, channel and corner class: pooled from the car's own
-        finished one-factor experiments, or a prior from another car's item with the same
-        job, flagged is_prior. The profiles are rebuilt and stored on every request.
+        Measured rows per item, clicks, channel, corner class, phase and stratum (track,
+        driver, AI hint, baseline value, click size), pooled by random effects from the car's
+        own finished one-factor experiments, each re-derived once per engine version, with a
+        knowledge level and provenance (ADR 0033). Priors from another car's item with the
+        same job are a separate list without a class; experiments not pooled (invalid, stale)
+        are listed with the reason. A car's stored rows are replaced only when its profile
+        changed.
       responses:
         "200":
           description: One profile per car.

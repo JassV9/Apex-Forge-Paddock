@@ -1,6 +1,7 @@
 # ADR 0011: A sensitivity profile that is re-derived, priors that are flagged, and a ranking that explains itself
 
-Status: accepted (2026-11-12)
+Status: accepted (2026-11-12). Pooling, the profile key, priors and the stored rows amended by
+[ADR 0033](0033-stratified-vehicle-sensitivity-profile.md).
 
 ## Context
 

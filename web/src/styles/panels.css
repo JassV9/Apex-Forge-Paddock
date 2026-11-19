@@ -199,7 +199,8 @@ section[aria-label="Scorecard"] table {
   font-size: 0.8rem;
 }
 
-tr.prior td {
+tr.prior td,
+tr.stale td {
   color: var(--muted);
 }
 

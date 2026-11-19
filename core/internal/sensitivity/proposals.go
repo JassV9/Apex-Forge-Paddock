@@ -52,7 +52,11 @@ func (s *Service) Proposals(ctx context.Context, sessionID int64) (contracts.Pro
 	if err != nil {
 		return contracts.Proposals{}, err
 	}
-	request := proposeRequest(candidatesOf(diagnosis, menu), carID, profiles)
+	track, err := sessionTrack(ctx, s.database, sessionID)
+	if err != nil {
+		return contracts.Proposals{}, err
+	}
+	request := proposeRequest(candidatesOf(diagnosis, menu), carID, track, profiles)
 	request.Sigma, request.Corners = sigma, max(corners, 1)
 	proposals, err := s.engine.Propose(ctx, request)
 	if err != nil {
@@ -61,16 +65,19 @@ func (s *Service) Proposals(ctx context.Context, sessionID int64) (contracts.Pro
 	return proposals, nil
 }
 
-func proposeRequest(candidates []contracts.ProposeCandidate, carID int64, profiles []contracts.SensitivityProfile) contracts.ProposeRequest {
+// proposeRequest ranks against the car's own rows on the session's track (any driver) and, apart,
+// the priors other cars lend it.
+func proposeRequest(candidates []contracts.ProposeCandidate, carID int64, track string, profiles []contracts.SensitivityProfile) contracts.ProposeRequest {
 	test := experiments.DefaultTest()
 	request := contracts.ProposeRequest{
-		Candidates: candidates, Effects: []contracts.SensitivityEffect{},
+		Candidates: candidates, Effects: []contracts.SensitivityEffect{}, Priors: []contracts.SensitivityPrior{},
 		Channel: test.Channel, Better: contracts.ProposeRequestBetter(test.Better), Rope: test.Rope,
 		LapsPerBlock: experiments.DefaultLapsPerBlock,
 	}
 	for _, profile := range profiles {
 		if int64(profile.CarId) == carID {
-			request.Effects, request.Experiments = profile.Effects, profile.Experiments
+			request.Effects, request.Experiments = onTrack(profile.Effects, track, ""), profile.Experiments
+			request.Priors = profile.Priors
 		}
 	}
 	return request

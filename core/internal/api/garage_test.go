@@ -22,6 +22,7 @@ func (f *fakeGarage) Profiles(context.Context) ([]contracts.SensitivityProfile, 
 	return []contracts.SensitivityProfile{{
 		CarId: 1, CarName: "Mazda MX-5 Cup", ModelVersion: "m-1",
 		Labels: contracts.SensitivityProfileLabels{}, Effects: []contracts.SensitivityEffect{},
+		Priors: []contracts.SensitivityPrior{}, Excluded: []contracts.ExcludedMeasurement{},
 	}}, f.err
 }
 

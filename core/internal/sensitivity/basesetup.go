@@ -47,7 +47,7 @@ func (b *BaseSetups) Build(ctx context.Context, sessionID int64, driver contract
 	if err != nil {
 		return contracts.BaseSetupReply{}, err
 	}
-	request, carName, err := b.request(ctx, sessionID)
+	request, carName, err := b.request(ctx, sessionID, string(driver))
 	if err != nil {
 		return contracts.BaseSetupReply{}, err
 	}
@@ -74,9 +74,10 @@ func (b *BaseSetups) Build(ctx context.Context, sessionID int64, driver contract
 	return reply, nil
 }
 
-// request is the engine's question: the car's profile and the baseline's changeable items,
-// each marked when it is one of a pair.
-func (b *BaseSetups) request(ctx context.Context, sessionID int64) (contracts.BaseSetupRequest, string, error) {
+// request is the engine's question: the car's own rows on the session's track for the driver
+// who will drive the base experiment, the priors (only to be listed as left out) and the
+// baseline's changeable items, each marked when it is one of a pair.
+func (b *BaseSetups) request(ctx context.Context, sessionID int64, driver string) (contracts.BaseSetupRequest, string, error) {
 	carID, err := carOfSession(ctx, b.garage.database, sessionID)
 	if err != nil {
 		return contracts.BaseSetupRequest{}, "", err
@@ -93,16 +94,22 @@ func (b *BaseSetups) request(ctx context.Context, sessionID int64) (contracts.Ba
 	if err != nil {
 		return contracts.BaseSetupRequest{}, "", err
 	}
+	track, err := sessionTrack(ctx, b.garage.database, sessionID)
+	if err != nil {
+		return contracts.BaseSetupRequest{}, "", err
+	}
 	test := experiments.DefaultTest()
 	request := contracts.BaseSetupRequest{
-		Effects: []contracts.SensitivityEffect{}, Items: baseItems(items, carByID(cars, carID)),
+		Effects: []contracts.SensitivityEffect{}, Priors: []contracts.SensitivityPrior{},
+		Items:   baseItems(items, carByID(cars, carID)),
 		Channel: test.Channel, Better: contracts.BaseSetupRequestBetter(test.Better), Rope: test.Rope,
 		Level: test.Level, Guardrails: experiments.DefaultGuardrails(),
 	}
 	carName := ""
 	for _, profile := range profiles {
 		if int64(profile.CarId) == carID {
-			request.Effects, carName = profile.Effects, profile.CarName
+			request.Effects, request.Priors = onTrack(profile.Effects, track, driver), profile.Priors
+			carName = profile.CarName
 		}
 	}
 	return request, carName, nil

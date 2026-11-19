@@ -4,6 +4,29 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Engine, core and web (ADR 0033, audit findings I1, I11, I12, I13): a stratified vehicle
+  sensitivity profile. Each finished one-item experiment is re-derived once per engine version
+  (`POST /sensitivity/measure`: finding, block-level estimate, standard error and degrees of
+  freedom per pooled channel and speed class) and kept in `sensitivity_derivation` /
+  `sensitivity_measurement`; one that cannot be replayed is read from the ledger and marked
+  stale. Rows are pooled per stratum (track with its `_paddock` copy, driver, AI hint bucket,
+  baseline value, click size, corner class, phase; an all-track row apart) by random effects:
+  Paule-Mandel tau with the HKSJ interval (t(k-1), max(1, q)) and a prediction interval from 3
+  experiments, a half-normal tau prior scaled to the margin for 2, the experiment's own t
+  interval for 1; `from_interval` inverts with t(df), not z. Never pooled, and listed: invalid
+  findings, 4-block runs beside longer ones, stale rows beside re-derived ones. Each row has a
+  knowledge level (confirmed and neutral need 3 experiments) and its provenance. Priors from
+  other cars are their own type and table (`sensitivity_prior`) with no class. Base setup
+  qualifies confirmed or preliminary rows on this track that pass Benjamini-Hochberg at q = 0.05
+  and predicts with empirical-Bayes shrinkage; ranking skips only pooled neutral or confirmed
+  worse rows. A read writes a car's rows only when its profile changed. Migration 00014. The
+  Garage shows knowledge level, stratum and provenance per row and priors in a separate section.
+  Simulated: HKSJ covers 88.6 to 100 % at k = 2 to 6 where fixed effect falls to 55 to 66 % at
+  tau = margin; 8 null items qualify anything 5.1 % of the time (34 % unadjusted); the shrunk
+  prediction's bias is -0.2 ms against -2.1 ms raw. Replay (FH26 rear ARB +1, experiments 7, 11,
+  16, 19): -2.64 [-6.46, +1.17] ms fixed effect before, -1.84 [-8.03, +4.67] ms insufficient
+  after (7 and 11 left out: 4 blocks); base setup still takes nothing on the FH26 and ARB front -1
+  on the 488 GT3. **Unverified in game**.
 - Engine, core and web (ADR 0034): the verdict says what the car did, apart from the time. Core
   sends, in the same evaluate request, where the raw samples are and the experiment's push passes
   (off-track ones included); the engine freezes phases and per-corner regimes from the baseline

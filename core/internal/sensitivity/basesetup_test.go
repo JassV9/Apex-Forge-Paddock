@@ -58,7 +58,9 @@ func baseSetups(f *fixture, chooser *fakeChooser) (*BaseSetups, *fakeLedger) {
 
 func TestABaseSetupIsProposedFromTheCarsOwnMeasurements(t *testing.T) {
 	f := newFixture(t, "base_setup_built")
-	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.0042)
+	ai := f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.0042)
+	f.exec(t, `UPDATE experiment SET driver = 'ai' WHERE id = $1`, ai)
+	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -2}, -0.009) // a person's: another stratum
 	chooser := &fakeChooser{reply: contracts.BaseSetup{
 		Channel: "corner_time_s", Changes: []contracts.BaseSetupChange{softerFront},
 		LeftOut: []contracts.BaseSetupLeftOut{}, Measured: []contracts.BaseSetupMeasured{},
@@ -74,7 +76,7 @@ func TestABaseSetupIsProposedFromTheCarsOwnMeasurements(t *testing.T) {
 		t.Fatalf("reply %+v, err %v", reply, err)
 	}
 	asked := chooser.asked[0]
-	if len(asked.Effects) != 1 || asked.Effects[0].Parameter != "ARB_FRONT" || asked.Channel != "corner_time_s" ||
+	if len(asked.Effects) != 1 || asked.Effects[0].Clicks != -1 || asked.Channel != "corner_time_s" ||
 		asked.Level != 0.9 || len(asked.Guardrails) != 2 {
 		t.Errorf("engine was asked %+v", asked)
 	}
@@ -105,9 +107,10 @@ func TestWithoutAQualifyingChangeTheReplySaysWhatWasMeasured(t *testing.T) {
 	}{
 		{"nothing measured", []contracts.BaseSetupMeasured{}, "measured nothing yet"},
 		{"measured, nothing faster", []contracts.BaseSetupMeasured{{
-			Parameter: "ARB_FRONT", Label: "ARB Front", Clicks: 1,
-			EffectClass: contracts.BaseSetupMeasuredEffectClassInconclusive,
-		}}, "ARB Front +1 inconclusive"},
+			Parameter: "ARB_FRONT", Label: "ARB Front", Clicks: 1, Experiments: 2,
+			EffectClass:    contracts.BaseSetupMeasuredEffectClassInconclusive,
+			KnowledgeLevel: contracts.BaseSetupMeasuredKnowledgeLevelInsufficient,
+		}}, "ARB Front +1 insufficient (2 experiments)"},
 	}
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

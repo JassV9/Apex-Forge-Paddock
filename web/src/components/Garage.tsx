@@ -1,6 +1,6 @@
-import { fetchSensitivity, type SensitivityEffect, type SensitivityProfile } from "../api/client";
-import { clicksText, signed } from "../experimentText";
+import { fetchSensitivity, type SensitivityProfile } from "../api/client";
 import { useLoaded } from "../hooks/useLoaded";
+import { EffectRow, PriorRow, scales } from "./GarageRows";
 
 interface GarageProps {
   /** The car of the session on screen; only its profile is shown. */
@@ -9,82 +9,83 @@ interface GarageProps {
   loadProfiles?: () => Promise<SensitivityProfile[]>;
 }
 
-const READING: Record<SensitivityEffect["effect_class"], string> = {
-  negative: "Lowers it",
-  positive: "Raises it",
-  negligible: "Negligible",
-  inconclusive: "Inconclusive",
-};
-
-const BAR_WIDTH = 160;
-const BAR_HALF = 76;
-
-/** The largest bound of any effect on a channel: every bar of that channel shares one scale. */
-function scales(effects: SensitivityEffect[]): Map<string, number> {
-  const largest = new Map<string, number>();
-  for (const effect of effects) {
-    const reach = Math.max(Math.abs(effect.ci_low), Math.abs(effect.ci_high));
-    largest.set(effect.channel, Math.max(largest.get(effect.channel) ?? 0, reach));
+function Measured({ profile, scale }: { profile: SensitivityProfile; scale: Map<string, number> }) {
+  if (profile.effects.length === 0) {
+    return <p>Nothing measured yet. Finish an experiment that changes one item on this car.</p>;
   }
-  return largest;
-}
-
-/** The interval as a bar around zero. The numbers beside it say the same thing in text. */
-function IntervalBar({ effect, scale }: { effect: SensitivityEffect; scale: number }) {
-  const at = (value: number) => BAR_WIDTH / 2 + (scale === 0 ? 0 : (value / scale) * BAR_HALF);
-  const kind = effect.is_prior ? "prior" : effect.effect_class;
   return (
-    <svg className={`interval interval-${kind}`} width={BAR_WIDTH} height="16" aria-hidden="true">
-      <line className="zero" x1={BAR_WIDTH / 2} x2={BAR_WIDTH / 2} y1="1" y2="15" />
-      <line x1={at(effect.ci_low)} x2={at(effect.ci_high)} y1="8" y2="8" />
-      <circle cx={at(effect.estimate)} cy="8" r="3.5" />
-    </svg>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Change</th>
+          <th scope="col">Channel</th>
+          <th scope="col">Measured under</th>
+          <th scope="col">Effect per corner pass</th>
+          <th scope="col">Interval</th>
+          <th scope="col">Knowledge</th>
+          <th scope="col">Provenance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {profile.effects.map((effect) => (
+          <EffectRow
+            key={`${effect.parameter} ${String(effect.clicks)} ${effect.channel} ${effect.corner_class} ${effect.phase} ${effect.track} ${effect.driver} ${effect.hint_bucket} ${String(effect.baseline_value)}`}
+            effect={effect}
+            label={profile.labels[effect.parameter] ?? effect.parameter}
+            scale={scale.get(effect.channel) ?? 0}
+          />
+        ))}
+      </tbody>
+    </table>
   );
 }
 
-/** Where the number comes from. A prior is never worded as a measurement. */
-function basisText(effect: SensitivityEffect): string {
-  if (effect.is_prior) return `Prior from ${effect.prior_source}, not measured on this car`;
-  const count = effect.experiment_ids.length;
-  const experiments = `${String(count)} ${count === 1 ? "experiment" : "experiments"}`;
-  return `Measured: ${experiments}, ${String(effect.n_passes)} passes`;
-}
-
-interface EffectRowProps {
-  effect: SensitivityEffect;
-  label: string;
-  scale: number;
-}
-
-function EffectRow({ effect, label, scale }: EffectRowProps) {
+/** Other cars' effects, apart and labelled: a reason to test, never a result. */
+function Priors({ profile, scale }: { profile: SensitivityProfile; scale: Map<string, number> }) {
+  if (profile.priors.length === 0) return null;
   return (
-    <tr className={effect.is_prior ? "prior" : undefined}>
-      <td>
-        {label} {clicksText(effect.clicks)}
-      </td>
-      <td>
-        <code>{effect.channel}</code>, {effect.corner_class} corners
-      </td>
-      <td>
-        {signed(effect.estimate)} [{signed(effect.ci_low)}, {signed(effect.ci_high)}]
-      </td>
-      <td>
-        <IntervalBar effect={effect} scale={scale} />
-      </td>
-      <td>
-        {READING[effect.effect_class]}
-        {effect.nonlinear && <span className="badge">non-linear</span>}
-      </td>
-      <td>
-        {basisText(effect)}
-        {effect.nonlinear && <p className="note">{effect.note}</p>}
-      </td>
-    </tr>
+    <section aria-label="Priors from other cars">
+      <h4>Priors from other cars (not measured on this car)</h4>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Change</th>
+            <th scope="col">Channel</th>
+            <th scope="col">Prior effect</th>
+            <th scope="col">Interval</th>
+            <th scope="col">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {profile.priors.map((prior) => (
+            <PriorRow
+              key={`${prior.parameter} ${String(prior.clicks)} ${prior.channel} ${prior.corner_class} ${prior.phase}`}
+              prior={prior}
+              label={profile.labels[prior.parameter] ?? prior.parameter}
+              scale={scale.get(prior.channel) ?? 0}
+            />
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function Excluded({ profile }: { profile: SensitivityProfile }) {
+  if (profile.excluded.length === 0) return null;
+  return (
+    <ul className="note" aria-label="Experiments not pooled">
+      {profile.excluded.map((entry) => (
+        <li key={`${String(entry.experiment_id)} ${entry.kind}`}>
+          Experiment {entry.experiment_id} not pooled ({entry.kind}): {entry.reason}
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function CarProfile({ profile }: { profile: SensitivityProfile }) {
-  const scale = scales(profile.effects);
+  const scale = scales([...profile.effects, ...profile.priors]);
   const judged = `${String(profile.experiments)} judged ${profile.experiments === 1 ? "experiment" : "experiments"}`;
   return (
     <section aria-label={profile.car_name}>
@@ -92,32 +93,9 @@ function CarProfile({ profile }: { profile: SensitivityProfile }) {
       <p className="note">
         {judged}. Method: <code>{profile.model_version}</code>.
       </p>
-      {profile.effects.length === 0 ? (
-        <p>Nothing measured yet. Finish an experiment that changes one item on this car.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Change</th>
-              <th scope="col">Channel</th>
-              <th scope="col">Effect per corner pass</th>
-              <th scope="col">Interval</th>
-              <th scope="col">Reading</th>
-              <th scope="col">Basis</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profile.effects.map((effect) => (
-              <EffectRow
-                key={`${effect.parameter} ${String(effect.clicks)} ${effect.channel} ${effect.corner_class}`}
-                effect={effect}
-                label={profile.labels[effect.parameter] ?? effect.parameter}
-                scale={scale.get(effect.channel) ?? 0}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      <Measured profile={profile} scale={scale} />
+      <Excluded profile={profile} />
+      <Priors profile={profile} scale={scale} />
     </section>
   );
 }
@@ -133,8 +111,11 @@ export function Garage({ carName, loadProfiles = fetchSensitivity }: GarageProps
   return (
     <>
       <p className="note">
-        Effects are the variant minus the baseline, with a 90 % interval. An effect borrowed from
-        another car is a prior: a reason to test, never a result.
+        Effects are the variant minus the baseline, pooled from this car&apos;s own experiments per
+        track, driver and AI hint, with a 90 % interval. Confirmed and neutral need at least three
+        experiments. An effect borrowed from another car is a prior, listed apart: a reason to test,
+        never a result. What a change is expected to move in general (the parameter-to-observable
+        map) is a hypothesis and is never shown here as a finding.
       </p>
       <CarProfile profile={profile} />
     </>

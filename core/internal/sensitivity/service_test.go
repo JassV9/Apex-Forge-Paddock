@@ -10,7 +10,7 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/engine"
 )
 
-func TestProfilesAreBuiltFromFinishedExperimentsAndStored(t *testing.T) {
+func TestProfilesPoolTheLedgerMarkedStaleWhenAnExperimentCannotBeRederived(t *testing.T) {
 	f := newFixture(t, "sensitivity_profiles")
 	softer := f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
 	f.finished(t, entry{parameter: "ARB_REAR", clicks: 1, state: "rejected"}, 0.02)
@@ -20,7 +20,7 @@ func TestProfilesAreBuiltFromFinishedExperimentsAndStored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Profiles: %v", err)
 	}
-	if len(profiles) != 1 || len(profiles[0].Effects) != 2 {
+	if len(profiles) != 1 || len(profiles[0].Effects) != 2 || len(profiles[0].Priors) != 0 {
 		t.Fatalf("profiles = %+v, want the sample car with two effects", profiles)
 	}
 	got := profiles[0]
@@ -30,30 +30,42 @@ func TestProfilesAreBuiltFromFinishedExperimentsAndStored(t *testing.T) {
 		t.Errorf("profile = %+v", got)
 	}
 	request := f.engine.asked[0]
-	wantFirst := contracts.Measurement{
-		ExperimentId: softer, Parameter: "ARB_FRONT", Clicks: -1, Channel: "corner_time_s",
-		CornerClass: contracts.MeasurementCornerClassAll, Estimate: -0.03, CiLow: -0.04, CiHigh: -0.02, NPasses: 84,
-	}
-	if len(f.engine.asked) != 1 || len(request.Measurements) != 2 || request.Measurements[0] != wantFirst {
-		t.Errorf("engine was asked %+v", f.engine.asked)
+	first := request.Measurements[0]
+	if len(f.engine.asked) != 1 || len(request.Measurements) != 2 || first.ExperimentId != softer ||
+		!first.Stale || first.StandardError != nil || *first.CiLow != -0.04 || first.Phase != "corner" ||
+		first.Driver != contracts.MeasurementDriverHuman || first.HintBucket != "none" {
+		t.Errorf("engine was asked %+v", request.Measurements)
 	}
 	if request.Level != 0.9 || request.Ropes["corner_time_s"] != 0.005 || request.Ropes["rear_slip_peak_deg"] != 0.5 {
 		t.Errorf("level %v and bands %v, want the ones the experiments are judged with", request.Level, request.Ropes)
 	}
-	var direction, ids, model string
+	var direction, ids, model, level string
 	var clicks int
-	var prior bool
-	f.scan(t, `SELECT e.direction, e.clicks, e.is_prior, e.experiment_ids::text, e.model_version
+	var stale bool
+	f.scan(t, `SELECT e.direction, e.clicks, e.stale, e.experiment_ids::text, e.model_version, e.knowledge_level
 	           FROM sensitivity_effect e JOIN setup_parameter p ON p.id = e.parameter_id
-	           WHERE p.name = 'ARB_FRONT'`, nil, &direction, &clicks, &prior, &ids, &model)
-	if direction != "decrease" || clicks != 1 || prior || ids != fmt.Sprintf("{%d}", softer) || model != fakeModel {
-		t.Errorf("stored row = %s %d prior=%v %s %s", direction, clicks, prior, ids, model)
+	           WHERE p.name = 'ARB_FRONT'`, nil, &direction, &clicks, &stale, &ids, &model, &level)
+	if direction != "decrease" || clicks != 1 || !stale || ids != fmt.Sprintf("{%d}", softer) || model != fakeModel ||
+		level != "preliminary" {
+		t.Errorf("stored row = %s %d stale=%v %s %s %s", direction, clicks, stale, ids, model, level)
+	}
+	var failed int
+	f.scan(t, `SELECT count(*) FROM sensitivity_derivation WHERE status = 'failed' AND engine_version = $1`,
+		[]any{fakeVersion}, &failed)
+	if failed != 2 {
+		t.Errorf("%d failed derivations stored, want one per experiment", failed)
 	}
 }
 
-func TestRebuildingReplacesTheStoredRows(t *testing.T) {
-	f := newFixture(t, "sensitivity_rebuild")
-	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
+func TestAnExperimentIsRederivedOncePerEngineVersion(t *testing.T) {
+	f := newFixture(t, "sensitivity_rederived")
+	id := f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
+	f.replays.ready = true
+	f.engine.measured = &contracts.SensitivityMeasure{
+		EngineVersion: fakeVersion, FindingClass: contracts.SensitivityMeasureFindingClassLikelyImprovement,
+		Effects: []contracts.MeasuredEffect{{Channel: "corner_time_s", CornerClass: "all", Estimate: -0.025,
+			StandardError: 0.004, Df: 5, NPasses: 240, Blocks: 8, Corners: 7}},
+	}
 
 	for range 2 {
 		if _, err := f.service.Profiles(t.Context()); err != nil {
@@ -61,10 +73,58 @@ func TestRebuildingReplacesTheStoredRows(t *testing.T) {
 		}
 	}
 
+	if f.engine.measures != 1 || !reflect.DeepEqual(f.replays.asked, []int64{int64(id)}) {
+		t.Errorf("measured %d times for replays %v, want once", f.engine.measures, f.replays.asked)
+	}
+	m := f.engine.asked[1].Measurements[0]
+	if m.Stale || m.Estimate != -0.025 || *m.StandardError != 0.004 || *m.Df != 5 || m.CiLow != nil ||
+		*m.EngineVersion != fakeVersion || *m.FindingClass != contracts.MeasurementFindingClassLikelyImprovement {
+		t.Errorf("re-derived measurement = %+v", m)
+	}
+}
+
+func TestARederivedInvalidExperimentReachesTheEngineAsInvalid(t *testing.T) {
+	f := newFixture(t, "sensitivity_invalid")
+	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
+	f.replays.ready = true
+	f.engine.measured = &contracts.SensitivityMeasure{
+		EngineVersion: fakeVersion, FindingClass: contracts.SensitivityMeasureFindingClassInvalid,
+		Reason: "sessions tangled", Effects: []contracts.MeasuredEffect{},
+	}
+
+	if _, err := f.service.Profiles(t.Context()); err != nil {
+		t.Fatalf("Profiles: %v", err)
+	}
+
+	m := f.engine.asked[0].Measurements
+	if len(m) != 1 || *m[0].FindingClass != contracts.MeasurementFindingClassInvalid || m[0].Note != "sessions tangled" {
+		t.Errorf("engine was asked %+v", m)
+	}
+}
+
+func TestAReadThatChangesNothingWritesNothing(t *testing.T) {
+	f := newFixture(t, "sensitivity_rebuild")
+	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
+	var first, second int64
+
+	for _, id := range []*int64{&first, &second} {
+		if _, err := f.service.Profiles(t.Context()); err != nil {
+			t.Fatalf("Profiles: %v", err)
+		}
+		f.scan(t, `SELECT id FROM sensitivity_effect`, nil, id)
+	}
+
+	if first != second {
+		t.Errorf("row %d replaced by %d although nothing changed", first, second)
+	}
+	f.finished(t, entry{parameter: "ARB_REAR", clicks: 1}, 0.02)
+	if _, err := f.service.Profiles(t.Context()); err != nil {
+		t.Fatalf("Profiles: %v", err)
+	}
 	var rows int
 	f.scan(t, `SELECT count(*) FROM sensitivity_effect`, nil, &rows)
-	if rows != 1 {
-		t.Errorf("%d stored rows after two rebuilds, want 1", rows)
+	if rows != 2 {
+		t.Errorf("%d stored rows after a new experiment, want 2", rows)
 	}
 }
 
@@ -99,7 +159,7 @@ func TestExperimentsThatSayNothingAboutOneItemAreLeftOut(t *testing.T) {
 	}
 }
 
-func TestAnotherCarsEffectArrivesAsAPrior(t *testing.T) {
+func TestAnotherCarsEffectArrivesAsAPriorInItsOwnTable(t *testing.T) {
 	f := newFixture(t, "sensitivity_prior")
 	f.exec(t, `UPDATE car SET drivetrain = 'rwd'`)
 	f.exec(t, `INSERT INTO car (ac_id, name, drivetrain) VALUES ('other_car', 'Another Car', 'rwd')`)
@@ -107,6 +167,12 @@ func TestAnotherCarsEffectArrivesAsAPrior(t *testing.T) {
 	f.exec(t, `INSERT INTO setup_parameter (car_id, name, label, min, max, step, shown_scale, role, axle)
 	           SELECT id, 'ARB_F', 'Front bar', 0, 5, 1, -1, 'arb', 'F' FROM car WHERE ac_id = 'other_car'`)
 	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
+	f.replays.ready = true
+	f.engine.measured = &contracts.SensitivityMeasure{
+		EngineVersion: fakeVersion, FindingClass: contracts.SensitivityMeasureFindingClassLikelyImprovement,
+		Effects: []contracts.MeasuredEffect{{Channel: "corner_time_s", CornerClass: "all", Estimate: -0.03,
+			StandardError: 0.004, Df: 5, NPasses: 84, Blocks: 8, Corners: 7}},
+	}
 
 	profiles, err := f.service.Profiles(t.Context())
 
@@ -114,23 +180,21 @@ func TestAnotherCarsEffectArrivesAsAPrior(t *testing.T) {
 		t.Fatalf("Profiles: %v", err)
 	}
 	other := profiles[0] // "Another Car" sorts before the Mazda
-	if len(profiles) != 2 || other.CarName != "Another Car" || len(other.Effects) != 1 {
+	if len(profiles) != 2 || other.CarName != "Another Car" || len(other.Effects) != 0 || len(other.Priors) != 1 {
 		t.Fatalf("profiles = %+v", profiles)
 	}
-	prior := other.Effects[0]
-	if !prior.IsPrior || prior.PriorSource != profiles[1].CarName || prior.Parameter != "ARB_F" || prior.Clicks != 1 {
+	prior := other.Priors[0]
+	if prior.SourceCar != profiles[1].CarName || prior.Parameter != "ARB_F" || prior.Clicks != 1 {
 		t.Errorf("prior = %+v, want the Mazda's effect on ARB_F, one click the other way", prior)
 	}
-	if len(f.engine.asked) != 3 {
-		t.Fatalf("engine was asked %d times, want once per car and once more for the borrower", len(f.engine.asked))
-	}
 	lent := f.engine.asked[2].Transfers
-	if len(lent) != 1 || !lent[0].SameDrivetrain || lent[0].Estimate != -0.03 || lent[0].NPasses != 84 {
-		t.Errorf("transfers = %+v", lent)
+	if len(f.engine.asked) != 3 || len(lent) != 1 || !lent[0].SameDrivetrain || lent[0].Estimate != -0.03 ||
+		lent[0].SourceExperiments != 1 || lent[0].StandardError <= 0.004 {
+		t.Errorf("transfers = %+v (the error is the row's interval in normal units, wider than its own)", lent)
 	}
 	var lender int64
 	var direction string
-	f.scan(t, `SELECT prior_source_car_id, direction FROM sensitivity_effect WHERE is_prior`, nil, &lender, &direction)
+	f.scan(t, `SELECT source_car_id, direction FROM sensitivity_prior`, nil, &lender, &direction)
 	if lender != f.carID || direction != "increase" {
 		t.Errorf("stored prior: lender %d direction %s, want car %d increase", lender, direction, f.carID)
 	}
@@ -180,13 +244,31 @@ func TestOnlyACarsOneItemForAJobLendsOrBorrows(t *testing.T) {
 	}
 }
 
+func TestAStaleRowLendsNothing(t *testing.T) {
+	source := car{id: 1, knobs: []knob{{name: "ARB_FRONT", role: "arb", axle: "F"}}}
+	target := car{id: 2, knobs: []knob{{name: "ARB_F", role: "arb", axle: "F"}}}
+	measured := map[int64]contracts.SensitivityResponse{1: {Effects: []contracts.SensitivityEffect{
+		{Parameter: "ARB_FRONT", Clicks: 1, Stale: true},
+	}}}
+
+	if lent := transfersFor(target, []car{source, target}, measured); len(lent) != 0 {
+		t.Errorf("lent %+v", lent)
+	}
+}
+
 func TestAnEngineThatIsDownIsReportedAndNothingIsStored(t *testing.T) {
 	f := newFixture(t, "sensitivity_engine_down")
+	f.finished(t, entry{parameter: "ARB_FRONT", clicks: -1}, -0.03)
 	f.engine.failure = fmt.Errorf("connection refused: %w", engine.ErrUnavailable)
 
 	_, err := f.service.Profiles(t.Context())
 
 	if !errors.Is(err, engine.ErrUnavailable) {
 		t.Errorf("Profiles error = %v, want engine.ErrUnavailable", err)
+	}
+	var derivations int
+	f.scan(t, `SELECT count(*) FROM sensitivity_derivation`, nil, &derivations)
+	if derivations != 0 {
+		t.Errorf("%d derivations stored while the engine was down", derivations)
 	}
 }

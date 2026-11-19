@@ -1,6 +1,7 @@
 // Package sensitivity keeps what each setup item does on each car, and asks the engine which
 // experiment to run next. Core gathers and stores; the pooling, the priors and the ranking
-// are the engine's (docs/adr/0011-sensitivity-and-ranking.md).
+// are the engine's (docs/adr/0011-sensitivity-and-ranking.md,
+// docs/adr/0033-stratified-vehicle-sensitivity-profile.md).
 package sensitivity
 
 import (
@@ -13,8 +14,10 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 )
 
-// Engine pools effects and ranks candidates. *engine.Client implements it.
+// Engine re-derives experiments, pools effects and ranks candidates. *engine.Client implements it.
 type Engine interface {
+	Version(ctx context.Context) (string, error)
+	Measure(ctx context.Context, request contracts.EvaluateRequest) (contracts.SensitivityMeasure, error)
 	Sensitivity(ctx context.Context, request contracts.SensitivityRequest) (contracts.SensitivityResponse, error)
 	Propose(ctx context.Context, request contracts.ProposeRequest) (contracts.Proposals, error)
 }
@@ -30,13 +33,15 @@ type Diagnoses interface {
 type Service struct {
 	database  *sql.DB
 	engine    Engine
+	replays   Replays
 	diagnoses Diagnoses
 	logger    *slog.Logger
 }
 
-// NewService wires the service to its database, the engine and the diagnoses.
-func NewService(database *sql.DB, engine Engine, diagnoses Diagnoses, logger *slog.Logger) *Service {
-	return &Service{database: database, engine: engine, diagnoses: diagnoses, logger: logger}
+// NewService wires the service to its database, the engine, the ledger's replays and the
+// diagnoses.
+func NewService(database *sql.DB, engine Engine, replays Replays, diagnoses Diagnoses, logger *slog.Logger) *Service {
+	return &Service{database: database, engine: engine, replays: replays, diagnoses: diagnoses, logger: logger}
 }
 
 // built is one car's profile as the engine made it.
@@ -45,15 +50,24 @@ type built struct {
 	reply contracts.SensitivityResponse
 }
 
-// Profiles rebuilds every car's profile from the finished experiments, stores the rows and
-// returns them. Nothing is updated in place: the profile is always what today's results and
-// today's method say, and the stored rows record which method that was.
+// Profiles pools every car's profile from the finished experiments, each re-derived once per
+// engine version, and returns it. Nothing is updated in place: the profile is always what
+// today's results and today's method say. A car's stored rows are replaced only when its pooled
+// profile changed, so a read that changes nothing writes nothing.
 func (s *Service) Profiles(ctx context.Context) ([]contracts.SensitivityProfile, error) {
 	cars, err := readCars(ctx, s.database)
 	if err != nil {
 		return nil, err
 	}
-	measurements, err := readMeasurements(ctx, s.database, experiments.DefaultTest().Level)
+	version, err := s.engine.Version(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("engine version: %w", err)
+	}
+	level := experiments.DefaultTest().Level
+	if err := s.derive(ctx, version, level); err != nil {
+		return nil, err
+	}
+	measurements, err := readMeasurements(ctx, s.database, level, version)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +83,7 @@ func (s *Service) Profiles(ctx context.Context) ([]contracts.SensitivityProfile,
 	for _, profile := range profiles {
 		answer = append(answer, profileOf(profile))
 	}
-	s.logger.InfoContext(ctx, "sensitivity profiles rebuilt", "cars", len(cars))
+	s.logger.InfoContext(ctx, "sensitivity profiles pooled", "cars", len(cars), "engine_version", version)
 	return answer, nil
 }
 
@@ -134,12 +148,24 @@ func profileOf(profile built) contracts.SensitivityProfile {
 			labels[effect.Parameter] = k.label
 		}
 	}
-	effects := profile.reply.Effects
-	if effects == nil {
-		effects = []contracts.SensitivityEffect{}
+	for _, prior := range profile.reply.Priors {
+		if k, known := profile.car.knob(prior.Parameter); known {
+			labels[prior.Parameter] = k.label
+		}
 	}
 	return contracts.SensitivityProfile{
 		CarId: int(profile.car.id), CarName: profile.car.label, Experiments: profile.car.judged,
-		ModelVersion: profile.reply.ModelVersion, Labels: labels, Effects: effects,
+		ModelVersion: profile.reply.ModelVersion, Labels: labels,
+		Effects:  orEmpty(profile.reply.Effects),
+		Priors:   orEmpty(profile.reply.Priors),
+		Excluded: orEmpty(profile.reply.Excluded),
 	}
+}
+
+// orEmpty keeps a list a list in JSON: [] rather than null.
+func orEmpty[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
 }

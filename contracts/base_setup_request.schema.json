@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "required": [
     "effects",
+    "priors",
     "items",
     "channel",
     "better",
@@ -16,7 +17,7 @@
   ],
   "properties": {
     "effects": {
-      "description": "The car's sensitivity profile.",
+      "description": "The car's own measured rows of the session's track and driver.",
       "type": "array",
       "items": {
         "$ref": "#/definitions/SensitivityEffect"
@@ -58,12 +59,19 @@
       "items": {
         "$ref": "#/definitions/GuardrailSpec"
       }
+    },
+    "priors": {
+      "description": "Other cars' effects; never taken, listed as left out.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SensitivityPrior"
+      }
     }
   },
   "definitions": {
     "SensitivityEffect": {
       "title": "SensitivityEffect",
-      "description": "What moving one setup item by some clicks does to one channel on this car: a pooled measurement, or a prior transferred from another car and flagged as one.",
+      "description": "What moving one setup item by some clicks does to one channel on this car, pooled from the car's own experiments in one stratum (track, driver, AI hint, baseline value, click size). Never a prior: those are SensitivityPrior.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -71,16 +79,26 @@
         "clicks",
         "channel",
         "corner_class",
+        "phase",
+        "track",
+        "track_name",
+        "driver",
+        "hint_bucket",
         "estimate",
         "ci_low",
         "ci_high",
-        "n_passes",
+        "standard_error",
+        "p_increase",
+        "method",
+        "experiments",
+        "knowledge_level",
         "effect_class",
+        "n_passes",
         "nonlinear",
         "note",
-        "is_prior",
-        "prior_source",
-        "experiment_ids"
+        "stale",
+        "experiment_ids",
+        "engine_versions"
       ],
       "properties": {
         "parameter": {
@@ -106,6 +124,41 @@
             "fast"
           ]
         },
+        "phase": {
+          "description": "Corner phase the effect is measured over; corner for the whole corner.",
+          "type": "string",
+          "minLength": 1
+        },
+        "track": {
+          "description": "The track the experiments were driven on (game id and layout, a _paddock test copy counted as its layout, ADR 0027), or all for a row pooled over every track.",
+          "type": "string",
+          "minLength": 1
+        },
+        "track_name": {
+          "description": "What the dashboard calls the track.",
+          "type": "string"
+        },
+        "driver": {
+          "type": "string",
+          "enum": [
+            "ai",
+            "human"
+          ]
+        },
+        "hint_bucket": {
+          "description": "The AI's planning share of the car's tyre hint, to the nearest 0.01 (ADR 0028): pinned on the experiment or read from its run context. unknown when the experiment was driven before run context was recorded, none for a human driver.",
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_value": {
+          "description": "Raw value of the item on the experiments' baseline.",
+          "type": "number"
+        },
+        "click_step": {
+          "description": "Raw size of one click of the item.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "estimate": {
           "description": "Variant minus baseline, in the channel's unit, per corner pass.",
           "type": "number"
@@ -116,9 +169,52 @@
         "ci_high": {
           "type": "number"
         },
-        "n_passes": {
-          "type": "integer",
+        "standard_error": {
+          "description": "Standard error of the estimate.",
+          "type": "number",
           "minimum": 0
+        },
+        "p_increase": {
+          "description": "One-sided p-value (or posterior probability) of an effect at most zero: small when the effect is clearly above zero; 1 - p_increase is the same for a decrease.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pi_low": {
+          "description": "Prediction interval for the effect in a new experiment (at least 3 experiments).",
+          "type": "number"
+        },
+        "pi_high": {
+          "type": "number"
+        },
+        "tau": {
+          "description": "Between-experiment standard deviation (Paule-Mandel; the posterior mean under the half-normal prior for 2 experiments).",
+          "type": "number",
+          "minimum": 0
+        },
+        "method": {
+          "description": "single: one experiment, its own block-level t interval. half_normal: two experiments, random effects with a half-normal prior on tau scaled to the margin. hksj: three or more, Paule-Mandel tau and the Hartung-Knapp-Sidik-Jonkman interval with t(k-1).",
+          "type": "string",
+          "enum": [
+            "single",
+            "half_normal",
+            "hksj"
+          ]
+        },
+        "experiments": {
+          "description": "Experiments pooled.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "knowledge_level": {
+          "description": "What the car's own experiments establish (ADR 0033). confirmed: the pooled random-effects interval (HKSJ, at least 3 experiments) lies wholly beyond the margin. neutral: it lies wholly inside the margin (two one-sided tests, at least 3 experiments). preliminary: the interval excludes zero (fewer than 3 experiments, or not beyond the margin). insufficient: otherwise, or no experiment of the row could be re-derived by the current engine.",
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "preliminary",
+            "neutral",
+            "insufficient"
+          ]
         },
         "effect_class": {
           "type": "string",
@@ -127,29 +223,43 @@
             "negative",
             "negligible",
             "inconclusive"
-          ]
+          ],
+          "description": "The pooled interval against the margin: beyond it (positive, negative), inside it (negligible), or neither."
+        },
+        "margin": {
+          "description": "Margin of practical equivalence the row is judged against; absent when the channel has none.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
         },
         "nonlinear": {
           "description": "True when the item's other measured clicks show the response is not a straight line.",
           "type": "boolean"
         },
         "note": {
-          "description": "Why it is flagged non-linear, or how a prior was derived; empty otherwise.",
+          "description": "Why it is flagged non-linear or stale; empty otherwise.",
           "type": "string"
         },
-        "is_prior": {
-          "description": "True when this was not measured on this car.",
+        "stale": {
+          "description": "True when no experiment of the row could be re-derived by the current engine (the ledger's numbers): never confirmed, neutral or preliminary.",
           "type": "boolean"
         },
-        "prior_source": {
-          "description": "Name of the car a prior was transferred from; empty for a measurement.",
-          "type": "string"
-        },
         "experiment_ids": {
-          "description": "The experiments the measurement is pooled from; empty for a prior.",
+          "description": "The experiments the row is pooled from.",
           "type": "array",
+          "minItems": 1,
           "items": {
             "type": "integer"
+          }
+        },
+        "engine_versions": {
+          "description": "Engine versions that computed the pooled numbers; empty for stale rows judged before versions were recorded.",
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       }
@@ -229,6 +339,95 @@
             "higher",
             "lower"
           ]
+        }
+      }
+    },
+    "SensitivityPrior": {
+      "title": "SensitivityPrior",
+      "description": "Another car's measured effect for an item with the same job, shrunk towards zero and widened. A reason to test, never a measurement: it has no class and no knowledge level.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "clicks",
+        "channel",
+        "corner_class",
+        "phase",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "standard_error",
+        "source_car",
+        "source_track",
+        "source_experiments",
+        "weight",
+        "note"
+      ],
+      "properties": {
+        "parameter": {
+          "description": "This car's item.",
+          "type": "string",
+          "minLength": 1
+        },
+        "clicks": {
+          "description": "Clicks moved; negative lowers the raw value. Never 0.",
+          "type": "integer"
+        },
+        "channel": {
+          "description": "Metric id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "corner_class": {
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "phase": {
+          "description": "Corner phase the effect is measured over; corner for the whole corner.",
+          "type": "string",
+          "minLength": 1
+        },
+        "estimate": {
+          "description": "Variant minus baseline, in the channel's unit, per corner pass.",
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "standard_error": {
+          "description": "Standard error of the estimate.",
+          "type": "number",
+          "minimum": 0
+        },
+        "source_car": {
+          "description": "Name of the car it was measured on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_track": {
+          "description": "Track of the lender's row.",
+          "type": "string"
+        },
+        "source_experiments": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "weight": {
+          "description": "Share of the lender's effect kept (similarity of the cars).",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "note": {
+          "type": "string"
         }
       }
     }

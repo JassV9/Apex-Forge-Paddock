@@ -180,11 +180,11 @@ def test_a_refuel_that_does_not_take_stops_the_run(agent: Agent) -> None:
     agent.drive.pit(True)
     agent.drive.idle(130)
     let_ai_load(agent)
-    agent.drive.run(agent.rt.table_from({"laps": 1, "stopAt": (agent.drive.t or 0) + 2}))
+    agent.drive.run(agent.rt.table_from({"laps": 1, "stopAt": (agent.drive.t or 0) + 8}))
 
     ghost = agent.rt.eval('require("game.ghost")')
     assert ghost.phase() == "failed"
-    assert "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L" in (
+    assert "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L (set 4 times)" in (
         ghost.message()
     )
     assert not [p for p in agent.passes() if "block" in p and p["block"]["lap"] > 0]

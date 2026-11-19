@@ -78,6 +78,28 @@ def test_the_fuel_is_set_again_after_the_reset_has_taken_effect(rt):
     assert handed_over[0] == {"name": "set_fuel", "liters": 40}
 
 
+def test_a_fuel_read_back_that_is_off_sets_the_fuel_again_and_the_block_goes_on(rt):
+    # the setup's own [FUEL] VALUE can land after the hand-over's set (seen in game, experiment
+    # 20 block 9: 26 L for a 50 L block); the out-lap sets the fuel again
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    seen = run_for(rt, ghost, state, ghost.FUEL_CHECK_S + 0.1, fuel=26)
+    assert seen == ["set_fuel"] and state.phase == "driving"
+    assert run_for(rt, ghost, state, ghost.FUEL_CHECK_S * 3, fuel=40) == []
+    assert state.phase == "driving"
+
+
+def test_a_fuel_that_never_takes_stops_the_block_after_its_resets(rt):
+    ghost, state = machine(rt)
+    start_driving(rt, ghost, state)
+
+    seconds = (ghost.FUEL_RESETS + 1) * ghost.FUEL_CHECK_S + 0.5
+    seen = run_for(rt, ghost, state, seconds, fuel=26)
+    assert seen.count("set_fuel") == ghost.FUEL_RESETS and seen[-1] == "autopilot_off"
+    assert state.phase == "failed" and "(set 4 times)" in state.message
+
+
 def test_every_block_gets_the_fuel_of_the_first(rt):
     ghost, state = machine(rt)
     start_driving(rt, ghost, state)

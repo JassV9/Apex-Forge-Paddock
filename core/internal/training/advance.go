@@ -10,10 +10,6 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 )
 
-// trainingExtensions is how often a program drives an inconclusive experiment further: once,
-// and only when what was measured already points the right way.
-const trainingExtensions = 1
-
 // Run advances every open program every interval until ctx is cancelled.
 func (s *Service) Run(ctx context.Context, interval time.Duration) error {
 	ticker := time.NewTicker(interval)
@@ -71,7 +67,7 @@ func (s *Service) tend(ctx context.Context, id int64, exp contracts.Experiment) 
 	eid := int64(exp.Id)
 	switch exp.State {
 	case experiments.Running:
-		if !driven(exp) {
+		if !experiments.AllDriven(exp.Blocks) {
 			return true, s.setState(ctx, id, contracts.TrainingProgramStateRunning,
 				fmt.Sprintf("The AI is driving experiment %d (%s).", exp.Id, progress(exp)))
 		}
@@ -80,7 +76,7 @@ func (s *Service) tend(ctx context.Context, id int64, exp contracts.Experiment) 
 	case experiments.Evaluating:
 		return true, nil
 	case experiments.Inconclusive:
-		if promising(exp) && exp.Extensions < trainingExtensions {
+		if continues(exp) && exp.Extensions < experiments.MaxExtensions {
 			_, err := s.ledger.Extend(ctx, eid)
 			return true, err
 		}
@@ -103,20 +99,6 @@ func (s *Service) tend(ctx context.Context, id int64, exp contracts.Experiment) 
 	return false, nil // accepted, reverted, aborted or discarded: closed
 }
 
-// driven reports whether every block has its laps. A lap counts once the car has finished it,
-// so the verdict waits for the last lap's corners (docs/adr/0025-finished-laps-and-lap-noise.md).
-func driven(exp contracts.Experiment) bool {
-	if len(exp.Blocks) == 0 {
-		return false
-	}
-	for _, block := range exp.Blocks {
-		if block.LapsDone < block.LapsTarget {
-			return false
-		}
-	}
-	return true
-}
-
 func progress(exp contracts.Experiment) string {
 	for _, block := range exp.Blocks {
 		if block.LapsDone < block.LapsTarget {
@@ -126,19 +108,13 @@ func progress(exp contracts.Experiment) string {
 	return "all blocks driven"
 }
 
-// promising reports whether the whole interval of the primary result over all corners lies on
-// the better side of zero: a real effect too small to clear the band yet.
-func promising(exp contracts.Experiment) bool {
-	for _, r := range exp.Results {
-		if r.Role != contracts.ExperimentResultRolePrimary || r.CornerClass != contracts.ExperimentResultCornerClassAll {
-			continue
-		}
-		if exp.SuccessTest.Better == contracts.SuccessTestBetterLower {
-			return r.CiHigh < 0
-		}
-		return r.CiLow > 0
-	}
-	return false
+// continues reports whether the engine's verdict on the experiment says to drive it to the
+// next pre-registered look: the effect could still clear the margin, and the look spends its
+// share of the error (docs/adr/0029-block-level-inference-and-finding-classes.md). A verdict
+// judged before ADR 0029 recommends nothing, and the baseline stays.
+func continues(exp contracts.Experiment) bool {
+	return exp.Verdict != nil && exp.Verdict.Recommendation != nil &&
+		*exp.Verdict.Recommendation == contracts.VerdictSummaryRecommendationContinue
 }
 
 // start puts the experiment on the car; when another one is on it the program waits.

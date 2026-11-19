@@ -1,4 +1,5 @@
-"""Plans sized for the noise of whole laps (ADR 0025): the sizing rule and the lap estimate."""
+"""Plans for the noise of whole laps (ADR 0025) at the first look (ADR 0029), and the lap
+estimate."""
 
 import math
 from typing import Any
@@ -11,17 +12,11 @@ from simulation import BASELINE, simulate_abab
 
 from paddock_engine.contracts.plan_request_schema import PlanRequest
 from paddock_engine.contracts.plan_response_schema import Arm, SigmaLapSource
-from paddock_engine.experiments.plan import (
-    MAX_BLOCKS,
-    STANDARD_BLOCKS,
-    decision_effect,
-    plan,
-    size,
-    time_inflation,
-)
+from paddock_engine.experiments.plan import decision_effect, plan, size, time_inflation
 from paddock_engine.stats.effects import estimate_effects
 from paddock_engine.stats.lap_noise import MIN_LAPS, LapPass, lap_scatter
 from paddock_engine.stats.mde import lap_inclusive_sigma, minimum_detectable_effect
+from paddock_engine.stats.sequential import FIRST_LOOK_BLOCKS
 
 ROPE, LEVEL = 0.005, 0.9
 sigmas = st.floats(0.002, 0.15)
@@ -30,19 +25,19 @@ corner_counts = st.integers(3, 20)
 
 
 @given(sigma=sigmas, corners=corner_counts, laps=st.integers(2, 5))
-def test_without_lap_noise_the_plan_is_the_standard_one(
+def test_without_lap_noise_the_first_look_meets_its_target(
     sigma: float, corners: int, laps: int
 ) -> None:
     sizing = size(sigma, 0.0, corners, laps, ROPE, LEVEL)
 
-    assert sizing.blocks == STANDARD_BLOCKS and sizing.met
-    assert sizing.mde_detect == pytest.approx(minimum_detectable_effect(sigma, 2 * laps, corners))
-    standard = decision_effect(sigma, 0.0, corners, laps, STANDARD_BLOCKS, ROPE, LEVEL)
+    assert sizing.blocks == FIRST_LOOK_BLOCKS and sizing.met
+    assert sizing.mde_detect == pytest.approx(minimum_detectable_effect(sigma, 4 * laps, corners))
+    standard = decision_effect(sigma, 0.0, corners, laps, FIRST_LOOK_BLOCKS, ROPE, LEVEL)
     assert sizing.mde_decide == standard <= sizing.target
 
 
 @given(sigma=sigmas, low=lap_sigmas, high=lap_sigmas, corners=corner_counts)
-def test_more_lap_noise_never_means_fewer_blocks(
+def test_more_lap_noise_never_decides_more(
     sigma: float, low: float, high: float, corners: int
 ) -> None:
     low, high = sorted((low, high))
@@ -51,8 +46,9 @@ def test_more_lap_noise_never_means_fewer_blocks(
         size(sigma, high, corners, 3, ROPE, LEVEL),
     )
 
-    assert quiet.blocks <= noisy.blocks
-    for blocks in range(STANDARD_BLOCKS, MAX_BLOCKS + 1, 2):
+    assert quiet.mde_decide <= noisy.mde_decide * (1 + 1e-12)
+    assert quiet.met or not noisy.met
+    for blocks in (8, 10, 12):
         less = decision_effect(sigma, low, corners, 3, blocks, ROPE, LEVEL)
         assert less <= decision_effect(sigma, high, corners, 3, blocks, ROPE, LEVEL) * (1 + 1e-12)
 
@@ -70,15 +66,13 @@ def test_the_plan_does_not_depend_on_the_unit(
     assert other.target == pytest.approx(seconds.target * scale, rel=1e-9)
 
 
-def test_a_car_whose_laps_scatter_gets_more_blocks_up_to_the_longest_plan() -> None:
+def test_every_plan_is_the_first_look_and_says_whether_it_reaches_the_target() -> None:
     ferrari = size(0.025, 0.0026, 17, 3, ROPE, LEVEL)  # experiment 5's baseline
     hybrid = size(0.0336, 0.0092, 14, 3, ROPE, LEVEL)  # experiment 10's
-    hopeless = size(0.0385, 0.10, 14, 3, ROPE, LEVEL)
 
-    assert (ferrari.blocks, ferrari.met) == (4, True)
-    assert (hybrid.blocks, hybrid.met) == (6, True)
-    assert (hopeless.blocks, hopeless.met) == (MAX_BLOCKS, False)
-    assert hopeless.mde_decide > hopeless.target
+    assert (ferrari.blocks, ferrari.met) == (FIRST_LOOK_BLOCKS, True)
+    assert (hybrid.blocks, hybrid.met) == (FIRST_LOOK_BLOCKS, False)
+    assert hybrid.mde_decide > hybrid.target
 
 
 def test_lap_noise_counts_once_per_lap_not_once_per_pass() -> None:
@@ -175,7 +169,8 @@ def test_laps_driven_to_a_run_plan_come_before_free_laps() -> None:
 
     assert with_plans.sigma_lap_source is SigmaLapSource.planned and with_plans.sigma_lap < 0.01
     assert without.sigma_lap_source is SigmaLapSource.free and without.sigma_lap > 0.03
-    assert len(without.blocks) > len(with_plans.blocks) == STANDARD_BLOCKS
+    assert len(without.blocks) == len(with_plans.blocks) == FIRST_LOOK_BLOCKS
+    assert with_plans.target_met and not without.target_met
     assert nothing.sigma_lap_source is SigmaLapSource.none and nothing.sigma_lap == 0.0
     assert [b.arm for b in without.blocks] == [Arm.baseline, Arm.variant] * (
         len(without.blocks) // 2
@@ -193,7 +188,6 @@ def test_the_planned_standard_error_is_what_simulated_experiments_show(blocks: i
             simulate_abab(rng, 0.0, corners, sigma=sigma, lap_sigma=lap, blocks=blocks),
             BASELINE,
             ROPE,
-            replicates=40,
         )[0].estimate
         for _ in range(150)
     ]

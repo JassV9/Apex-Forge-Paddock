@@ -26,3 +26,41 @@ def classify(ci_low: float, ci_high: float, rope: float) -> EffectClass:
     if ci_low >= -rope and ci_high <= rope:
         return EffectClass.NEGLIGIBLE
     return EffectClass.INCONCLUSIVE
+
+
+class Finding(StrEnum):
+    """What an interval of the gain says against a margin (ADR 0029).
+
+    The gain is the effect turned so that positive is better. The invalid and context-dependent
+    findings are not read off one interval (experiments/finding.py).
+    """
+
+    CONFIRMED_IMPROVEMENT = "confirmed_improvement"  # whole interval above the margin
+    CONFIRMED_REGRESSION = "confirmed_regression"  # whole interval below minus the margin
+    NEUTRAL = "neutral"  # whole interval inside the margin: two one-sided tests
+    LIKELY_IMPROVEMENT = "likely_improvement"  # whole interval above zero
+    LIKELY_REGRESSION = "likely_regression"  # whole interval below zero
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"  # the interval straddles zero
+
+
+def interval_finding(
+    gain_low: float, gain_high: float, margin: float, confirmable: bool
+) -> Finding:
+    """The finding of a gain interval against a positive margin.
+
+    `confirmable` is False before the first pre-registered look (fewer than 8 blocks): an
+    interval beyond the margin is then only likely.
+    """
+    if margin <= 0 or gain_low > gain_high:
+        raise ValueError(f"invalid interval [{gain_low}, {gain_high}] or margin {margin}")
+    if confirmable and gain_low > margin:
+        return Finding.CONFIRMED_IMPROVEMENT
+    if confirmable and gain_high < -margin:
+        return Finding.CONFIRMED_REGRESSION
+    if gain_low > -margin and gain_high < margin:
+        return Finding.NEUTRAL
+    if gain_low > 0:
+        return Finding.LIKELY_IMPROVEMENT
+    if gain_high < 0:
+        return Finding.LIKELY_REGRESSION
+    return Finding.INSUFFICIENT_EVIDENCE

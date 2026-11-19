@@ -1,5 +1,6 @@
 import type { Experiment } from "../api/client";
 import { effectText, formatTime, isBlind, STATE_LABEL, type State } from "../experimentText";
+import { confounderText, FINDING_LABEL, lookText, RECOMMENDATION_LABEL } from "../findingText";
 
 /** The test the experiment must pass. It was stored when the experiment was proposed. */
 export function TestSection({ experiment }: { experiment: Experiment }) {
@@ -60,7 +61,7 @@ function lapNote(plan: Plan): string {
       : ` Whole laps scatter ${plan.sigma_lap.toFixed(3)} (${plan.sigma_lap_source} laps).`;
   const short =
     plan.target_met === false && plan.mde_target !== undefined
-      ? ` Short of the ${plan.mde_target.toFixed(3)} it was sized for: this is the longest plan.`
+      ? ` Short of the ${plan.mde_target.toFixed(3)} it was sized for at the first look: two extensions are the later looks.`
       : "";
   return laps + short;
 }
@@ -158,6 +159,28 @@ const DECIDED_BY: Record<Verdict["decided_by"], string> = {
   training: "the AI training program",
 };
 
+/** What the engine found, apart from what the ledger decided, and what to do next (ADR 0029). */
+function Finding({ verdict }: { verdict: Verdict }) {
+  if (verdict.finding_class === undefined) return null;
+  return (
+    <div aria-label="Finding" role="group">
+      <p>
+        Finding: <strong>{FINDING_LABEL[verdict.finding_class]}</strong>. {lookText(verdict)}
+      </p>
+      {verdict.recommendation !== undefined && (
+        <p>Next: {RECOMMENDATION_LABEL[verdict.recommendation]}</p>
+      )}
+      {verdict.confounders !== undefined && verdict.confounders.length > 0 && (
+        <ul aria-label="Confounders">
+          {verdict.confounders.map((confounder) => (
+            <li key={`${confounder.kind}-${confounder.name}`}>{confounderText(confounder)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function VerdictSection({ experiment }: { experiment: Experiment }) {
   const verdict = experiment.verdict;
   if (verdict === undefined) return null;
@@ -168,6 +191,7 @@ export function VerdictSection({ experiment }: { experiment: Experiment }) {
         <strong>{STATE_LABEL[verdict.decision]}</strong>, decided by{" "}
         {DECIDED_BY[verdict.decided_by]} on {formatTime(verdict.decided_at)}. {verdict.reason}
       </p>
+      <Finding verdict={verdict} />
       {verdict.prediction_total > 0 && (
         <p>
           Predictions that came true: {verdict.prediction_hits} of {verdict.prediction_total}.

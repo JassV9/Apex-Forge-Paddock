@@ -130,14 +130,15 @@ func fileUnderLeaders(cars []car, measurements map[int64][]contracts.Measurement
 	}
 }
 
-// A measurement is one result of a finished one-factor experiment. An experiment that is
+// A measurement is one current result (the latest verdict's, ADR 0030) of a finished one-factor
+// experiment. An experiment that is
 // still being driven, was aborted, or re-checks a champion says nothing about one item. The
 // intervals must all be at the level the engine is told, so an experiment judged at another
 // level is left out rather than misread.
 const measurementsSQL = `
 SELECT h.car_id, e.id, sp.name, e.clicks, r.channel, r.corner_class, r.estimate, r.ci_low,
        r.ci_high, r.n_passes
-FROM result r
+FROM current_result r
 JOIN experiment e ON e.id = r.experiment_id
 JOIN hypothesis h ON h.id = e.hypothesis_id
 JOIN setup_parameter sp ON sp.id = e.parameter_id

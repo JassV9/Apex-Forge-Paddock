@@ -146,6 +146,14 @@ tests validate them against the same schema files.
    where this car and track's corners have their largest gaps (`features/regimes.py`,
    [ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)); a pass's own minimum
    speed never picks its class.
+   `y ~ arm + covariates + (1 | corner)` ([ADR 0008](adr/0008-effect-model.md)), each corner
+   weighted by its own scatter (`stats/weights.py`,
+   [ADR 0023](adr/0023-corners-weighted-by-their-own-scatter.md)), with the interval from the
+   run blocks: the spread of the fit's block means, blocks - 2 degrees of freedom less one per
+   covariate that changes between blocks (`stats/block_level.py`), at the level of the
+   pre-registered look (`stats/sequential.py`), judged against a margin per metric and setup
+   item (`config/margins.toml`) into one of eight findings (`experiments/finding.py`,
+   [ADR 0029](adr/0029-block-level-inference-and-finding-classes.md)).
    `stats/mde.py` says what a plan can detect before it is driven; `stats/noise.py` measures
    the scatter per corner and `stats/lap_noise.py` the error a whole lap shares across its
    corners ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)).
@@ -160,11 +168,12 @@ the session's Parquet parts.
    experiment: the setup of the session's latest pass), makes the variant with
    `setups.Step` (a linked item moves with its group, [ADR 0026](adr/0026-linked-setup-items.md)), and stores the hypothesis, the predictions, the success test and the
    guardrails. Nothing changes them later.
-2. **Plan.** Core asks the engine (`POST /plan`) for interleaved blocks and stores them. The
-   engine sizes the plan for the scatter of single passes and of whole laps on the baseline:
-   four blocks, or more pairs (up to eight) for a car whose laps scatter, and it says when even
-   eight cannot decide the target ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)). The
-   two setups get random code names.
+2. **Plan.** Core asks the engine (`POST /plan`) for interleaved blocks and stores them:
+   eight, the first pre-registered look
+   ([ADR 0029](adr/0029-block-level-inference-and-finding-classes.md)). The engine says what that
+   look decides for the scatter of single passes and of whole laps on the baseline, and when it
+   cannot decide the target ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)). The two
+   setups get random code names.
 3. **Start.** Core writes the car's run plan (`runplans/<car>.json`) and one setup file per
    arm into the outbox. Only one experiment per car can be on it, and it must start from
    the champion. The plan says who drives: the human, or AC's AI (phase 6).
@@ -175,11 +184,17 @@ the session's Parquet parts.
    for 15 minutes.
 5. **Features.** Ingest queues a job per spool file; core's features worker sends the passes
    to the engine (`POST /features/session`) and stores the metrics on `corner_pass`.
-6. **Evaluate.** Core sends the valid push-lap passes with their covariates to
-   `POST /evaluate`. The engine returns an effect and interval per channel, the guardrail
-   checks, the prediction score and a decision; core stores them and moves the state.
+6. **Evaluate.** Only once every block is driven. Core sends the valid push-lap passes on the
+   block's setup and from the experiment's driver, with their covariates (time since the first
+   pass, a term per game session after the first), the passes it left out, the off-track count
+   per block, and the look (8, 10, 12 blocks) to `POST /evaluate`. The engine returns an effect
+   and interval per channel, the guardrail checks (off-track share included), the prediction
+   score, a finding, what to do next and a decision; core appends the verdict and its results
+   with the engine version ([ADR 0030](adr/0030-append-only-results-and-engine-version.md)) and
+   moves the state.
 7. **Settle.** Accepted: the variant is the champion. Rejected: reverted in the same
-   transaction. Trade-off: the driver decides. Inconclusive: extend (twice at most) or revert.
+   transaction. Trade-off: the driver decides. Inconclusive: extend (twice at most: the looks at
+   10 and 12 blocks) or revert; a training program extends only when the engine recommends it.
    Reverting appends a zero-lap block that tells the agent to load the baseline. After three
    accepted experiments core proposes a re-check of the champion against the original.
 
@@ -311,6 +326,7 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 | agent: capture with conditions, setup catalog and setup lines, setup desk window, setup loading with read-back and rollback, block and lap tags, AI test driver with calibration, installer (`tools/install_agent.py`), test layouts (`tools/prepare_test_layout.py`) | 151 offline tests pass; capture, setup loading, run plans and AI-driven blocks **seen in game** (488 GT3, COTA); the window was not clicked in game |
 | core: ingest, setup catalog and versions, features worker, experiment state machine, outbox, champion and re-check, session diagnoses, sensitivity profiles with priors between cars, proposals, scorecard, REST API for all of them, `GET /metrics` | Working, tested against a real PostgreSQL and in Docker |
 | engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose`, `POST /response` | Working, 206 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
+| engine: phases, features, effect model, bootstrap, ROPE, MDE, noise model, diagnosis (evidence pack, rule table, driver and conditions alternatives, candidates), explanations behind a validation gate, sensitivity pooling with priors and non-linearity flags, candidate ranking, `POST /features/session`, `POST /plan`, `POST /evaluate`, `POST /diagnose`, `POST /sensitivity/update`, `POST /propose` | Working, 270 tests, `mypy --strict`; acceptance numbers are from simulation; hosted language models **unverified against the live APIs** |
 | web: one workspace (session rail, overview grid, overlaid telemetry per corner, diagnosis, experiments with propose panel and scorecard, garage); a read-only build | Working, 186 tests |
 | End to end: the Lua agent on the mocked game, core and the engine through a diagnosis, three experiments, and the profile, ranking and scorecard they leave (`make test-e2e`) | Passes locally and in CI |
 | Demo dataset: the real v0 FA26 COTA session as a spool (`datasets/demo`), `make demo` | Working: 136 passes over 17 corners; it has no setup data, so a diagnosis but no candidates, no experiments and an empty garage |
@@ -324,8 +340,10 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 | Hybrid battery per pass: `ers` on the pass line (CSP `kersCharge`, `kersInput`, only with `kersPresent`), `corner_pass.ers_*` (migration 00010), the start charge sent as covariate `ers_charge_start` ([ADR 0024](adr/0024-ers-state-per-pass.md)) | Tested offline (agent pytest on the mocked CSP API, Go ingest against PostgreSQL, pytest simulation); **unverified in game** |
 | A lap counts once finished (every corner, next block, or 15 minutes quiet); plans sized for lap noise (`stats/lap_noise.py`, four to eight blocks, target of four bands, `sigma_lap` and `target_met` on the plan) ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)) | Tested (Go table-driven and against PostgreSQL, pytest incl. hypothesis and simulations, Vitest, offline replay of experiments 5 and 7 to 10's baselines); **unverified in game** |
 | Run context and AI provenance: the session line's `context` (CSP version and build, cars, the AI's hints, learned and pinned share, level, aggression), the agent build in `agent_version` (`tools/install_agent.py` writes `src/build.lua`), per pass `context` (hint given, damage, resets, ABS/TC/DRS share, clock) and optional sample columns `nd_*`, `w_*`, `st_*`, `vx`, `vz`, `x`, `z`, `gear`, `rpm`; `ai_hint_share` pinned per experiment and in the run plan, `ai_laps_fixed`, fuel read back; migration 00011 (`experiment.ai_hint_share`, `corner_pass` context columns, `run_context`) ([ADR 0028](adr/0028-run-context-and-ai-provenance.md)) | Tested offline (agent pytest on the mocked CSP API, Go ingest and experiments against PostgreSQL, the end-to-end test); **unverified in game** |
+| A lap counts once finished (every corner, next block, or 15 minutes quiet); plans sized for lap noise (`stats/lap_noise.py`, eight blocks since ADR 0029, target of four bands, `sigma_lap` and `target_met` on the plan) ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)) | Tested (Go table-driven and against PostgreSQL, pytest incl. hypothesis and simulations, Vitest, offline replay of experiments 5 and 7 to 10's baselines); **unverified in game** |
 | Linked setup items are one setting: detected per car (same label and range, equal in every setup read back from the car, at least 3, and moved) or declared (`setups.DeclaredLinks`: FH26 `WING_1` + `WING_9`); experiments, base setups, setup items, ranking and training treat a group as one item, labelled `Rear Wing (WING_1 + WING_9)` ([ADR 0026](adr/0026-linked-setup-items.md)) | Tested (Go table-driven and against PostgreSQL, Vitest; detection run read-only on the real rows: FH26 rear wing found, nothing on the Ferrari 488 GT3); **unverified in game** |
 | AI training program: `core/internal/training`, `POST /sessions/{id}/training`, `GET /training`, migration 00008, the window's Calibrate and Train buttons, web "Train the AI" card | Working, tested (Go against PostgreSQL with a scripted ledger, agent pytest, Vitest); **one AI experiment driven in game, a whole program not yet** ([ADR 0020](adr/0020-ai-training-program.md)) |
+| Block-level intervals, pre-registered looks at 8, 10 and 12 blocks (O'Brien-Fleming, 70 % of the 5 % spent), eight findings with a recommendation, margins per metric and setup item (`engine/paddock_engine/config/margins.toml`), Holm for driver inputs and speed-class interactions, off-track share as a guardrail, passes on another setup or from another driver left out and counted, every block driven before a manual evaluate ([ADR 0029](adr/0029-block-level-inference-and-finding-classes.md)); results kept per verdict with the engine version (migration 00012, [ADR 0030](adr/0030-append-only-results-and-engine-version.md)) | Tested (pytest incl. hypothesis and known-truth simulations, a real-data A/A and replay of experiments 11, 12 and 15 to 19 offline, Go table-driven and against PostgreSQL, Vitest, the end-to-end test on the mocked game); **unverified in game** |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
 | Corner phases at fixed distances, per-corner speed regimes and the vehicle-response analysis: `phases/align.py`, `events.py`, `cuts.py`, `join.py`, `reference.py`, `features/regimes.py`, `engine/paddock_engine/response/` with its metrics and parameter-to-observable configuration (`metrics.toml`, `parameters.toml`), `POST /response` (`contracts/response_*.schema.json`), absolute `brake_point_m` / `throttle_pickup_point_m` ([ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)) | Tested (pytest incl. hypothesis, the real FH26 and 488 GT3 corner medians as a fixture, offline replay of experiment 15's real passes); core does not call `/response` yet; **unverified in game** |

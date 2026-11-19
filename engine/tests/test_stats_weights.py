@@ -26,13 +26,13 @@ CORNERS = 14
 WILD_SCATTER = [SIGMA_S] * (CORNERS - 2) + [10.0 * SIGMA_S] * 2  # corners 13 and 14 at 10x
 TRUTH = 0.020
 REPS = 100  # simulated experiments per coverage check: the rates are exact (fixed seeds)
-REPLICATES = 200
+BLOCKS = 8  # the first look (ADR 0029)
 
 
 def _trials(seed: int, scatter: float | list[float]) -> list[Effect]:
     rng = np.random.default_rng(seed)
-    rows = [simulate_abab(rng, TRUTH, CORNERS, sigma=scatter) for _ in range(REPS)]
-    return [estimate_effects(r, BASELINE, rope=0.005, replicates=REPLICATES)[0] for r in rows]
+    rows = [simulate_abab(rng, TRUTH, CORNERS, sigma=scatter, blocks=BLOCKS) for _ in range(REPS)]
+    return [estimate_effects(r, BASELINE, rope=0.005)[0] for r in rows]
 
 
 def _unweighted_trials(seed: int, scatter: float | list[float]) -> list[Effect]:
@@ -103,8 +103,8 @@ def test_weights_do_not_depend_on_the_unit_of_the_channel(seed: int, unit: float
     rows = [Observation(r.corner, r.arm, r.value, r.block, r.lap) for r in rows]
     scaled = [Observation(r.corner, r.arm, r.value * unit, r.block, r.lap) for r in rows]
 
-    first = estimate_effects(rows, BASELINE, rope=0.005, replicates=20)[0]
-    second = estimate_effects(scaled, BASELINE, rope=0.005 * unit, replicates=20)[0]
+    first = estimate_effects(rows, BASELINE, rope=0.005)[0]
+    second = estimate_effects(scaled, BASELINE, rope=0.005 * unit)[0]
 
     assert second.corner_weights.keys() == first.corner_weights.keys()
     for corner, weight in first.corner_weights.items():
@@ -214,7 +214,7 @@ def test_equal_weights_are_no_weights(constant: float, seed: int) -> None:
 def test_the_verdict_says_when_corners_were_weighted(
     scatter: float | list[float], note: str
 ) -> None:
-    rows = simulate_abab(np.random.default_rng(5), -0.060, CORNERS, sigma=scatter)
+    rows = simulate_abab(np.random.default_rng(5), -0.060, CORNERS, sigma=scatter, blocks=BLOCKS)
     passes = [
         {
             "corner": row.corner,
@@ -231,4 +231,4 @@ def test_the_verdict_says_when_corners_were_weighted(
 
     verdict = evaluate(EvaluateRequest.model_validate(request | {"passes": passes}))
 
-    assert verdict.reason.endswith("guardrails hold." + note)
+    assert verdict.reason.endswith("Guardrails hold." + note)

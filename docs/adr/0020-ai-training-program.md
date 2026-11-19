@@ -1,6 +1,6 @@
 # ADR 0020: The AI trains on a car by itself: a queue of experiments judged as they finish
 
-Status: accepted (2026-11-16)
+Status: accepted (2026-11-16). Amended by [ADR 0029](0029-block-level-inference-and-finding-classes.md): a program extends an inconclusive experiment when the engine recommends `continue` (the next pre-registered look), up to the two extensions any experiment has, instead of once when the interval was on the better side.
 
 ## Context
 

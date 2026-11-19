@@ -53,8 +53,14 @@ func (f *fakeEngine) Evaluate(_ context.Context, request contracts.EvaluateReque
 	}
 	decision := f.decisions[0]
 	f.decisions = f.decisions[1:]
+	finding := findings[decision]
+	next := contracts.EvaluateResponseRecommendationContinue
+	version, look := "test-engine", 0
 	return contracts.EvaluateResponse{
-		Decision: decision, Reason: "The engine says " + string(decision) + ".",
+		FindingClass: &finding, Recommendation: &next, EngineVersion: &version, Look: &look,
+		Flags:       []contracts.EvaluateResponseFlagsElem{contracts.EvaluateResponseFlagsElemFewBlocks},
+		Confounders: []contracts.Confounder{{Kind: contracts.ConfounderKindCovariateBetweenBlocks, Name: "time_since_start_s"}},
+		Decision:    decision, Reason: "The engine says " + string(decision) + ".",
 		Results: []contracts.ChannelResult{{
 			Channel: request.SuccessTest.Channel, Role: contracts.ChannelResultRolePrimary,
 			CornerClass: contracts.ChannelResultCornerClassAll, Estimate: -0.03, CiLow: -0.04,
@@ -64,6 +70,14 @@ func (f *fakeEngine) Evaluate(_ context.Context, request contracts.EvaluateReque
 		Guardrails:     []contracts.GuardrailResult{},
 		PredictionHits: 1, PredictionTotal: 1, PassesUsed: len(request.Passes),
 	}, nil
+}
+
+// findings is what the fake engine finds with each decision.
+var findings = map[contracts.EvaluateResponseDecision]contracts.EvaluateResponseFindingClass{
+	contracts.EvaluateResponseDecisionAccepted:     contracts.EvaluateResponseFindingClassConfirmedImprovement,
+	contracts.EvaluateResponseDecisionTradeoff:     contracts.EvaluateResponseFindingClassConfirmedImprovement,
+	contracts.EvaluateResponseDecisionRejected:     contracts.EvaluateResponseFindingClassNeutral,
+	contracts.EvaluateResponseDecisionInconclusive: contracts.EvaluateResponseFindingClassLikelyImprovement,
 }
 
 type fixture struct {
@@ -119,15 +133,17 @@ func (f *fixture) propose(t *testing.T, clicks int) contracts.Experiment {
 }
 
 // Every block that has laps to drive and no passes yet gets an out-lap (lap 0) and its push
-// laps in every corner, with features as the engine would have computed them.
+// laps in every corner, on the block's setup, with features as the engine would have computed
+// them.
 const driveSQL = `
 INSERT INTO corner_pass (session_id, corner_id, seq, t_start, duration_s, features, block_id,
-                         block_lap, fuel_l, tyre_core_c)
+                         block_lap, fuel_l, tyre_core_c, setup_version_id)
 SELECT $1, c.id, $2 * 100000 + b."order" * 1000 + lap * 10 + c.number,
        now() + make_interval(secs => $2 * 100000 + b."order" * 1000 + lap * 10 + c.number),
        5.0, '{"metrics": {"corner_time_s": 5.0}, "speed_class": "slow"}'::jsonb,
-       b.id, lap, 40 - lap, ARRAY[80, 81, 82, 83]::float8[]
+       b.id, lap, 40 - lap, ARRAY[80, 81, 82, 83]::float8[], a.setup_version_id
 FROM run_block b
+JOIN experiment_arm a ON a.id = b.arm_id
 CROSS JOIN generate_series(0, b.laps_target) AS lap
 CROSS JOIN corner c
 WHERE b.experiment_id = $2 AND b.laps_target > 0

@@ -74,8 +74,10 @@ sections of the lap it last went wrong. Delete the file to start over.
 Once calibrated, **Setups › Train the AI on this car › Start training** (or
 `POST /sessions/{id}/training {"experiments": 4}` with the calibrated AI session) runs the
 session's best-ranked experiments one after another with the AI driving. Core judges each one
-when its laps are in, extends a promising inconclusive one once, puts the baseline back after
-a loss, and starts the next untested item ([ADR 0020](../adr/0020-ai-training-program.md)). A
+when every block is driven, extends an inconclusive one when the engine recommends the next
+look (8, then 10 and 12 blocks), puts the baseline back after a loss, and starts the next
+untested item ([ADR 0020](../adr/0020-ai-training-program.md),
+[ADR 0029](../adr/0029-block-level-inference-and-finding-classes.md)). A
 trade-off waits for you. Leave the game running; about 40 minutes per experiment on a 2:15 lap.
 `GET /training` and the window show where it is; **Stop training** ends it.
 

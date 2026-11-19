@@ -94,12 +94,13 @@ func (l *fakeLedger) drive(id int64) {
 	}
 }
 
-// judge gives the experiment its verdict and primary result over all corners.
-func (l *fakeLedger) judge(id int64, state experiments.State, ciLow, ciHigh float64) {
+// judge gives the experiment the engine's verdict and what it recommends ("" for nothing).
+func (l *fakeLedger) judge(id int64, state experiments.State, next contracts.VerdictSummaryRecommendation) {
 	exp := l.states[id]
 	exp.State = state
-	exp.Results = []contracts.ExperimentResult{{
-		Channel: "corner_time_s", Role: contracts.ExperimentResultRolePrimary,
-		CornerClass: contracts.ExperimentResultCornerClassAll, CiLow: ciLow, CiHigh: ciHigh,
-	}}
+	exp.Verdict = &contracts.VerdictSummary{Decision: contracts.VerdictSummaryDecision(state),
+		DecidedBy: contracts.VerdictSummaryDecidedByEngine}
+	if next != "" {
+		exp.Verdict.Recommendation = &next
+	}
 }

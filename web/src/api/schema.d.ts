@@ -1113,6 +1113,25 @@ export interface components {
       by_state: components["schemas"]["StateCount"][];
     };
     /**
+     * Confounder
+     * @description Something besides the setup that may be in the number, named for the reader.
+     */
+    Confounder: {
+      /** @enum {string} */
+      kind:
+        | "covariate_left_out"
+        | "covariate_between_blocks"
+        | "driver_input_shifted"
+        | "session_tangled"
+        | "setup_mismatch"
+        | "source_mismatch"
+        | "speed_class_interaction";
+      /** @description The covariate, channel, speed classes or reason it is about. */
+      name: string;
+      /** @description Passes concerned, for the exclusions. */
+      count?: number;
+    };
+    /**
      * SuccessTest
      * @description The test an experiment must pass, fixed before driving.
      */
@@ -1235,6 +1254,41 @@ export interface components {
       decided_at: string;
       prediction_hits: number;
       prediction_total: number;
+      /**
+       * @description What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence. From the latest verdict the engine gave.
+       * @enum {string}
+       */
+      finding_class?:
+        | "invalid"
+        | "confirmed_improvement"
+        | "confirmed_regression"
+        | "neutral"
+        | "context_dependent"
+        | "likely_improvement"
+        | "likely_regression"
+        | "insufficient_evidence";
+      /** @description True when the finding was derived from an old verdict's decision and reason (judged before ADR 0029, by another method). */
+      finding_derived?: boolean;
+      /** @description few_blocks: fewer than 8 blocks, never a confirmed finding. uninformative: the interval is more than twice the margin wide on each side. */
+      flags?: ("few_blocks" | "uninformative")[];
+      /**
+       * @description What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.
+       * @enum {string}
+       */
+      recommendation?:
+        | "continue"
+        | "larger_perturbation"
+        | "investigate_context"
+        | "switch_metric"
+        | "stop_neutral"
+        | "stop_invalid";
+      confounders?: components["schemas"]["Confounder"][];
+      driver_adapted?: boolean;
+      engine_version?: string;
+      passes_used?: number;
+      passes_excluded?: number;
+      look?: number;
+      margin?: number;
     };
     /**
      * ExperimentEvent

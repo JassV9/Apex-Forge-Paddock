@@ -21,7 +21,9 @@ from paddock_engine.stats.observations import (
 def test_a_restarted_experiment_keeps_a_narrow_interval(seed: int) -> None:
     """Experiment 6: time and fuel were correlated (0.94) but not copies, and with the clock
     and the tank reset by each new session both were entangled with which setup was on the car.
-    The interval was +-450 ms around an effect of 0; it must stay within a few milliseconds."""
+    The interval was +-450 ms around an effect of 0; it must stay within a few tens of
+    milliseconds. Four blocks leave the block-level interval two degrees of freedom (ADR 0029),
+    so it is wider than ADR 0022's 30 ms."""
     observations = simulate_restarted_abab(np.random.default_rng(seed), effect=0.0)
 
     design = build_design(observations, BASELINE)
@@ -29,7 +31,7 @@ def test_a_restarted_experiment_keeps_a_narrow_interval(seed: int) -> None:
 
     assert (design.covariates, design.dropped) == (["time_in_session_s"], ["fuel_l"])
     assert effect.dropped_covariates == ["fuel_l"]
-    assert effect.ci_high - effect.ci_low < 0.03
+    assert effect.ci_high - effect.ci_low < 0.06
     assert effect.ci_low < 0.0 < effect.ci_high
 
 

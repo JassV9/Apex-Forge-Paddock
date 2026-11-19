@@ -1,0 +1,16 @@
+# Margins of practical equivalence (docs/adr/0029-block-level-inference-and-finding-classes.md).
+#
+# A margin is the smallest change of a channel that matters, in the channel's unit. A finding is
+# judged against it: confirmed when the whole interval lies beyond it, neutral when the whole
+# interval lies inside it. A margin is never 0: a channel without one gets no neutral finding,
+# and the success test's band is used only when the configuration has none.
+#
+# [metrics] holds the defaults; [parameters.<SETUP_ITEM>] overrides them for one setup item.
+
+[metrics]
+corner_time_s = 0.005       # 5 ms per corner pass (ADR 0008)
+rear_slip_peak_deg = 0.5    # the guardrail tolerances core freezes on every experiment
+countersteer_s = 0.05
+offtrack_rate = 0.05        # share of push-lap passes off track, variant minus baseline
+
+[parameters]

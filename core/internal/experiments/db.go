@@ -47,6 +47,7 @@ type record struct {
 	baselineVersion int64
 	variantVersion  int64
 	extensions      int
+	parameter       string // the setup item a one-factor experiment moves; empty otherwise
 	test            contracts.SuccessTest
 	guardrails      []contracts.GuardrailSpec
 }
@@ -55,10 +56,11 @@ const recordSQL = `
 SELECT e.id, e.kind, e.state, h.car_id, h.track_id, c.ac_id, e.baseline_version_id,
        (SELECT a.setup_version_id FROM experiment_arm a
         WHERE a.experiment_id = e.id AND NOT a.is_baseline),
-       e.extensions, e.success_test, e.guardrails
+       e.extensions, COALESCE(sp.name, ''), e.success_test, e.guardrails
 FROM experiment e
 JOIN hypothesis h ON h.id = e.hypothesis_id
 JOIN car c ON c.id = h.car_id
+LEFT JOIN setup_parameter sp ON sp.id = e.parameter_id
 WHERE e.id = $1`
 
 // loadRecord reads an experiment. In a transaction pass lock = true: the row stays locked
@@ -72,7 +74,7 @@ func loadRecord(ctx context.Context, q querier, id int64, lock bool) (record, er
 	var test, guardrails []byte
 	err := q.QueryRowContext(ctx, query, id).Scan(&exp.id, &exp.kind, &exp.state, &exp.carID,
 		&exp.trackID, &exp.carACID, &exp.baselineVersion, &exp.variantVersion, &exp.extensions,
-		&test, &guardrails)
+		&exp.parameter, &test, &guardrails)
 	if errors.Is(err, sql.ErrNoRows) {
 		return record{}, fmt.Errorf("experiment %d: %w", id, ErrNotFound)
 	}

@@ -6096,6 +6096,1091 @@ func (j *ReferenceTrack) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// ESTIMATE: peak lateral g = c0 + c1 v^2 over the corners' baseline medians. Its
+// share is reported only when adequate (R^2 >= 0.5, c0 and c1 positive).
+type ResponseAeroFit struct {
+	// Adequate corresponds to the JSON schema field "adequate".
+	Adequate bool `json:"adequate"`
+
+	// C0G corresponds to the JSON schema field "c0_g".
+	C0G float64 `json:"c0_g"`
+
+	// C1GPerMs2 corresponds to the JSON schema field "c1_g_per_ms2".
+	C1GPerMs2 float64 `json:"c1_g_per_ms2"`
+
+	// Corners corresponds to the JSON schema field "corners".
+	Corners int `json:"corners"`
+
+	// R2 corresponds to the JSON schema field "r2".
+	R2 float64 `json:"r2"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseAeroFit) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["adequate"]; raw != nil && !ok {
+		return fmt.Errorf("field adequate in ResponseAeroFit: required")
+	}
+	if _, ok := raw["c0_g"]; raw != nil && !ok {
+		return fmt.Errorf("field c0_g in ResponseAeroFit: required")
+	}
+	if _, ok := raw["c1_g_per_ms2"]; raw != nil && !ok {
+		return fmt.Errorf("field c1_g_per_ms2 in ResponseAeroFit: required")
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in ResponseAeroFit: required")
+	}
+	if _, ok := raw["r2"]; raw != nil && !ok {
+		return fmt.Errorf("field r2 in ResponseAeroFit: required")
+	}
+	type Plain ResponseAeroFit
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.Corners {
+		return fmt.Errorf("field %s: must be >= %v", "corners", 0)
+	}
+	*j = ResponseAeroFit(plain)
+	return nil
+}
+
+// Where a corner and its zone are, in metres from the start line.
+type ResponseCorner struct {
+	// EndM corresponds to the JSON schema field "end_m".
+	EndM float64 `json:"end_m"`
+
+	// Number corresponds to the JSON schema field "number".
+	Number int `json:"number"`
+
+	// StartM corresponds to the JSON schema field "start_m".
+	StartM float64 `json:"start_m"`
+
+	// ZoneEndM corresponds to the JSON schema field "zone_end_m".
+	ZoneEndM float64 `json:"zone_end_m"`
+
+	// ZoneStartM corresponds to the JSON schema field "zone_start_m".
+	ZoneStartM float64 `json:"zone_start_m"`
+}
+
+// One corner's frozen cuts, in metres from its zone start, identical for both
+// arms.
+type ResponseCornerCuts struct {
+	// ESTIMATE of the share of lateral grip that grows with speed at v_min_kmh, from
+	// the aero fit; left out when the fit is not adequate.
+	AeroShareEstimate *float64 `json:"aero_share_estimate,omitempty,omitzero"`
+
+	// True on a flat-out corner: the apex is the curvature peak, not the slowest
+	// point.
+	ApexByCurvature bool `json:"apex_by_curvature"`
+
+	// ApexM corresponds to the JSON schema field "apex_m".
+	ApexM float64 `json:"apex_m"`
+
+	// BaselinePasses corresponds to the JSON schema field "baseline_passes".
+	BaselinePasses int `json:"baseline_passes"`
+
+	// B: median first braking of the baseline; left out when the baseline does not
+	// brake.
+	BrakingM *float64 `json:"braking_m,omitempty,omitzero"`
+
+	// Descriptive only: the variant's median time against the baseline's median trace
+	// since the first cut, every 10 m. Never used for inference.
+	DeltaT []ResponseDeltaPoint `json:"delta_t"`
+
+	// EndM corresponds to the JSON schema field "end_m".
+	EndM float64 `json:"end_m"`
+
+	// Flags corresponds to the JSON schema field "flags".
+	Flags []string `json:"flags"`
+
+	// w: the mid phase is the apex +- w.
+	MidHalfM float64 `json:"mid_half_m"`
+
+	// Number corresponds to the JSON schema field "number".
+	Number int `json:"number"`
+
+	// Phases corresponds to the JSON schema field "phases".
+	Phases []ResponsePhaseSpan `json:"phases"`
+
+	// PickupM corresponds to the JSON schema field "pickup_m".
+	PickupM *float64 `json:"pickup_m,omitempty,omitzero"`
+
+	// Regime corresponds to the JSON schema field "regime".
+	Regime ResponseResponseCornersElemRegime `json:"regime"`
+
+	// TurnInM corresponds to the JSON schema field "turn_in_m".
+	TurnInM float64 `json:"turn_in_m"`
+
+	// Median minimum speed of the baseline passes: what the regime is read from.
+	VMinKmh float64 `json:"v_min_kmh"`
+
+	// VariantPasses corresponds to the JSON schema field "variant_passes".
+	VariantPasses int `json:"variant_passes"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseCornerCuts) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["apex_by_curvature"]; raw != nil && !ok {
+		return fmt.Errorf("field apex_by_curvature in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["apex_m"]; raw != nil && !ok {
+		return fmt.Errorf("field apex_m in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["baseline_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field baseline_passes in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["delta_t"]; raw != nil && !ok {
+		return fmt.Errorf("field delta_t in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field end_m in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["flags"]; raw != nil && !ok {
+		return fmt.Errorf("field flags in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["mid_half_m"]; raw != nil && !ok {
+		return fmt.Errorf("field mid_half_m in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["number"]; raw != nil && !ok {
+		return fmt.Errorf("field number in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["phases"]; raw != nil && !ok {
+		return fmt.Errorf("field phases in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["regime"]; raw != nil && !ok {
+		return fmt.Errorf("field regime in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["turn_in_m"]; raw != nil && !ok {
+		return fmt.Errorf("field turn_in_m in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["v_min_kmh"]; raw != nil && !ok {
+		return fmt.Errorf("field v_min_kmh in ResponseCornerCuts: required")
+	}
+	if _, ok := raw["variant_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field variant_passes in ResponseCornerCuts: required")
+	}
+	type Plain ResponseCornerCuts
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.BaselinePasses {
+		return fmt.Errorf("field %s: must be >= %v", "baseline_passes", 0)
+	}
+	if 1 > plain.Number {
+		return fmt.Errorf("field %s: must be >= %v", "number", 1)
+	}
+	if 0 > plain.VariantPasses {
+		return fmt.Errorf("field %s: must be >= %v", "variant_passes", 0)
+	}
+	*j = ResponseCornerCuts(plain)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseCorner) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field end_m in ResponseCorner: required")
+	}
+	if _, ok := raw["number"]; raw != nil && !ok {
+		return fmt.Errorf("field number in ResponseCorner: required")
+	}
+	if _, ok := raw["start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field start_m in ResponseCorner: required")
+	}
+	if _, ok := raw["zone_end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field zone_end_m in ResponseCorner: required")
+	}
+	if _, ok := raw["zone_start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field zone_start_m in ResponseCorner: required")
+	}
+	type Plain ResponseCorner
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.EndM {
+		return fmt.Errorf("field %s: must be >= %v", "end_m", 0)
+	}
+	if 1 > plain.Number {
+		return fmt.Errorf("field %s: must be >= %v", "number", 1)
+	}
+	if 0 > plain.StartM {
+		return fmt.Errorf("field %s: must be >= %v", "start_m", 0)
+	}
+	if 0 > plain.ZoneEndM {
+		return fmt.Errorf("field %s: must be >= %v", "zone_end_m", 0)
+	}
+	if 0 > plain.ZoneStartM {
+		return fmt.Errorf("field %s: must be >= %v", "zone_start_m", 0)
+	}
+	*j = ResponseCorner(plain)
+	return nil
+}
+
+type ResponseDeltaPoint struct {
+	// DeltaS corresponds to the JSON schema field "delta_s".
+	DeltaS float64 `json:"delta_s"`
+
+	// XM corresponds to the JSON schema field "x_m".
+	XM float64 `json:"x_m"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseDeltaPoint) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["delta_s"]; raw != nil && !ok {
+		return fmt.Errorf("field delta_s in ResponseDeltaPoint: required")
+	}
+	if _, ok := raw["x_m"]; raw != nil && !ok {
+		return fmt.Errorf("field x_m in ResponseDeltaPoint: required")
+	}
+	type Plain ResponseDeltaPoint
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ResponseDeltaPoint(plain)
+	return nil
+}
+
+// Variant minus baseline of one metric over one phase and regime, from the effect
+// model (ADR 0008, 0023).
+type ResponseEffect struct {
+	// BaselineMean corresponds to the JSON schema field "baseline_mean".
+	BaselineMean *float64 `json:"baseline_mean,omitempty,omitzero"`
+
+	// CiHigh corresponds to the JSON schema field "ci_high".
+	CiHigh *float64 `json:"ci_high,omitempty,omitzero"`
+
+	// CiLow corresponds to the JSON schema field "ci_low".
+	CiLow *float64 `json:"ci_low,omitempty,omitzero"`
+
+	// Corners corresponds to the JSON schema field "corners".
+	Corners int `json:"corners"`
+
+	// Estimate corresponds to the JSON schema field "estimate".
+	Estimate *float64 `json:"estimate,omitempty,omitzero"`
+
+	// Whether the parameter row of the changed item lists this cell: direct, proxy,
+	// or none (no row, or not listed).
+	Expected ResponseResponseEffectsElemExpected `json:"expected"`
+
+	// The interval against the metric's margin: increase, decrease, neutral (inside
+	// the margin), likely increase / likely decrease (excludes 0, not the margin),
+	// insufficient.
+	Finding ResponseResponseEffectsElemFinding `json:"finding"`
+
+	// direct: read from a recorded channel. proxy: derived, standing in for something
+	// not recorded.
+	Kind ResponseResponseEffectsElemKind `json:"kind"`
+
+	// Margin corresponds to the JSON schema field "margin".
+	Margin *float64 `json:"margin,omitempty,omitzero"`
+
+	// Metric corresponds to the JSON schema field "metric".
+	Metric string `json:"metric"`
+
+	// NPasses corresponds to the JSON schema field "n_passes".
+	NPasses int `json:"n_passes"`
+
+	// Note corresponds to the JSON schema field "note".
+	Note *string `json:"note,omitempty,omitzero"`
+
+	// Phase corresponds to the JSON schema field "phase".
+	Phase ResponseResponseEffectsElemPhase `json:"phase"`
+
+	// Regime corresponds to the JSON schema field "regime".
+	Regime ResponseResponseEffectsElemRegime `json:"regime"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseEffect) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in ResponseEffect: required")
+	}
+	if _, ok := raw["expected"]; raw != nil && !ok {
+		return fmt.Errorf("field expected in ResponseEffect: required")
+	}
+	if _, ok := raw["finding"]; raw != nil && !ok {
+		return fmt.Errorf("field finding in ResponseEffect: required")
+	}
+	if _, ok := raw["kind"]; raw != nil && !ok {
+		return fmt.Errorf("field kind in ResponseEffect: required")
+	}
+	if _, ok := raw["metric"]; raw != nil && !ok {
+		return fmt.Errorf("field metric in ResponseEffect: required")
+	}
+	if _, ok := raw["n_passes"]; raw != nil && !ok {
+		return fmt.Errorf("field n_passes in ResponseEffect: required")
+	}
+	if _, ok := raw["phase"]; raw != nil && !ok {
+		return fmt.Errorf("field phase in ResponseEffect: required")
+	}
+	if _, ok := raw["regime"]; raw != nil && !ok {
+		return fmt.Errorf("field regime in ResponseEffect: required")
+	}
+	type Plain ResponseEffect
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.Corners {
+		return fmt.Errorf("field %s: must be >= %v", "corners", 0)
+	}
+	if plain.Margin != nil && 0 > *plain.Margin {
+		return fmt.Errorf("field %s: must be >= %v", "margin", 0)
+	}
+	if utf8.RuneCountInString(string(plain.Metric)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "metric", 1)
+	}
+	if 0 > plain.NPasses {
+		return fmt.Errorf("field %s: must be >= %v", "n_passes", 0)
+	}
+	*j = ResponseEffect(plain)
+	return nil
+}
+
+// One pass of the experiment's push laps.
+type ResponsePass struct {
+	// Arm corresponds to the JSON schema field "arm".
+	Arm ResponseRequestPassesElemArm `json:"arm"`
+
+	// Block corresponds to the JSON schema field "block".
+	Block int `json:"block"`
+
+	// Corner corresponds to the JSON schema field "corner".
+	Corner int `json:"corner"`
+
+	// Conditions to adjust for, as in EvaluatePass.
+	Covariates ResponseRequestPassesElemCovariates `json:"covariates,omitempty,omitzero"`
+
+	// DurationS corresponds to the JSON schema field "duration_s".
+	DurationS float64 `json:"duration_s"`
+
+	// Lap code; passes of one lap share their errors.
+	Lap *int `json:"lap,omitempty,omitzero"`
+
+	// Order of the pass within its session.
+	Seq int `json:"seq"`
+
+	// Session corresponds to the JSON schema field "session".
+	Session int `json:"session"`
+
+	// When the pass started, seconds on any clock shared by the session's passes.
+	TStartS float64 `json:"t_start_s"`
+
+	// False: not compared, but its samples may still complete the previous pass's
+	// exit and traction.
+	Valid bool `json:"valid"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponsePass) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["arm"]; raw != nil && !ok {
+		return fmt.Errorf("field arm in ResponsePass: required")
+	}
+	if _, ok := raw["block"]; raw != nil && !ok {
+		return fmt.Errorf("field block in ResponsePass: required")
+	}
+	if _, ok := raw["corner"]; raw != nil && !ok {
+		return fmt.Errorf("field corner in ResponsePass: required")
+	}
+	if _, ok := raw["duration_s"]; raw != nil && !ok {
+		return fmt.Errorf("field duration_s in ResponsePass: required")
+	}
+	if _, ok := raw["seq"]; raw != nil && !ok {
+		return fmt.Errorf("field seq in ResponsePass: required")
+	}
+	if _, ok := raw["session"]; raw != nil && !ok {
+		return fmt.Errorf("field session in ResponsePass: required")
+	}
+	if _, ok := raw["t_start_s"]; raw != nil && !ok {
+		return fmt.Errorf("field t_start_s in ResponsePass: required")
+	}
+	if _, ok := raw["valid"]; raw != nil && !ok {
+		return fmt.Errorf("field valid in ResponsePass: required")
+	}
+	type Plain ResponsePass
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 1 > plain.Block {
+		return fmt.Errorf("field %s: must be >= %v", "block", 1)
+	}
+	if 1 > plain.Corner {
+		return fmt.Errorf("field %s: must be >= %v", "corner", 1)
+	}
+	if 0 >= plain.DurationS {
+		return fmt.Errorf("field %s: must be > %v", "duration_s", 0)
+	}
+	if plain.Lap != nil && 0 > *plain.Lap {
+		return fmt.Errorf("field %s: must be >= %v", "lap", 0)
+	}
+	if 1 > plain.Seq {
+		return fmt.Errorf("field %s: must be >= %v", "seq", 1)
+	}
+	if 1 > plain.Session {
+		return fmt.Errorf("field %s: must be >= %v", "session", 1)
+	}
+	*j = ResponsePass(plain)
+	return nil
+}
+
+type ResponsePhaseSpan struct {
+	// EndM corresponds to the JSON schema field "end_m".
+	EndM float64 `json:"end_m"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name ResponseResponseCornersElemPhasesElemName `json:"name"`
+
+	// Note corresponds to the JSON schema field "note".
+	Note *string `json:"note,omitempty,omitzero"`
+
+	// StartM corresponds to the JSON schema field "start_m".
+	StartM float64 `json:"start_m"`
+
+	// ok: cut and measured. merged: shorter than 5 m, its metres went to a neighbour.
+	// absent: the event does not happen (no braking). unavailable: the passes end too
+	// early.
+	Status ResponseResponseCornersElemPhasesElemStatus `json:"status"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponsePhaseSpan) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["end_m"]; raw != nil && !ok {
+		return fmt.Errorf("field end_m in ResponsePhaseSpan: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ResponsePhaseSpan: required")
+	}
+	if _, ok := raw["start_m"]; raw != nil && !ok {
+		return fmt.Errorf("field start_m in ResponsePhaseSpan: required")
+	}
+	if _, ok := raw["status"]; raw != nil && !ok {
+		return fmt.Errorf("field status in ResponsePhaseSpan: required")
+	}
+	type Plain ResponsePhaseSpan
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ResponsePhaseSpan(plain)
+	return nil
+}
+
+// How the corners were classed: per corner, from the baseline, never per pass.
+type ResponseRegimes struct {
+	// ESTIMATE: peak lateral g = c0 + c1 v^2 over the corners' baseline medians. Its
+	// share is reported only when adequate (R^2 >= 0.5, c0 and c1 positive).
+	AeroFit *ResponseAeroFit `json:"aero_fit,omitempty,omitzero"`
+
+	// BreaksKmh corresponds to the JSON schema field "breaks_kmh".
+	BreaksKmh []float64 `json:"breaks_kmh"`
+
+	// gaps: the two largest gaps in log median minimum speed, at least 2 corners per
+	// class. fixed: 100 and 150 km/h (too few corners). stored: the passes' stored
+	// classes (no minimum speeds).
+	Method ResponseResponseRegimesMethod `json:"method"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseRegimes) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["breaks_kmh"]; raw != nil && !ok {
+		return fmt.Errorf("field breaks_kmh in ResponseRegimes: required")
+	}
+	if _, ok := raw["method"]; raw != nil && !ok {
+		return fmt.Errorf("field method in ResponseRegimes: required")
+	}
+	type Plain ResponseRegimes
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.BreaksKmh != nil && len(plain.BreaksKmh) < 2 {
+		return fmt.Errorf("field %s length: must be >= %d", "breaks_kmh", 2)
+	}
+	if len(plain.BreaksKmh) > 2 {
+		return fmt.Errorf("field %s length: must be <= %d", "breaks_kmh", 2)
+	}
+	*j = ResponseRegimes(plain)
+	return nil
+}
+
+// Asks the engine how an experiment's variant changed the car's response, per
+// phase and speed regime (POST /response, ADR 0031).
+type ResponseRequest struct {
+	// Corners corresponds to the JSON schema field "corners".
+	Corners []ResponseCorner `json:"corners"`
+
+	// F or R when the changed item belongs to one axle; empty otherwise.
+	ItemAxle *string `json:"item_axle,omitempty,omitzero"`
+
+	// The changed setup item's role in the catalog (arb, wing, bias, ...); picks the
+	// parameter row of the observables mapping.
+	ItemRole *string `json:"item_role,omitempty,omitzero"`
+
+	// Confidence level of every interval; 0.9 when left out.
+	Level *float64 `json:"level,omitempty,omitzero"`
+
+	// Passes corresponds to the JSON schema field "passes".
+	Passes []ResponsePass `json:"passes"`
+
+	// Where each session's raw samples are.
+	Sessions []ResponseSession `json:"sessions"`
+
+	// Lap length along the AI line.
+	TrackLengthM float64 `json:"track_length_m"`
+}
+
+type ResponseRequestPassesElemArm string
+
+const ResponseRequestPassesElemArmBaseline ResponseRequestPassesElemArm = "baseline"
+const ResponseRequestPassesElemArmVariant ResponseRequestPassesElemArm = "variant"
+
+var enumValues_ResponseRequestPassesElemArm = []interface{}{
+	"baseline",
+	"variant",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseRequestPassesElemArm) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseRequestPassesElemArm {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseRequestPassesElemArm, v)
+	}
+	*j = ResponseRequestPassesElemArm(v)
+	return nil
+}
+
+// Conditions to adjust for, as in EvaluatePass.
+type ResponseRequestPassesElemCovariates map[string]float64
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in ResponseRequest: required")
+	}
+	if _, ok := raw["passes"]; raw != nil && !ok {
+		return fmt.Errorf("field passes in ResponseRequest: required")
+	}
+	if _, ok := raw["sessions"]; raw != nil && !ok {
+		return fmt.Errorf("field sessions in ResponseRequest: required")
+	}
+	if _, ok := raw["track_length_m"]; raw != nil && !ok {
+		return fmt.Errorf("field track_length_m in ResponseRequest: required")
+	}
+	type Plain ResponseRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.Corners != nil && len(plain.Corners) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "corners", 1)
+	}
+	if plain.Level != nil && 1 <= *plain.Level {
+		return fmt.Errorf("field %s: must be < %v", "level", 1)
+	}
+	if plain.Level != nil && 0.5 >= *plain.Level {
+		return fmt.Errorf("field %s: must be > %v", "level", 0.5)
+	}
+	if plain.Sessions != nil && len(plain.Sessions) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "sessions", 1)
+	}
+	if 0 >= plain.TrackLengthM {
+		return fmt.Errorf("field %s: must be > %v", "track_length_m", 0)
+	}
+	*j = ResponseRequest(plain)
+	return nil
+}
+
+// How the variant changed the car's response: frozen phase cuts per corner, the
+// corner's speed regime, and one effect per (metric, phase, regime) (ADR 0031).
+type ResponseResponse struct {
+	// Corners corresponds to the JSON schema field "corners".
+	Corners []ResponseCornerCuts `json:"corners"`
+
+	// Effects corresponds to the JSON schema field "effects".
+	Effects []ResponseEffect `json:"effects"`
+
+	// Notes corresponds to the JSON schema field "notes".
+	Notes []string `json:"notes"`
+
+	// The parameter row the changed item matched, when it matched one.
+	Parameter *string `json:"parameter,omitempty,omitzero"`
+
+	// Passes not compared: not valid, no samples, or an unknown corner.
+	PassesExcluded int `json:"passes_excluded"`
+
+	// PassesUsed corresponds to the JSON schema field "passes_used".
+	PassesUsed int `json:"passes_used"`
+
+	// How the corners were classed: per corner, from the baseline, never per pass.
+	Regimes ResponseRegimes `json:"regimes"`
+
+	// Observables not computable from the channels recorded today: listed, never
+	// estimated.
+	Unavailable []ResponseUnavailable `json:"unavailable"`
+}
+
+type ResponseResponseCornersElemPhasesElemName string
+
+const ResponseResponseCornersElemPhasesElemNameBraking ResponseResponseCornersElemPhasesElemName = "braking"
+const ResponseResponseCornersElemPhasesElemNameEntry ResponseResponseCornersElemPhasesElemName = "entry"
+const ResponseResponseCornersElemPhasesElemNameExit ResponseResponseCornersElemPhasesElemName = "exit"
+const ResponseResponseCornersElemPhasesElemNameMid ResponseResponseCornersElemPhasesElemName = "mid"
+const ResponseResponseCornersElemPhasesElemNameTraction ResponseResponseCornersElemPhasesElemName = "traction"
+
+var enumValues_ResponseResponseCornersElemPhasesElemName = []interface{}{
+	"braking",
+	"entry",
+	"mid",
+	"exit",
+	"traction",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseCornersElemPhasesElemName) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseCornersElemPhasesElemName {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseCornersElemPhasesElemName, v)
+	}
+	*j = ResponseResponseCornersElemPhasesElemName(v)
+	return nil
+}
+
+type ResponseResponseCornersElemPhasesElemStatus string
+
+const ResponseResponseCornersElemPhasesElemStatusAbsent ResponseResponseCornersElemPhasesElemStatus = "absent"
+const ResponseResponseCornersElemPhasesElemStatusMerged ResponseResponseCornersElemPhasesElemStatus = "merged"
+const ResponseResponseCornersElemPhasesElemStatusOk ResponseResponseCornersElemPhasesElemStatus = "ok"
+const ResponseResponseCornersElemPhasesElemStatusUnavailable ResponseResponseCornersElemPhasesElemStatus = "unavailable"
+
+var enumValues_ResponseResponseCornersElemPhasesElemStatus = []interface{}{
+	"ok",
+	"merged",
+	"absent",
+	"unavailable",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseCornersElemPhasesElemStatus) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseCornersElemPhasesElemStatus {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseCornersElemPhasesElemStatus, v)
+	}
+	*j = ResponseResponseCornersElemPhasesElemStatus(v)
+	return nil
+}
+
+type ResponseResponseCornersElemRegime string
+
+const ResponseResponseCornersElemRegimeFast ResponseResponseCornersElemRegime = "fast"
+const ResponseResponseCornersElemRegimeMedium ResponseResponseCornersElemRegime = "medium"
+const ResponseResponseCornersElemRegimeSlow ResponseResponseCornersElemRegime = "slow"
+
+var enumValues_ResponseResponseCornersElemRegime = []interface{}{
+	"slow",
+	"medium",
+	"fast",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseCornersElemRegime) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseCornersElemRegime {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseCornersElemRegime, v)
+	}
+	*j = ResponseResponseCornersElemRegime(v)
+	return nil
+}
+
+type ResponseResponseEffectsElemExpected string
+
+const ResponseResponseEffectsElemExpectedDirect ResponseResponseEffectsElemExpected = "direct"
+const ResponseResponseEffectsElemExpectedNone ResponseResponseEffectsElemExpected = "none"
+const ResponseResponseEffectsElemExpectedProxy ResponseResponseEffectsElemExpected = "proxy"
+
+var enumValues_ResponseResponseEffectsElemExpected = []interface{}{
+	"direct",
+	"proxy",
+	"none",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseEffectsElemExpected) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseEffectsElemExpected {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseEffectsElemExpected, v)
+	}
+	*j = ResponseResponseEffectsElemExpected(v)
+	return nil
+}
+
+type ResponseResponseEffectsElemFinding string
+
+const ResponseResponseEffectsElemFindingDecrease ResponseResponseEffectsElemFinding = "decrease"
+const ResponseResponseEffectsElemFindingIncrease ResponseResponseEffectsElemFinding = "increase"
+const ResponseResponseEffectsElemFindingInsufficient ResponseResponseEffectsElemFinding = "insufficient"
+const ResponseResponseEffectsElemFindingLikelyDecrease ResponseResponseEffectsElemFinding = "likely decrease"
+const ResponseResponseEffectsElemFindingLikelyIncrease ResponseResponseEffectsElemFinding = "likely increase"
+const ResponseResponseEffectsElemFindingNeutral ResponseResponseEffectsElemFinding = "neutral"
+
+var enumValues_ResponseResponseEffectsElemFinding = []interface{}{
+	"increase",
+	"decrease",
+	"neutral",
+	"likely increase",
+	"likely decrease",
+	"insufficient",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseEffectsElemFinding) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseEffectsElemFinding {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseEffectsElemFinding, v)
+	}
+	*j = ResponseResponseEffectsElemFinding(v)
+	return nil
+}
+
+type ResponseResponseEffectsElemKind string
+
+const ResponseResponseEffectsElemKindDirect ResponseResponseEffectsElemKind = "direct"
+const ResponseResponseEffectsElemKindProxy ResponseResponseEffectsElemKind = "proxy"
+
+var enumValues_ResponseResponseEffectsElemKind = []interface{}{
+	"direct",
+	"proxy",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseEffectsElemKind) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseEffectsElemKind {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseEffectsElemKind, v)
+	}
+	*j = ResponseResponseEffectsElemKind(v)
+	return nil
+}
+
+type ResponseResponseEffectsElemPhase string
+
+const ResponseResponseEffectsElemPhaseBraking ResponseResponseEffectsElemPhase = "braking"
+const ResponseResponseEffectsElemPhaseCorner ResponseResponseEffectsElemPhase = "corner"
+const ResponseResponseEffectsElemPhaseEntry ResponseResponseEffectsElemPhase = "entry"
+const ResponseResponseEffectsElemPhaseExit ResponseResponseEffectsElemPhase = "exit"
+const ResponseResponseEffectsElemPhaseMid ResponseResponseEffectsElemPhase = "mid"
+const ResponseResponseEffectsElemPhaseTraction ResponseResponseEffectsElemPhase = "traction"
+
+var enumValues_ResponseResponseEffectsElemPhase = []interface{}{
+	"braking",
+	"entry",
+	"mid",
+	"exit",
+	"traction",
+	"corner",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseEffectsElemPhase) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseEffectsElemPhase {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseEffectsElemPhase, v)
+	}
+	*j = ResponseResponseEffectsElemPhase(v)
+	return nil
+}
+
+type ResponseResponseEffectsElemRegime string
+
+const ResponseResponseEffectsElemRegimeAll ResponseResponseEffectsElemRegime = "all"
+const ResponseResponseEffectsElemRegimeFast ResponseResponseEffectsElemRegime = "fast"
+const ResponseResponseEffectsElemRegimeMedium ResponseResponseEffectsElemRegime = "medium"
+const ResponseResponseEffectsElemRegimeSlow ResponseResponseEffectsElemRegime = "slow"
+
+var enumValues_ResponseResponseEffectsElemRegime = []interface{}{
+	"all",
+	"slow",
+	"medium",
+	"fast",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseEffectsElemRegime) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseEffectsElemRegime {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseEffectsElemRegime, v)
+	}
+	*j = ResponseResponseEffectsElemRegime(v)
+	return nil
+}
+
+type ResponseResponseRegimesMethod string
+
+const ResponseResponseRegimesMethodFixed ResponseResponseRegimesMethod = "fixed"
+const ResponseResponseRegimesMethodGaps ResponseResponseRegimesMethod = "gaps"
+const ResponseResponseRegimesMethodStored ResponseResponseRegimesMethod = "stored"
+
+var enumValues_ResponseResponseRegimesMethod = []interface{}{
+	"gaps",
+	"fixed",
+	"stored",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponseRegimesMethod) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ResponseResponseRegimesMethod {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ResponseResponseRegimesMethod, v)
+	}
+	*j = ResponseResponseRegimesMethod(v)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseResponse) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["corners"]; raw != nil && !ok {
+		return fmt.Errorf("field corners in ResponseResponse: required")
+	}
+	if _, ok := raw["effects"]; raw != nil && !ok {
+		return fmt.Errorf("field effects in ResponseResponse: required")
+	}
+	if _, ok := raw["notes"]; raw != nil && !ok {
+		return fmt.Errorf("field notes in ResponseResponse: required")
+	}
+	if _, ok := raw["passes_excluded"]; raw != nil && !ok {
+		return fmt.Errorf("field passes_excluded in ResponseResponse: required")
+	}
+	if _, ok := raw["passes_used"]; raw != nil && !ok {
+		return fmt.Errorf("field passes_used in ResponseResponse: required")
+	}
+	if _, ok := raw["regimes"]; raw != nil && !ok {
+		return fmt.Errorf("field regimes in ResponseResponse: required")
+	}
+	if _, ok := raw["unavailable"]; raw != nil && !ok {
+		return fmt.Errorf("field unavailable in ResponseResponse: required")
+	}
+	type Plain ResponseResponse
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if 0 > plain.PassesExcluded {
+		return fmt.Errorf("field %s: must be >= %v", "passes_excluded", 0)
+	}
+	if 0 > plain.PassesUsed {
+		return fmt.Errorf("field %s: must be >= %v", "passes_used", 0)
+	}
+	*j = ResponseResponse(plain)
+	return nil
+}
+
+type ResponseSession struct {
+	// Directory of the session's Parquet parts.
+	ParquetDir string `json:"parquet_dir"`
+
+	// Session corresponds to the JSON schema field "session".
+	Session int `json:"session"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseSession) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["parquet_dir"]; raw != nil && !ok {
+		return fmt.Errorf("field parquet_dir in ResponseSession: required")
+	}
+	if _, ok := raw["session"]; raw != nil && !ok {
+		return fmt.Errorf("field session in ResponseSession: required")
+	}
+	type Plain ResponseSession
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(string(plain.ParquetDir)) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "parquet_dir", 1)
+	}
+	if 1 > plain.Session {
+		return fmt.Errorf("field %s: must be >= %v", "session", 1)
+	}
+	*j = ResponseSession(plain)
+	return nil
+}
+
+type ResponseUnavailable struct {
+	// Observable corresponds to the JSON schema field "observable".
+	Observable string `json:"observable"`
+
+	// Reason corresponds to the JSON schema field "reason".
+	Reason string `json:"reason"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ResponseUnavailable) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["observable"]; raw != nil && !ok {
+		return fmt.Errorf("field observable in ResponseUnavailable: required")
+	}
+	if _, ok := raw["reason"]; raw != nil && !ok {
+		return fmt.Errorf("field reason in ResponseUnavailable: required")
+	}
+	type Plain ResponseUnavailable
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ResponseUnavailable(plain)
+	return nil
+}
+
 // What the agent must load and for how many laps. Written by core as runplan.json;
 // the agent reads it in the pits. Labels are code names: the plan does not say
 // which setup is the baseline.

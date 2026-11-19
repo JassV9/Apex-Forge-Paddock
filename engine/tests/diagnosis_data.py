@@ -13,6 +13,7 @@ from paddock_engine.features.pass_features import from_legacy
 
 REPO = Path(__file__).resolve().parents[2]
 DEMO_SPOOL = REPO / "datasets/demo/spool/demo-fa26-cota/000001.jsonl"
+CORNER_OF_CLASS = {"slow": 1, "medium": 2, "fast": 3}
 CONFIDENT = {"confidence_entry": 1.0, "confidence_mid": 1.0, "confidence_exit": 1.0}
 
 
@@ -34,10 +35,15 @@ def cota_request(items: list[DiagnoseItem] | None = None) -> DiagnoseRequest:
 
 
 def passes_of(speed_class: str, count: int = 4, **metrics: float | None) -> list[DiagnosePass]:
-    """`count` identical passes of one corner class, confident in every phase."""
+    """`count` identical passes of one corner class, confident in every phase.
+
+    The class belongs to the corner (ADR 0031), so each class gets its own corner.
+    """
     return [
         DiagnosePass(
-            corner=1, speed_class=SpeedClass(speed_class), metrics={**CONFIDENT, **metrics}
+            corner=CORNER_OF_CLASS[speed_class],
+            speed_class=SpeedClass(speed_class),
+            metrics={**CONFIDENT, **metrics},
         )
         for _ in range(count)
     ]

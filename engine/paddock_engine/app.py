@@ -19,6 +19,8 @@ from paddock_engine.contracts.plan_request_schema import PlanRequest
 from paddock_engine.contracts.plan_response_schema import PlanResponse
 from paddock_engine.contracts.proposals_schema import Proposals
 from paddock_engine.contracts.propose_request_schema import ProposeRequest
+from paddock_engine.contracts.response_request_schema import ResponseRequest
+from paddock_engine.contracts.response_response_schema import ResponseResponse
 from paddock_engine.contracts.sensitivity_request_schema import SensitivityRequest
 from paddock_engine.contracts.sensitivity_response_schema import SensitivityResponse
 from paddock_engine.diagnosis.report import report
@@ -28,6 +30,7 @@ from paddock_engine.explain.config import Choice, from_env
 from paddock_engine.features.session import session_features
 from paddock_engine.optimize.base_setup import base_setup
 from paddock_engine.optimize.rank import propose
+from paddock_engine.response.service import load_samples, response
 from paddock_engine.sensitivity.profile import update
 
 
@@ -51,6 +54,10 @@ def create_app(llm: Choice | None = None) -> FastAPI:
     @app.post("/evaluate")
     def judge(request: EvaluateRequest) -> EvaluateResponse:
         return evaluate(request)
+
+    @app.post("/response", response_model_exclude_none=True)
+    def vehicle_response(request: ResponseRequest) -> ResponseResponse:
+        return response(request, load_samples(request))
 
     @app.post("/diagnose")
     def diagnose_session(request: DiagnoseRequest) -> Diagnosis:

@@ -1,0 +1,91 @@
+# Which observables a change of each setup parameter is expected to move (ADR 0031;
+# investigation 2026-11-18, section 4). Configuration, not code: add or change a row without
+# touching the analysis. Metric ids are those of metrics.toml; every id is checked on load.
+#
+# Parameter rows: which observables a change of this setup item is expected to move, direct
+# measurements and proxies listed apart. `match` is the catalog's role (agent/src/core/catalog.lua)
+# and axle ("" for none). Initial, from investigation section 4; to be learned from discovery
+# sweeps (ADR 0032).
+[[parameters]]
+key = "front_arb"
+match = [{ role = "arb", axle = "F" }]
+direct = ["steer_per_g", "front_slip_deg", "yaw_gain"]
+proxy = ["slip_balance_deg"]
+phases = ["entry", "mid"]
+regimes = ["slow", "medium", "fast"]
+
+[[parameters]]
+key = "rear_arb"
+match = [{ role = "arb", axle = "R" }]
+direct = ["rear_slip_deg", "yaw_gain", "rear_slip_ratio_traction"]
+proxy = ["steer_reversals_per_s", "slip_balance_deg"]
+phases = ["mid", "exit"]
+regimes = ["slow", "medium"]
+
+[[parameters]]
+key = "front_wing"
+match = [{ role = "wing", axle = "F" }]
+direct = ["steer_per_g", "front_slip_deg"]
+proxy = ["slip_balance_deg"]
+phases = ["mid"]
+regimes = ["fast"]
+
+[[parameters]]
+key = "rear_wing"
+match = [{ role = "wing", axle = "R" }]
+direct = ["rear_slip_deg", "yaw_gain", "v_max_kmh"]
+proxy = ["slip_balance_deg"]
+phases = ["mid", "exit", "traction"]
+regimes = ["fast"]
+
+[[parameters]]
+key = "diff_preload"
+match = [{ role = "preload", axle = "" }, { role = "diff", axle = "" }, { role = "diffpower", axle = "" }, { role = "diffcoast", axle = "" }]
+direct = ["yaw_gain", "pickup_point_m"]
+proxy = ["rear_slip_ratio_traction"]
+phases = ["entry", "exit", "corner"]
+regimes = ["slow"]
+unavailable = ["wheel_speed_difference"]
+
+[[parameters]]
+key = "brake_bias"
+match = [{ role = "bias", axle = "" }]
+direct = ["front_slip_ratio_braking", "rear_slip_ratio_braking", "yaw_gain"]
+proxy = ["brake_point_m", "front_lock_share", "rear_lock_share"]
+phases = ["braking", "entry", "corner"]
+regimes = ["slow", "medium", "fast"]
+
+[[parameters]]
+key = "brake_power"
+match = [{ role = "brakepower", axle = "" }]
+direct = ["peak_decel_g", "front_slip_ratio_braking", "rear_slip_ratio_braking", "brake_point_m"]
+proxy = ["front_lock_share", "rear_lock_share"]
+phases = ["braking", "corner"]
+regimes = ["slow", "medium", "fast"]
+
+[[parameters]]
+key = "springs_ride_height"
+match = [{ role = "spring", axle = "F" }, { role = "spring", axle = "R" }, { role = "heave", axle = "F" }, { role = "heave", axle = "R" }, { role = "height", axle = "F" }, { role = "height", axle = "R" }]
+direct = ["ride_height_front_mm", "ride_height_rear_mm"]
+proxy = ["ride_height_front_sd_mm", "ride_height_rear_sd_mm"]
+phases = ["mid"]
+regimes = ["fast"]
+unavailable = ["suspension_travel"]
+
+[[parameters]]
+key = "dampers"
+match = [{ role = "damper", axle = "F" }, { role = "damper", axle = "R" }, { role = "damper", axle = "" }]
+direct = ["yaw_gain"]
+proxy = ["ride_height_front_sd_mm", "ride_height_rear_sd_mm"]
+phases = ["entry", "exit", "braking", "mid"]
+regimes = ["slow", "medium", "fast"]
+unavailable = ["suspension_travel"]
+
+[[parameters]]
+key = "tyre_pressure"
+match = [{ role = "pressure", axle = "F" }, { role = "pressure", axle = "R" }, { role = "pressure", axle = "" }]
+direct = ["front_slip_deg", "rear_slip_deg", "lat_g_mean"]
+proxy = []
+phases = ["mid"]
+regimes = ["slow", "medium", "fast"]
+unavailable = ["tyre_temp_inner_outer"]

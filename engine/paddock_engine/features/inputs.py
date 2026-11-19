@@ -3,6 +3,15 @@
 Ported from Apex Forge v0 `core/analyze.lua` (the "input metrics" the audit keeps) and tested
 against its outputs. These channels describe the driver, not the car: an experiment only
 counts as a setup effect when they did not shift between the two setups.
+
+Where an input happens is reported in metres from the zone start (`brake_point_m`,
+`throttle_pickup_point_m`), because the slowest point that `brake_dist_m` and
+`throttle_pickup_m` are measured from jitters by 20 to 46 m between passes while the braking
+point itself moves less than 4 m (finding I6, ADR 0031). The apex-relative pair stays only
+because core's driver-adapted check (experiments/create.go) and the AI reference
+(reference/features.go, the web's reference table) read it by name; moving them to the absolute
+pair needs the stored features recomputed first, or re-judging an older experiment would
+silently lose those two driver checks.
 """
 
 from dataclasses import dataclass
@@ -24,11 +33,13 @@ LOCK_RUN_SAMPLES = 3  # in a row, about 50 ms
 
 @dataclass(frozen=True)
 class DriverInputs:
+    brake_point_m: float | None  # where braking starts, metres from the zone start
     brake_dist_m: float | None  # where braking starts, metres before the apex
     brake_peak: float | None
     brake_attack_s: float | None  # time to 80 % of peak pressure
     brake_release_m: float | None  # where braking ends relative to the apex (negative: before)
     trail_share: float | None  # share of braking (pressure x time) done with the wheel turned
+    throttle_pickup_point_m: float | None  # metres from the zone start
     throttle_pickup_m: float | None  # relative to the apex (negative: before)
     throttle_to_full_s: float | None
     lifts: int
@@ -165,11 +176,13 @@ def driver_inputs(
     front_locks, rear_locks, spin = _slip_events(s, axles, driven)
     braked = seg.brake_start is not None
     return DriverInputs(
+        brake_point_m=float(x[seg.brake_start]) if seg.brake_start is not None else None,
         brake_dist_m=apex_x - float(x[seg.brake_start]) if seg.brake_start is not None else None,
         brake_peak=seg.brake_peak if braked else None,
         brake_attack_s=_attack(s, seg),
         brake_release_m=float(x[seg.brake_end]) - apex_x if seg.brake_end is not None else None,
         trail_share=_trail_share(s, seg),
+        throttle_pickup_point_m=float(x[pick]) if pick is not None else None,
         throttle_pickup_m=float(x[pick]) - apex_x if pick is not None else None,
         throttle_to_full_s=(
             float(s.t[full] - s.t[pick]) if pick is not None and full is not None else None

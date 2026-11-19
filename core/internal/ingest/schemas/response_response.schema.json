@@ -1,0 +1,370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "response_response.schema.json",
+  "title": "ResponseResponse",
+  "description": "How the variant changed the car's response: frozen phase cuts per corner, the corner's speed regime, and one effect per (metric, phase, regime) (ADR 0031).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "regimes",
+    "corners",
+    "effects",
+    "unavailable",
+    "passes_used",
+    "passes_excluded",
+    "notes"
+  ],
+  "properties": {
+    "regimes": {
+      "title": "ResponseRegimes",
+      "description": "How the corners were classed: per corner, from the baseline, never per pass.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "breaks_kmh"
+      ],
+      "properties": {
+        "method": {
+          "description": "gaps: the two largest gaps in log median minimum speed, at least 2 corners per class. fixed: 100 and 150 km/h (too few corners). stored: the passes' stored classes (no minimum speeds).",
+          "type": "string",
+          "enum": [
+            "gaps",
+            "fixed",
+            "stored"
+          ]
+        },
+        "breaks_kmh": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "aero_fit": {
+          "title": "ResponseAeroFit",
+          "description": "ESTIMATE: peak lateral g = c0 + c1 v^2 over the corners' baseline medians. Its share is reported only when adequate (R^2 >= 0.5, c0 and c1 positive).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "c0_g",
+            "c1_g_per_ms2",
+            "r2",
+            "corners",
+            "adequate"
+          ],
+          "properties": {
+            "c0_g": {
+              "type": "number"
+            },
+            "c1_g_per_ms2": {
+              "type": "number"
+            },
+            "r2": {
+              "type": "number"
+            },
+            "corners": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "adequate": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "corners": {
+      "type": "array",
+      "items": {
+        "title": "ResponseCornerCuts",
+        "description": "One corner's frozen cuts, in metres from its zone start, identical for both arms.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "number",
+          "regime",
+          "v_min_kmh",
+          "turn_in_m",
+          "apex_m",
+          "end_m",
+          "mid_half_m",
+          "apex_by_curvature",
+          "phases",
+          "flags",
+          "delta_t",
+          "baseline_passes",
+          "variant_passes"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "regime": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "medium",
+              "fast"
+            ]
+          },
+          "v_min_kmh": {
+            "description": "Median minimum speed of the baseline passes: what the regime is read from.",
+            "type": "number"
+          },
+          "aero_share_estimate": {
+            "description": "ESTIMATE of the share of lateral grip that grows with speed at v_min_kmh, from the aero fit; left out when the fit is not adequate.",
+            "type": "number"
+          },
+          "braking_m": {
+            "description": "B: median first braking of the baseline; left out when the baseline does not brake.",
+            "type": "number"
+          },
+          "turn_in_m": {
+            "type": "number"
+          },
+          "apex_m": {
+            "type": "number"
+          },
+          "pickup_m": {
+            "type": "number"
+          },
+          "end_m": {
+            "type": "number"
+          },
+          "mid_half_m": {
+            "description": "w: the mid phase is the apex +- w.",
+            "type": "number"
+          },
+          "apex_by_curvature": {
+            "description": "True on a flat-out corner: the apex is the curvature peak, not the slowest point.",
+            "type": "boolean"
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "title": "ResponsePhaseSpan",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "start_m",
+                "end_m",
+                "status"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "enum": [
+                    "braking",
+                    "entry",
+                    "mid",
+                    "exit",
+                    "traction"
+                  ]
+                },
+                "start_m": {
+                  "type": "number"
+                },
+                "end_m": {
+                  "type": "number"
+                },
+                "status": {
+                  "description": "ok: cut and measured. merged: shorter than 5 m, its metres went to a neighbour. absent: the event does not happen (no braking). unavailable: the passes end too early.",
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "merged",
+                    "absent",
+                    "unavailable"
+                  ]
+                },
+                "note": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "delta_t": {
+            "description": "Descriptive only: the variant's median time against the baseline's median trace since the first cut, every 10 m. Never used for inference.",
+            "type": "array",
+            "items": {
+              "title": "ResponseDeltaPoint",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "x_m",
+                "delta_s"
+              ],
+              "properties": {
+                "x_m": {
+                  "type": "number"
+                },
+                "delta_s": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "baseline_passes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "variant_passes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "title": "ResponseEffect",
+        "description": "Variant minus baseline of one metric over one phase and regime, from the effect model (ADR 0008, 0023).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "phase",
+          "regime",
+          "kind",
+          "finding",
+          "n_passes",
+          "corners",
+          "expected"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "braking",
+              "entry",
+              "mid",
+              "exit",
+              "traction",
+              "corner"
+            ]
+          },
+          "regime": {
+            "type": "string",
+            "enum": [
+              "all",
+              "slow",
+              "medium",
+              "fast"
+            ]
+          },
+          "kind": {
+            "description": "direct: read from a recorded channel. proxy: derived, standing in for something not recorded.",
+            "type": "string",
+            "enum": [
+              "direct",
+              "proxy"
+            ]
+          },
+          "finding": {
+            "description": "The interval against the metric's margin: increase, decrease, neutral (inside the margin), likely increase / likely decrease (excludes 0, not the margin), insufficient.",
+            "type": "string",
+            "enum": [
+              "increase",
+              "decrease",
+              "neutral",
+              "likely increase",
+              "likely decrease",
+              "insufficient"
+            ]
+          },
+          "estimate": {
+            "type": "number"
+          },
+          "ci_low": {
+            "type": "number"
+          },
+          "ci_high": {
+            "type": "number"
+          },
+          "baseline_mean": {
+            "type": "number"
+          },
+          "margin": {
+            "type": "number",
+            "minimum": 0
+          },
+          "n_passes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "corners": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expected": {
+            "description": "Whether the parameter row of the changed item lists this cell: direct, proxy, or none (no row, or not listed).",
+            "type": "string",
+            "enum": [
+              "direct",
+              "proxy",
+              "none"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "unavailable": {
+      "description": "Observables not computable from the channels recorded today: listed, never estimated.",
+      "type": "array",
+      "items": {
+        "title": "ResponseUnavailable",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observable",
+          "reason"
+        ],
+        "properties": {
+          "observable": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "parameter": {
+      "description": "The parameter row the changed item matched, when it matched one.",
+      "type": "string"
+    },
+    "passes_used": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "passes_excluded": {
+      "description": "Passes not compared: not valid, no samples, or an unknown corner.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

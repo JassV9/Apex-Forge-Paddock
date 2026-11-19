@@ -20,6 +20,27 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
   `experiment.ai_hint_share`, the pass context columns on `corner_pass` and `run_context` (per
   session and per block). Core must be rebuilt before the new agent is installed: an older core
   rejects its lines. Tested offline only; **unverified in game**.
+- Engine (ADR 0031): corner phases at fixed distances, speed regimes per corner, and a
+  vehicle-response analysis. Within an experiment every pass is put on a 1 m grid, joined with
+  the next pass where the zones touch (exit and traction now exist in chicanes: traction is cut
+  at all 14 Hungaroring corners), and both arms are cut at the same metres, frozen from the
+  baseline's median events (braking, turn-in, apex, pickup, corner end): braking, entry, mid,
+  exit and traction (150 m), each with a status, never silently empty; phase times sum to the
+  corner time. Speed classes now belong to the corner, frozen from the baseline's median
+  minimum speed and cut at the two largest gaps per car and track (FH26 Hungaroring: 130 and
+  161 km/h), in the verdict's per-class effects (a class needs 3 corners) and in the diagnosis's
+  evidence pack; the FA26 COTA demo's slow class moves from 32 to 37 passes. An aero-share
+  ESTIMATE (peak lateral g against v^2 over corners) is reported only where its R^2 is at least
+  0.5. New `POST /response` (contracts `response_request`, `response_response`): per (metric,
+  phase, regime) effects through the existing effect model, from a configured list of direct and
+  proxy metrics and a parameter-to-observable mapping (`response/metrics.toml`,
+  `response/parameters.toml`); what today's channels cannot give is listed as unavailable.
+  Per-pass features gain `brake_point_m` and `throttle_pickup_point_m` in metres from the zone
+  start (the apex-relative pair stays for core's driver check and the AI reference). The dead
+  agent `corners.speedClass` is gone. Replayed offline on experiment 15 (rear wing -1): rear slip
+  up 0.1 to 0.2 deg in mid and exit, yaw gain up 4 to 7 %, rear ride height up about 1 mm,
+  corner time insufficient (+4.6 [-2.8, +11.9] ms). Core does not call `/response` yet.
+  Unverified in game.
 - Core and web (ADR 0027): a layout and its test copy are one track in the web app. A session
   on an original layout (e.g. `fn_cota / layout_f1_2026`) is now compared, in "Against the AI"
   and the AI overlay, with the AI's sessions on `<layout>_paddock`, labelled "AI on COTA F1 2026

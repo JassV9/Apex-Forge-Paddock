@@ -65,6 +65,17 @@ func (s *Service) List(ctx context.Context) ([]contracts.Experiment, error) {
 // session was driven on. The variant is validated against the car's setup menu here, so an
 // experiment that could not be driven is never stored.
 func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate) (contracts.Experiment, error) {
+	return s.create(ctx, request, contracts.ExperimentPurposeImprove)
+}
+
+// CreateSweepStep proposes one step of a sensitivity sweep: an experiment like any other, but
+// measured and never promoted, so the baseline is the same for every step
+// (docs/adr/0032-sensitivity-discovery-sweeps.md).
+func (s *Service) CreateSweepStep(ctx context.Context, request contracts.ExperimentCreate) (contracts.Experiment, error) {
+	return s.create(ctx, request, contracts.ExperimentPurposeSweep)
+}
+
+func (s *Service) create(ctx context.Context, request contracts.ExperimentCreate, purpose contracts.ExperimentPurpose) (contracts.Experiment, error) {
 	if err := checkRequest(request); err != nil {
 		return contracts.Experiment{}, err
 	}
@@ -85,12 +96,14 @@ func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate
 		baselineVersion: base.versionID, variantValues: variant, parameterID: &parameterID,
 		clicks: request.Clicks, statement: strings.TrimSpace(request.Statement), origin: cameFrom,
 		predictions: request.Predictions, driver: request.Driver, aiHintShare: request.AiHintShare,
+		purpose: purpose,
 	})
 	if err != nil {
 		return contracts.Experiment{}, err
 	}
 	s.logger.InfoContext(ctx, "experiment proposed", "experiment_id", id,
-		"parameter", request.Parameter, "clicks", request.Clicks, "driver", driverOf(request.Driver))
+		"parameter", request.Parameter, "clicks", request.Clicks, "driver", driverOf(request.Driver),
+		"purpose", string(purpose))
 	return s.Get(ctx, id)
 }
 

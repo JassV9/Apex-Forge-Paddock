@@ -165,3 +165,71 @@ primary metric (time neutral, response moved), stop (neutral), stop (invalid or 
 | Distance-frozen phases, absolute events, per-corner speed regimes, response analysis and the parameter-observable map | 0031 | engine features, new engine `response` package |
 | Sensitivity discovery sweeps | 0032 | new core `discovery` package beside `training` |
 | Stratified persistent profile, priors separate, random-effects pooling, base-setup FDR | 0033 | engine sensitivity/optimize, core sensitivity, migration |
+
+## 9. In-game results
+
+### Experiment B: AI compensation (experiment 20, 2026-11-19)
+
+Formula Hybrid 2026, Hungaroring `_paddock`, rear ARB 2 -> 5 (+3 clicks), hint pinned at 0.9409 and
+applied (read back per pass), 8 ABAB blocks of 3 push laps, session 129, 336 passes, none excluded.
+Evaluated with engine 0.2.0 (block-level inference, look 1 of 3); the response table is an offline
+replay of the same passes through the `POST /response` service (ADR 0031), which now uses the
+block-level interval.
+
+**Verdict (pre-registered test, corner time):** -7.3 ms [-13.9, -0.6] per corner, finding *likely
+improvement*, decision inconclusive, recommendation continue (look 2 at 10 blocks). Confounders flagged:
+time since start differs between blocks, and `brake_dist_m` +2.6 m [+0.8, +4.4].
+
+**Response (variant minus baseline, 90 %):**
+
+| Metric | Phase | all (14) | slow (7) | medium (3) | fast (4) |
+|---|---|---|---|---|---|
+| corner time (ms) | corner | -7.5 [-14.2, -0.9] down? | +8.8 [-7.4, +25.0] insuff. | -17.1 [-25.5, -8.7] down | -7.7 [-10.8, -4.7] down? |
+| phase time (ms) | exit | -3.9 [-6.1, -1.6] down? | +4.0 [-2.7, +10.7] insuff. | -10.0 [-12.6, -7.4] down | -1.6 [-3.0, -0.2] down? |
+| phase time (ms) | traction | -3.6 [-6.7, -0.5] down? | +2.0 [-5.3, +9.2] insuff. | -7.1 [-12.9, -1.3] down? | -3.6 [-4.5, -2.7] down |
+| minimum speed (km/h) | mid | +0.2 [+0.1, +0.3] neutral | -0.2 [-0.6, +0.2] insuff. | +0.1 [-0.3, +0.5] insuff. | +0.7 [+0.5, +1.0] up |
+| braking point (m) | corner | -0.2 [-0.3, +0.0] neutral | -0.1 [-0.3, +0.1] neutral | -0.5 [-1.0, +0.0] insuff. | insuff. |
+| yaw gain | entry | +0.003 [+0.000, +0.006] up? | +0.001 [-0.004, +0.006] insuff. | +0.003 [+0.002, +0.004] neutral | +0.004 [+0.003, +0.006] up? |
+| yaw gain | mid | +0.003 [-0.000, +0.006] insuff. | +0.000 [-0.006, +0.007] insuff. | +0.009 [+0.006, +0.011] up | +0.003 [-0.000, +0.006] insuff. |
+| steer per g (deg/g) | mid | -0.12 [-0.41, +0.16] neutral | +1.25 [-0.32, +2.82] insuff. | -0.49 [-0.61, -0.36] down? | -0.05 [-0.17, +0.06] neutral |
+| rear slip (deg) | mid | +0.010 [-0.014, +0.034] neutral | +0.084 [-0.036, +0.203] insuff. | +0.017 [-0.000, +0.034] neutral | +0.009 [-0.001, +0.019] neutral |
+| rear slip (deg) | exit | +0.056 [+0.036, +0.075] up? | +0.072 [+0.025, +0.119] up? | +0.059 [+0.039, +0.080] up? | +0.024 [+0.016, +0.032] neutral |
+| front slip (deg) | mid | -0.043 [-0.085, -0.001] down? | +0.161 [-0.043, +0.364] insuff. | -0.122 [-0.171, -0.074] down | -0.011 [-0.042, +0.020] neutral |
+| slip balance F-R (deg) | mid | -0.043 [-0.092, +0.005] insuff. | +0.246 [-0.023, +0.516] insuff. | -0.145 [-0.180, -0.110] down | -0.009 [-0.043, +0.024] neutral |
+
+**Against the prediction** (minimum speed within 0.3 km/h and braking point within 1 m, while rear slip,
+yaw gain and steer per g move beyond their margins):
+
+- *AI inputs did not compensate: held.* The absolute braking point is unchanged (-0.2 m, neutral in
+  every regime) and minimum speed moved +0.2 km/h overall (+0.7 in fast corners). The verdict's
+  `brake_dist_m` +2.6 m is the slowest point moving, not the braking point (finding I6): the
+  "driver adapted" confounder is a false alarm from the apex-relative metric.
+- *The car responds strongly: refuted for this change.* Rear slip moved +0.06 deg on exit (about a
+  third of one click of rear wing on experiment 15, +0.17), yaw gain +0.003 (under 1 %, against +4 to
+  +7 % for the wing), steer per g neutral overall. Only the medium corners (5, 8, 9) show a coherent
+  balance shift: front slip -0.12 deg, slip balance -0.15 deg, yaw gain mid +0.009, steer per g -0.49.
+- *Time:* the gain sits in exit and traction of medium and fast corners (-10 and -7 ms exit/traction
+  at medium), where rear slip on exit rose only slightly. The slow corners carry no evidence either way.
+
+Reading: on this car and AI, three clicks of rear ARB is a small response change, smaller than one
+click of rear wing; it is not a case of "the response moved but the time did not". The prediction was
+written for a large balance change and the change was not large on this car. Not yet known: whether
+the time gain survives looks 2 and 3 (the time-since-start confounder is open), and whether the
+response is monotonic in clicks (experiment D).
+
+**Look 2 (10 blocks; blocks 9 and 10 in a second game session):** corner time -9.6 ms [-15.8, -3.5],
+still *likely improvement*: the interval excludes zero but not the 5 ms margin, so the decision stays
+inconclusive and the policy continues to look 3 (12 blocks). Time since start is left out of the model
+(collinear with the session term, ADR 0022); the session term is flagged as between blocks. By class:
+medium -14.9 ms [-19.5, -10.3], fast -7.1 [-9.8, -4.5], slow -12.0 [-26.8, +2.8].
+
+**Fuel:** every block, both sessions, started its out-lap on 29.6 L and burned about 1.45 L a lap
+(push lap 1 at 27.3 to 28.6 L in all ten blocks): the arms are equal. But not the 50 L the design
+named: the agent took "the first block's fuel" from whatever the car held when the AI first took it
+(at least 30 L), and block 9, after the relaunch, asked for 50 L and stopped on 26 L (the setup's own
+`[FUEL] VALUE` landing after the set). Fixed in the agent: one fuel, 30 L, for every block of every
+AI experiment, and an off read-back sets the fuel again during the out-lap before stopping (ADR 0028
+amendment). Experiments before this change compared across sessions may differ in fuel.
+
+Process gaps seen: the prediction was recorded only as event text (`predictions` empty, not
+machine-checked), and the verdict's driver check still uses the apex-relative pair.

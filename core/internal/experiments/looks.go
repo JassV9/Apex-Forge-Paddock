@@ -44,8 +44,43 @@ func Look(blocks []contracts.ExperimentBlock) int {
 	return min(maxLook, 1+(planned-FirstLookBlocks)/blocksPerLook)
 }
 
+// absoluteInputs are the driver events measured in metres from the zone start (ADR 0031) that
+// replace the pair measured from the pass's own slowest point, which jitters 20 to 46 m when the
+// setup moves where the car is slowest (experiment 20: brake_dist_m +2.6 m while the braking
+// point itself moved -0.2 m).
+var absoluteInputs = map[string]string{
+	"brake_dist_m":      "brake_point_m",
+	"throttle_pickup_m": "throttle_pickup_point_m",
+}
+
+// driverInputs are the driver channels to test: the absolute events wherever every compared
+// pass was measured with them, the apex-relative pair where features predate them, so that
+// re-judging an older experiment never silently loses a driver check.
+func driverInputs(passes []contracts.EvaluatePass) []string {
+	out := make([]string, 0, len(driverChannels))
+	for _, channel := range driverChannels {
+		if absolute, known := absoluteInputs[channel]; known && allMeasure(passes, absolute) {
+			channel = absolute
+		}
+		out = append(out, channel)
+	}
+	return out
+}
+
+// allMeasure reports whether there are passes and every one has the metric (null counts: it was
+// computed and could not be measured on that pass).
+func allMeasure(passes []contracts.EvaluatePass, metric string) bool {
+	for _, pass := range passes {
+		if _, ok := pass.Metrics[metric]; !ok {
+			return false
+		}
+	}
+	return len(passes) > 0
+}
+
 // evaluateRequest is what the engine judges: the compared passes, what core left out, the
-// off-track count per block, and the look the blocks make.
+// off-track count per block, the look the blocks make, and where the raw samples are for the
+// car's response (docs/adr/0034-vehicle-response-in-verdicts.md), all in one request.
 func evaluateRequest(ctx context.Context, q querier, exp record) (contracts.EvaluateRequest, error) {
 	blocks, err := readBlocks(ctx, q, exp.id)
 	if err != nil {
@@ -69,11 +104,14 @@ func evaluateRequest(ctx context.Context, q querier, exp record) (contracts.Eval
 	look, left := Look(blocks), MaxExtensions-exp.extensions
 	request := contracts.EvaluateRequest{
 		SuccessTest: exp.test, Guardrails: exp.guardrails, Predictions: predictions,
-		DriverChannels: driverChannels, Passes: compared.passes, Look: &look, ExtensionsLeft: &left,
+		DriverChannels: driverInputs(compared.passes), Passes: compared.passes, Look: &look, ExtensionsLeft: &left,
 		Excluded: &compared.excluded, Offtrack: compared.offtrack,
 	}
 	if exp.parameter != "" {
 		request.Parameter = &exp.parameter
+	}
+	if request.Response, err = vehicleInput(ctx, q, exp.id, compared.vehicle); err != nil {
+		return contracts.EvaluateRequest{}, err
 	}
 	return request, nil
 }

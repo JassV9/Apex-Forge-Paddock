@@ -40,6 +40,8 @@ type Deps struct {
 	Garage Garage
 	// Training serves /sessions/{id}/training and /training; nil leaves them out.
 	Training Training
+	// Sweeps serves /sessions/{id}/sweeps and /sweeps; nil leaves them out.
+	Sweeps Sweeps
 	// BaseSetups serves POST /sessions/{id}/base-setup; nil leaves it out.
 	BaseSetups BaseSetups
 	// Metrics serves GET /metrics for Prometheus; nil leaves the route out.
@@ -68,6 +70,9 @@ func NewHandler(deps Deps) http.Handler {
 	}
 	if deps.Training != nil {
 		registerTraining(mux, deps.Logger, deps.Training)
+	}
+	if deps.Sweeps != nil {
+		registerSweeps(mux, deps.Logger, deps.Sweeps)
 	}
 	if deps.BaseSetups != nil {
 		registerBaseSetups(mux, deps.Logger, deps.BaseSetups)

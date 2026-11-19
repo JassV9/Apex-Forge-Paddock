@@ -116,7 +116,7 @@ func dethrone(ctx context.Context, tx *sql.Tx, exp record, from State) error {
 		}
 		return nil
 	}
-	if from != Accepted {
+	if from != Accepted || exp.purpose == contracts.ExperimentPurposeSweep {
 		return nil // the variant never became champion
 	}
 	outcome, err := tx.ExecContext(ctx,

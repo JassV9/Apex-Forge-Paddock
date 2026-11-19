@@ -16,7 +16,7 @@ import (
 const headSQL = `
 SELECT e.id, e.kind, e.state, h.statement, h.source, c.name, t.name, COALESCE(sp.name, ''),
        COALESCE(sp.label, ''), e.clicks, e.success_test, e.guardrails, e.mde, e.extensions,
-       e.created_at, e.driver
+       e.created_at, e.driver, e.purpose
 FROM experiment e
 JOIN hypothesis h ON h.id = e.hypothesis_id
 JOIN car c ON c.id = h.car_id
@@ -36,6 +36,7 @@ func readExperiment(ctx context.Context, q querier, id int64) (contracts.Experim
 		func() (err error) { exp.Blocks, err = readBlocks(ctx, q, id); return },
 		func() (err error) { exp.Predictions, err = readPredictions(ctx, q, id); return },
 		func() (err error) { exp.Results, err = readResults(ctx, q, id); return },
+		func() (err error) { exp.Responses, err = readResponses(ctx, q, id); return },
 		func() (err error) { exp.Events, err = readEvents(ctx, q, id); return },
 		func() (err error) { exp.Verdict, err = readVerdict(ctx, q, id); return },
 	}
@@ -51,9 +52,11 @@ func readHead(ctx context.Context, q querier, id int64) (contracts.Experiment, e
 	var exp contracts.Experiment
 	var test, guardrails, plan []byte
 	var createdAt time.Time
+	var purpose contracts.ExperimentPurpose
 	err := q.QueryRowContext(ctx, headSQL, id).Scan(&exp.Id, &exp.Kind, &exp.State, &exp.Statement,
 		&exp.Source, &exp.CarName, &exp.TrackName, &exp.Parameter, &exp.ParameterLabel, &exp.Clicks,
-		&test, &guardrails, &plan, &exp.Extensions, &createdAt, &exp.Driver)
+		&test, &guardrails, &plan, &exp.Extensions, &createdAt, &exp.Driver, &purpose)
+	exp.Purpose = &purpose
 	if errors.Is(err, sql.ErrNoRows) {
 		return exp, fmt.Errorf("experiment %d: %w", id, ErrNotFound)
 	}
@@ -158,6 +161,20 @@ func readResults(ctx context.Context, q querier, id int64) ([]contracts.Experime
 			var r contracts.ExperimentResult
 			return r, rows.Scan(&r.Channel, &r.Role, &r.CornerClass, &r.Estimate, &r.CiLow,
 				&r.CiHigh, &r.NPasses, &r.EffectClass)
+		}, id)
+}
+
+// readResponses are the response findings of the latest verdict that measured any (ADR 0034);
+// none for an experiment judged before.
+func readResponses(ctx context.Context, q querier, id int64) ([]contracts.ExperimentResponse, error) {
+	return queryAll(ctx, q,
+		`SELECT channel, phase, corner_class, expected, response_finding, estimate, ci_low, ci_high,
+		        margin, n_passes
+		 FROM current_response WHERE experiment_id = $1 ORDER BY id`,
+		func(rows *sql.Rows) (contracts.ExperimentResponse, error) {
+			var r contracts.ExperimentResponse
+			return r, rows.Scan(&r.Metric, &r.Phase, &r.Regime, &r.Expected, &r.Finding, &r.Estimate,
+				&r.CiLow, &r.CiHigh, &r.Margin, &r.NPasses)
 		}, id)
 }
 

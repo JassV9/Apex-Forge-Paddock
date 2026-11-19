@@ -91,7 +91,7 @@
       "minimum": 0
     },
     "finding_class": {
-      "description": "What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence.",
+      "description": "What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed regimes or corner phases), likely improvement or regression (the interval excludes zero), insufficient evidence.",
       "type": "string",
       "enum": [
         "invalid",
@@ -116,7 +116,7 @@
       }
     },
     "recommendation": {
-      "description": "What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.",
+      "description": "What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed regime or phase, switch the primary metric (time neutral or unclear, an expected response channel moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.",
       "type": "string",
       "enum": [
         "continue",
@@ -148,6 +148,26 @@
       "description": "Version of the engine that computed the numbers (ADR 0030).",
       "type": "string",
       "minLength": 1
+    },
+    "responses": {
+      "description": "The vehicle-response finding per cell the changed parameter is expected to move (ADR 0034), separate from the time finding. Cells it is not expected to move are not judged here (POST /response describes them).",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResponseFinding"
+      }
+    },
+    "response_parameter": {
+      "description": "The parameter row of the observables mapping the expected cells came from.",
+      "type": "string",
+      "minLength": 1
+    },
+    "response_notes": {
+      "description": "Why the response findings are missing or what to read them with.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
   "definitions": {
@@ -239,11 +259,12 @@
             "session_tangled",
             "setup_mismatch",
             "source_mismatch",
-            "speed_class_interaction"
+            "speed_class_interaction",
+            "phase_interaction"
           ]
         },
         "name": {
-          "description": "The covariate, channel, speed classes or reason it is about.",
+          "description": "The covariate, channel, speed classes, phases or reason it is about.",
           "type": "string",
           "minLength": 1
         },
@@ -251,6 +272,105 @@
           "description": "Passes concerned, for the exclusions.",
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "ResponseFinding": {
+      "title": "ResponseFinding",
+      "description": "Variant minus baseline on one expected (metric, phase, speed regime) cell, block-level interval at the success test's level.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "phase",
+        "regime",
+        "expected",
+        "finding",
+        "margin",
+        "n_passes",
+        "corners"
+      ],
+      "properties": {
+        "metric": {
+          "description": "Response metric id (response/metrics.toml).",
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "title": "ResponsePhase",
+          "type": "string",
+          "enum": [
+            "braking",
+            "entry",
+            "mid",
+            "exit",
+            "traction",
+            "corner"
+          ]
+        },
+        "regime": {
+          "title": "ResponseRegime",
+          "description": "Speed regime of the corners, per corner and frozen from the baseline (ADR 0031).",
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "expected": {
+          "title": "ResponseExpected",
+          "description": "direct: a measurement the parameter is expected to move; proxy: a stand-in for one.",
+          "type": "string",
+          "enum": [
+            "direct",
+            "proxy"
+          ]
+        },
+        "finding": {
+          "title": "ResponseFindingClass",
+          "description": "What the car did on this cell (ADR 0034), judged against the metric's margin with Holm across the parameter's expected cells: increase or decrease (moved after Holm, the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), likely increase or decrease (moved after Holm, not by the margin), insufficient (otherwise).",
+          "type": "string",
+          "enum": [
+            "increase",
+            "decrease",
+            "neutral",
+            "likely_increase",
+            "likely_decrease",
+            "insufficient"
+          ]
+        },
+        "estimate": {
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "p_value": {
+          "description": "Two-sided, block-level t, before Holm.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "margin": {
+          "description": "From config/margins.toml: the item's own, else the metric's.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "n_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "corners": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "note": {
+          "type": "string"
         }
       }
     }

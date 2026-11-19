@@ -29,6 +29,44 @@ func saveResults(ctx context.Context, tx *sql.Tx, id, verdictID int64, version *
 	return nil
 }
 
+// saveResponses appends the engine's response findings of one verdict as result rows of role
+// response: the metric is the channel, the regime the corner class
+// (docs/adr/0034-vehicle-response-in-verdicts.md). A cell the engine could not estimate has no
+// number to store and is left out; the verdict's reply still lists it.
+func saveResponses(ctx context.Context, tx *sql.Tx, id, verdictID int64, version *string, findings []contracts.ResponseFinding) error {
+	for _, f := range findings {
+		if f.Estimate == nil || f.CiLow == nil || f.CiHigh == nil {
+			continue
+		}
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO result (experiment_id, verdict_id, engine_version, channel, role, phase,
+			                     corner_class, estimate, ci_low, ci_high, n_passes, effect_class,
+			                     response_finding, expected, margin)
+			 VALUES ($1, $2, $3, $4, 'response', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+			id, verdictID, version, f.Metric, string(f.Phase), string(f.Regime), *f.Estimate, *f.CiLow,
+			*f.CiHigh, f.NPasses, responseEffectClass(*f.CiLow, *f.CiHigh, f.Margin), string(f.Finding),
+			string(f.Expected), f.Margin)
+		if err != nil {
+			return fmt.Errorf("save response %s in %s (%s): %w", f.Metric, f.Phase, f.Regime, err)
+		}
+	}
+	return nil
+}
+
+// responseEffectClass is the interval read against the margin as every result row reads it
+// (ADR 0008): positive or negative beyond it, negligible inside it, inconclusive otherwise.
+func responseEffectClass(low, high, margin float64) string {
+	switch {
+	case low > margin:
+		return "positive"
+	case high < -margin:
+		return "negative"
+	case low > -margin && high < margin:
+		return "negligible"
+	}
+	return "inconclusive"
+}
+
 // verdict is one decision about an experiment, by the engine or by the driver. finding is set on
 // the engine's verdicts only.
 type verdict struct {

@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "discovery_curve_request.schema.json",
+  "title": "DiscoveryCurveRequest",
+  "description": "The per-step effects of a sensitivity sweep (POST /discovery/curve, docs/adr/0032-sensitivity-discovery-sweeps.md): for each observable, the variant-minus-baseline effect of every step, each step its own experiment against the same baseline.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "parameter",
+    "observables"
+  ],
+  "properties": {
+    "parameter": {
+      "description": "The setup item (a linked group's leader) the sweep moved.",
+      "type": "string",
+      "minLength": 1
+    },
+    "level": {
+      "description": "Level of every test of the classification; 0.9 when left out.",
+      "type": "number",
+      "exclusiveMinimum": 0.5,
+      "exclusiveMaximum": 1
+    },
+    "observables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CurveObservable"
+      }
+    }
+  },
+  "definitions": {
+    "CurveObservable": {
+      "title": "CurveObservable",
+      "description": "One observable (metric, phase, speed regime) measured at each step of the sweep.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "phase",
+        "regime",
+        "source",
+        "steps"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "title": "CurvePhase",
+          "type": "string",
+          "enum": [
+            "braking",
+            "entry",
+            "mid",
+            "exit",
+            "traction",
+            "corner"
+          ]
+        },
+        "regime": {
+          "title": "CurveRegime",
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "source": {
+          "title": "CurveSource",
+          "description": "verdict: a channel of the step's verdict (block-level, ADR 0029). response: a cell of the step's response analysis (ADR 0031).",
+          "type": "string",
+          "enum": [
+            "verdict",
+            "response"
+          ]
+        },
+        "role": {
+          "description": "For a verdict channel: primary, guardrail, driver_input or prediction.",
+          "type": "string"
+        },
+        "expected": {
+          "title": "CurveExpected",
+          "description": "For a response cell: whether the item's parameter row lists it (direct, proxy) or not (none).",
+          "type": "string",
+          "enum": [
+            "direct",
+            "proxy",
+            "none"
+          ]
+        },
+        "margin": {
+          "description": "Half-width of the band of changes too small to matter, in the metric's unit. Without it the observable is never negligible.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CurveStep"
+          }
+        }
+      }
+    },
+    "CurveStep": {
+      "title": "CurveStep",
+      "description": "The effect of one step: the variant, this many clicks from the baseline, minus the baseline.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clicks",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "level"
+      ],
+      "properties": {
+        "clicks": {
+          "description": "Clicks of the step from the baseline; never 0.",
+          "type": "integer"
+        },
+        "estimate": {
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "level": {
+          "description": "Nominal level of the interval.",
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "look": {
+          "description": "Set when the interval is the repeated confidence interval of a pre-registered look (ADR 0029): its level is then the look's, wider than the nominal one.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        }
+      }
+    }
+  }
+}

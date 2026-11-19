@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sweep.schema.json",
+  "title": "Sweep",
+  "description": "A sensitivity discovery sweep (docs/adr/0032-sensitivity-discovery-sweeps.md): how a car responds to one setting, learned from one experiment per step against the same baseline. It never changes the champion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "session_id",
+    "car_name",
+    "track_name",
+    "parameter",
+    "parameter_label",
+    "baseline_version_id",
+    "ai_hint_share",
+    "requested",
+    "planned",
+    "skipped",
+    "state",
+    "message",
+    "created_at",
+    "steps"
+  ],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "session_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "car_name": {
+      "type": "string"
+    },
+    "track_name": {
+      "type": "string"
+    },
+    "parameter": {
+      "description": "The setting swept: the item, or a linked group's leader.",
+      "type": "string"
+    },
+    "parameter_label": {
+      "type": "string"
+    },
+    "baseline_version_id": {
+      "description": "The setup every step is measured against; it goes back on the car between steps.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "ai_hint_share": {
+      "type": "number"
+    },
+    "requested": {
+      "description": "The steps asked for, in clicks from the baseline.",
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "planned": {
+      "description": "The steps the sweep drives, in order, after clipping to the item's range.",
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "skipped": {
+      "description": "What clipping changed or skipped, in words.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "state": {
+      "title": "SweepState",
+      "description": "running: a step is being driven or about to be. waiting: another experiment is on the car. done: every step measured and the curve classified. stopped: by the driver. failed: stopped by the sweep itself (an invalid step, an AI failure, the baseline moved); the message says why.",
+      "type": "string",
+      "enum": [
+        "running",
+        "waiting",
+        "done",
+        "stopped",
+        "failed"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "steps": {
+      "description": "The steps driven so far, oldest first.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SweepStep"
+      }
+    },
+    "curve": {
+      "$ref": "discovery_curve_response.schema.json"
+    }
+  },
+  "definitions": {
+    "SweepStep": {
+      "title": "SweepStep",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clicks",
+        "experiment_id",
+        "state"
+      ],
+      "properties": {
+        "clicks": {
+          "type": "integer"
+        },
+        "experiment_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "description": "The experiment's state (see experiment.schema.json).",
+          "type": "string"
+        },
+        "finding_class": {
+          "description": "The verdict's finding on lap time (ADR 0029), once judged.",
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

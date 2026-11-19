@@ -131,6 +131,44 @@ Not seen in game yet: whether CSP takes `setAITyresHint` above the learned share
 leaving the track (that is what the experiment measures), and whether `car.timestamp` advances
 for the player's car (if not, passes say `"clock": "app"`).
 
+## A sensitivity sweep (Experiment D of the reliability investigation)
+
+Why: [ADR 0032](../adr/0032-sensitivity-discovery-sweeps.md). A sweep learns how the car responds
+to one setting; it never changes the setup. Experiment D: rear ARB -1, +1, +2, +3 on the FH26 at
+the Hungaroring (`_paddock` test layout), pinned hint.
+
+1. Rebuild core and the engine (migration 00015 and `POST /discovery/curve` come with them), and
+   install the agent as for a pinned-hint experiment (above).
+2. Calibrate the AI on the car (above) and leave the car on the setup you want as the baseline.
+   The baseline must be a setup the agent read back from the car: drive at least one lap on it,
+   or core refuses the sweep (409, "never read back from the car").
+3. Make sure nothing else is on the car: no open experiment (finish or abort it), no training
+   program (stop it). Core refuses otherwise (409).
+4. Start it from the calibrated AI session, in the dashboard (**Experiments › Discover**: setting
+   Rear ARB, steps `-1, 1, 2, 3`, pinned hint share e.g. `0.93`) or:
+
+   ```bash
+   curl -s -X POST localhost:8080/sessions/<AI session>/sweeps -H 'Content-Type: application/json' \
+     -d '{"parameter": "ARB_REAR", "steps": [-1, 1, 2, 3], "ai_hint_share": 0.93}'
+   ```
+
+   The reply's `planned` and `skipped` say what the item's range allows: with the bar at 3 of 0..5,
+   +3 is clipped to +2 and skipped as a repeat. A hint share is required (422 without one).
+5. Leave the game running. Each step is an 8-block A-B-A-B experiment (about 40 minutes on a 1:15
+   lap; up to two extensions when the engine recommends the next look), then the baseline goes back
+   on the car and the next step starts. `GET /sweeps` and the card show the step, its block and
+   lap, and each finished step's finding.
+6. The sweep stops by itself, and says why in `message` (state `failed`), when a step is invalid,
+   aborted, driven at another hint than base x pinned share (`run_context`), when nothing has come
+   from the AI for 30 minutes, or when the baseline moved (someone accepted an experiment on the
+   car). Abort the step's experiment if it is still open; the steps before it stand. Start a new
+   sweep for the rest. **Stop sweep** ends it by hand and leaves the open experiment to you.
+7. When every step is in, the card shows one sentence per observable, e.g. "rear slip rises with
+   each click, about 0.1 deg per click, linear (exit, slow corners)". Check the hint afterwards with
+   the `run_context` query above for each step's experiment.
+
+Not seen in game yet: anything in this section.
+
 ## What the agent does with the car, and when it gives up
 
 | Situation | What happens |
@@ -141,8 +179,8 @@ for the player's car (if not, passes say `"clock": "app"`).
 | More than 5 units of damage in any zone on track | Back to the pits, repaired, the block is retried |
 | Any damage in the pit lane on the way out (brushing the pit wall) | Repaired on the spot, the AI drives on |
 | Reset by the game, or no lap counted for 10 minutes | Back to the pits, the block is retried |
-| Less than 30 L at the start | Every block starts with 30 L (or the first block's fuel, if more), never more than the tank holds |
-| The fuel read back 1 s after the refuel is more than 0.5 L off | The run stops: "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L" |
+| Any fuel at the start | Every block of every AI experiment starts with 30 L, never more than the tank holds |
+| The fuel read back 1 s after the refuel is more than 0.5 L off | The fuel is set again, up to three times a second apart, on the out-lap; then the run stops: "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L (set 4 times)" |
 | A plan pins the AI's tyre hint and the hint given is another (or CSP refused it) | The run stops, naming both hints; the `ai_tune` file is never written during a pinned run |
 | Free laps below 4 L | Back to the pits to refuel; not a retry |
 | Free laps while a plan for a human is open on the car | The AI laps the car's own setup (block 0) and the laps count for no experiment; the plan's blocks stay for the driver |

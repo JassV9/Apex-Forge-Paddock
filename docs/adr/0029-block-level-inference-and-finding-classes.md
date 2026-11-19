@@ -1,6 +1,7 @@
 # ADR 0029: Block-level inference, pre-registered looks and finding classes
 
-Status: accepted (2026-11-18). Amends [ADR 0008](0008-effect-model.md) (the interval and the
+Status: accepted (2026-11-18); amended by [ADR 0034](0034-vehicle-response-in-verdicts.md)
+(regimes per corner and phase interactions in the context test, one margins file). Amends [ADR 0008](0008-effect-model.md) (the interval and the
 judgement), [ADR 0020](0020-ai-training-program.md) (when a program extends),
 [ADR 0022](0022-covariates-the-arm-can-be-told-from.md) (session terms are never left out) and
 [ADR 0025](0025-finished-laps-and-lap-noise.md) (every plan is eight blocks). Implements C2, C3,

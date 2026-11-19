@@ -1,6 +1,6 @@
 -- Ghost Driver, level 2 (docs/adr/0014-ghost-driver.md): AC's own AI drives the run plan's
 -- blocks on the player's car. For every block the car is put in its pit box, repaired, given
--- the same fuel as the first block, gets the block's setup (read back like a human load), and
+-- the same fuel (BLOCK_FUEL_L), gets the block's setup (read back like a human load), and
 -- is handed to the AI. The run plan counts the laps and tags the passes exactly as for a human.
 --
 -- This file only decides; game/ghost.lua performs the actions. Pure Lua: no CSP calls.
@@ -32,10 +32,11 @@ local ghost = {
   SETTLE_S = 2,       -- parked this long after a teleport before the setup is loaded
   TELEPORT_RETRY_S = 10,
   MAX_RETRIES = 3,
-  MIN_FUEL_L = 30,    -- every block starts with the first block's fuel, but never less than this
+  BLOCK_FUEL_L = 30,  -- every block of every AI experiment starts with this (or a full tank)
   RESERVE_L = 4,      -- free laps go in to refuel below this; a dry car heads for the pits
   FUEL_CHECK_S = 1,   -- the fuel is read back this long after the block was handed to the AI
   FUEL_TOLERANCE_L = 0.5,
+  FUEL_RESETS = 3,    -- a read-back that is off sets the fuel again this many times before stopping
 }
 
 function ghost.new()
@@ -76,9 +77,11 @@ local function holdBack(s, o)
   return {}
 end
 
--- the first block's fuel, never less than MIN_FUEL_L, never more than the tank holds
+-- one fuel for every block of every experiment, never more than the tank holds. It was the
+-- fuel the car had when the AI first took it (at least 30 L): 30 L in one game, 50 L in the
+-- next, so experiments compared across sessions (a hint sweep) ran on different fuel
 local function fuelTarget(o)
-  local liters = math.max(o.fuel or 0, ghost.MIN_FUEL_L)
+  local liters = ghost.BLOCK_FUEL_L
   if o.maxFuel and o.maxFuel > 0 then liters = math.min(liters, o.maxFuel) end
   return liters
 end
@@ -124,23 +127,37 @@ local function retry(s, o, why)
   return goToPits(s, o.block, string.format("AI driver: %s, retrying %s.", why, name(o.block)))
 end
 
--- the fuel read back once, FUEL_CHECK_S after the block began: a refuel that did not take
--- (seen: experiment 15 drove block 1 on 24 L, the others on 48 L) would make the arms unequal
-local function fuelOff(s, o)
+-- the fuel read back FUEL_CHECK_S after the block began: a refuel that did not take (seen:
+-- experiment 15 drove block 1 on 24 L, the others on 48 L) would make the arms unequal. The
+-- setup's own [FUEL] VALUE can land after the set (seen: 26 L at block 9 of experiment 20,
+-- the first block after a relaunch), so the fuel is set again during the out-lap, up to
+-- FUEL_RESETS times, before the block stops
+local function checkFuel(s, o)
   if not s.fuelCheck then return nil end
   s.fuelCheck = s.fuelCheck - o.dt
   if s.fuelCheck > 0 then return nil end
   s.fuelCheck = nil
   if o.fuel == nil or math.abs(o.fuel - s.fuel) <= ghost.FUEL_TOLERANCE_L then return nil end
-  return string.format("the car has %.1f L after refuelling for %s, the plan wants %.1f L",
-    o.fuel, name(s.block), s.fuel)
+  s.fuelResets = (s.fuelResets or 0) + 1
+  if s.fuelResets <= ghost.FUEL_RESETS then
+    s.fuelCheck = ghost.FUEL_CHECK_S
+    return { act("set_fuel", { liters = s.fuel }) }
+  end
+  return fail(s, string.format("the car has %.1f L after refuelling for %s, the plan wants %.1f L"
+    .. " (set %d times)", o.fuel, name(s.block), s.fuel, s.fuelResets))
 end
 
--- why the block cannot count: its setup is not on the car, its fuel or the AI's hint is not
--- the plan's
+-- why the block cannot count: its setup is not on the car or the AI's hint is not the plan's
 local function invalid(s, o)
   if s.block ~= 0 and o.offCar then return o.offCar end
-  return fuelOff(s, o) or o.hintOff
+  return o.hintOff
+end
+
+-- the block stops when it cannot count; its fuel is set again while that can still help
+local function offPlan(s, o)
+  local why = invalid(s, o)
+  if why then return fail(s, why) end
+  return checkFuel(s, o)
 end
 
 local function whileDriving(s, o)
@@ -153,8 +170,8 @@ local function whileDriving(s, o)
     s.retries = 0
     return goToPits(s, o.block, "AI driver: block done, to the pits for " .. name(o.block) .. ".")
   end
-  local why = invalid(s, o)
-  if why then return fail(s, why) end
+  local off = offPlan(s, o)
+  if off then return off end
   if s.block == 0 and s.untilCalibrated and o.calibrated then
     s.phase, s.free, s.untilCalibrated = "off", false, false
     s.message = "AI calibrated on this car: the car is yours, or start an experiment."
@@ -216,9 +233,12 @@ function ghost.loaded(s, ok, message, offCar)
   if offCar then return fail(s, offCar) end
   if not ok then return fail(s, "the setup did not load (" .. tostring(message) .. ")") end
   s.phase, s.stuck, s.damage, s.sinceLap, s.fuelCheck = "driving", 0, nil, 0, ghost.FUEL_CHECK_S
+  s.fuelResets = 0
   s.resets, s.lapsDone = nil, nil  -- the teleport and the start count as resets; begin afresh
   s.message = "AI driver: driving " .. name(s.block) .. "."
-  return { act("autopilot_on"), act("start") }
+  -- the fuel again: resetCarState (the repair) takes effect a step later and can put back the
+  -- session's starting fuel over the first set_fuel (seen in game: 26 L for a 50 L block)
+  return { act("set_fuel", { liters = s.fuel }), act("autopilot_on"), act("start") }
 end
 
 ---The driver takes the car back. The AI does not start again until `resume`.

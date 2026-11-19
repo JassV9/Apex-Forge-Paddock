@@ -1,6 +1,6 @@
 [project]
 name = "paddock-engine"
-version = "0.2.0"
+version = "0.4.0"
 description = "Apex Forge: Paddock analysis engine (features, statistics, diagnosis, sensitivity)."
 requires-python = ">=3.12"
 dependencies = [

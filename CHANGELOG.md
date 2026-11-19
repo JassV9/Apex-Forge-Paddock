@@ -27,6 +27,44 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
   16, 19): -2.64 [-6.46, +1.17] ms fixed effect before, -1.84 [-8.03, +4.67] ms insufficient
   after (7 and 11 left out: 4 blocks); base setup still takes nothing on the FH26 and ARB front -1
   on the 488 GT3. **Unverified in game**.
+- Engine, core and web (ADR 0034): the verdict says what the car did, apart from the time. Core
+  sends, in the same evaluate request, where the raw samples are and the experiment's push passes
+  (off-track ones included); the engine freezes phases and per-corner regimes from the baseline
+  and judges each cell `response/parameters.toml` expects the changed parameter to move
+  (block-level interval, Holm across those cells at 5 %): increase, decrease, neutral, likely
+  increase or decrease, insufficient. These steer `switch_metric`, never the time finding or the
+  decision; other cells stay descriptive in `POST /response`. Context-dependent now tests speed
+  regimes per corner (one regime map per verdict) and arm x phase interactions on the phase
+  times together under one Holm family (confounder `phase_interaction`). One margins file,
+  `config/margins.toml`, for the verdict's channels and every response metric. Migration 00013:
+  response findings are result rows of role `response` (phase, regime as corner class, finding,
+  direct or proxy, margin), appended per verdict, out of `current_result`, in `current_response`.
+  The experiment page has a "What the car did" table. Engine 0.3.0. On identical setups 0.5 to
+  3.8 % of simulated experiments had any false response finding (82 to 92 % without Holm).
+  Replayed offline on experiment 15: time context-dependent (0.0 ms overall), ten of sixteen rear
+  wing cells moved after Holm (rear slip mid +0.11 deg, yaw gain +0.02, slip balance -0.17 deg).
+  The driver-input check uses the absolute braking and pickup points when every pass has them
+  (experiment 20's "driver adapted" came from the moving slowest point, not the braking point).
+  **Unverified in game.**
+- Core, engine and web (ADR 0032, Experiment D of the reliability investigation): sensitivity
+  discovery sweeps. `POST /sessions/{id}/sweeps {parameter, steps, ai_hint_share}` has the AI
+  drive one setting through a list of steps (clicks from the baseline, clipped to the item's
+  range, a clipped repeat skipped and said so; a linked group is one setting), each step its own
+  A-B-A-B experiment against the same verified baseline (read back from the car) at a required
+  pinned hint, the baseline back on the car between steps. New `core/internal/discovery` with its
+  own loop beside training's, using only the ledger's actions. Experiments now carry a purpose
+  (migration 00015: `improve`, `sweep`, `recheck`); a sweep step is never promoted, whatever the
+  verdict. A step stops the sweep, with the reason, on an invalid finding, an abort, a block
+  driven at another hint, 30 minutes without anything from the AI, or a moved baseline; `continue`
+  extends to the next look, any other recommendation moves on. Core now calls `POST /response`
+  per measured step (`experiments.Service.ResponseRequest`) and keeps the cells the item's row
+  expects. The engine's new `POST /discovery/curve` (`discovery/curve.py`) classifies each
+  observable as linear, nonlinear, negligible (TOST at every step), direction change or
+  insufficient (never from one step), from a weighted fit through the baseline. `GET /sweeps`,
+  `POST /sweeps/{id}/stop`, and a "Discover" card that says each curve in a sentence. The 2^2
+  factorial and response-surface stages are designed in the ADR, not built. Tested offline (Go
+  against PostgreSQL with a fake ledger and engine, pytest with hypothesis on synthetic curves,
+  Vitest); **unverified in game**.
 - Agent and core (ADR 0028, audit findings C1, I9, I10): run context and AI provenance. The
   session line now says what it was driven under (CSP version and build, cars in the session,
   the car's AI tyre, aero and brake hints, the learned share, AI level and aggression; in an AI

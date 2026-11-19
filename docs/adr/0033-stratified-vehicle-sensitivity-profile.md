@@ -33,7 +33,8 @@ exclusions, off-track counts and look) and the engine (`POST /sensitivity/measur
 `sensitivity/measure.py`) judges it again for its finding and measures the primary channel and
 each guardrail over all corners and per frozen speed class (3 corners and 3 block degrees of
 freedom at least), with the block-level estimate, standard error and degrees of freedom.
-Nothing is written to the ledger. Core keeps the answer in `sensitivity_derivation` (status,
+Nothing is written to the ledger. The engine version becomes 0.4.0 (0.3.0 was ADR 0034), so
+every experiment is re-derived once after the upgrade. Core keeps the answer in `sensitivity_derivation` (status,
 finding, engine version) and `sensitivity_measurement`, once per experiment and engine version
 (the engine's `GET /health`). An experiment that cannot be replayed (not fully driven, features
 pending) or that the engine refuses is kept as failed with the reason; its ledger rows are pooled
@@ -155,7 +156,7 @@ all AI, hint unknown, baseline 2, one click):
 | After | 7 and 11 left out (4 blocks, 1 block degree of freedom); 16 and 19 re-derived, half-normal tau | -1.84 [-8.03, +4.67] ms, tau 3.4 ms | insufficient |
 | For comparison | all four re-derived, HKSJ | -2.23 [-7.66, +3.20] ms, tau 0, prediction [-8.97, +4.51] | insufficient |
 
-Re-derived (engine 0.2.0): 7 -1.03 ms (se 1.96, df 1), 11 -4.67 (2.75, 1), 16 -3.65 (2.50, 6),
+Re-derived (engine 0.2.0; the same numbers under 0.4.0, `tests/test_measure.py`): 7 -1.03 ms (se 1.96, df 1), 11 -4.67 (2.75, 1), 16 -3.65 (2.50, 6),
 19 +1.29 (3.79, 5). Fast corners, 16 and 19: -4.40 [-9.84, +0.90] ms.
 
 Base setup now: on the FH26 nothing qualifies (rear ARB +1, diff preload -1 (17), brake bias -1

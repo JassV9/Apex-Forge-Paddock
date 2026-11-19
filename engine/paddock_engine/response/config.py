@@ -1,12 +1,16 @@
 """The observables configuration: metrics and unavailable channels (response/metrics.toml) and
-the parameter-to-observable mapping (response/parameters.toml). Read once; checked against the
-code by the tests."""
+the parameter-to-observable mapping (response/parameters.toml). A metric's margin is not here:
+every margin is in config/margins.toml (ADR 0034). Read once; checked against the code by the
+tests."""
 
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 from importlib import resources
 from typing import Any
+
+from paddock_engine.config.margins import margins
 
 PHASE_NAMES = ("braking", "entry", "mid", "exit", "traction", "corner")
 KINDS = ("direct", "proxy")
@@ -56,11 +60,13 @@ class Observables:
         return next((row for row in self.parameters if wanted in row.match), None)
 
 
-def _metric(name: str, raw: dict[str, Any]) -> MetricSpec:
+def _metric(name: str, raw: dict[str, Any], margin: float | None) -> MetricSpec:
     phases = tuple(raw["phases"])
     if raw["kind"] not in KINDS or not set(phases) <= set(PHASE_NAMES):
         raise ValueError(f"observables: metric {name} has an unknown kind or phase")
-    return MetricSpec(name, raw["kind"], raw["unit"], float(raw["margin"]), phases, raw["about"])
+    if margin is None:
+        raise ValueError(f"observables: metric {name} has no margin in config/margins.toml")
+    return MetricSpec(name, raw["kind"], raw["unit"], margin, phases, raw["about"])
 
 
 def _row(raw: dict[str, Any]) -> ParameterRow:
@@ -75,8 +81,11 @@ def _row(raw: dict[str, Any]) -> ParameterRow:
     )
 
 
-def parse(raw: dict[str, Any]) -> Observables:
-    metrics = {name: _metric(name, spec) for name, spec in raw["metrics"].items()}
+def parse(raw: dict[str, Any], metric_margins: Mapping[str, float]) -> Observables:
+    """The configuration, each metric with its default margin from `metric_margins`."""
+    metrics = {
+        name: _metric(name, spec, metric_margins.get(name)) for name, spec in raw["metrics"].items()
+    }
     unavailable = {name: str(reason) for name, reason in raw["unavailable"].items()}
     rows = tuple(_row(row) for row in raw["parameters"])
     for row in rows:
@@ -93,4 +102,4 @@ def observables() -> Observables:
     raw: dict[str, Any] = {}
     for name in ("metrics.toml", "parameters.toml"):
         raw |= tomllib.loads(folder.joinpath(name).read_text("utf-8"))
-    return parse(raw)
+    return parse(raw, margins().metrics)

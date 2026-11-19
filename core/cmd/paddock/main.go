@@ -16,6 +16,7 @@ import (
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/api"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/config"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/diagnosis"
+	"github.com/JassV9/Apex-Forge-Paddock/core/internal/discovery"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/engine"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/experiments"
 	"github.com/JassV9/Apex-Forge-Paddock/core/internal/features"
@@ -39,7 +40,8 @@ const (
 	// The agent writes each spool file to a temporary name and renames it, so a visible file
 	// is complete; the settle time only covers file systems where a rename is not atomic.
 	spoolSettleTime = time.Second
-	// A training program looks at its experiment this often: a block of AI laps takes minutes.
+	// A training program or a sweep looks at its experiment this often: a block of AI laps
+	// takes minutes.
 	trainingInterval = 15 * time.Second
 )
 
@@ -79,12 +81,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := startFeatures(ctx, cfg, database, analysis, logger, metrics); err != nil {
 		return err
 	}
-	deps, trainer := services(cfg, database, analysis, logger, metrics)
-	go func() {
-		if err := trainer.Run(ctx, trainingInterval); err != nil {
-			logger.Error("training programs stopped", "error", err)
-		}
-	}()
+	deps, loops := services(cfg, database, analysis, logger, metrics)
+	loops.run(ctx, logger)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           api.NewHandler(deps),
@@ -93,9 +91,29 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	return serve(ctx, server, logger)
 }
 
+// background is the services whose loops run beside the API: training programs and sweeps.
+type background struct {
+	trainer *training.Service
+	sweeps  *discovery.Service
+}
+
+// run keeps both loops going until ctx is cancelled.
+func (b background) run(ctx context.Context, logger *slog.Logger) {
+	go func() {
+		if err := b.trainer.Run(ctx, trainingInterval); err != nil {
+			logger.Error("training programs stopped", "error", err)
+		}
+	}()
+	go func() {
+		if err := b.sweeps.Run(ctx, trainingInterval); err != nil {
+			logger.Error("sweeps stopped", "error", err)
+		}
+	}()
+}
+
 // services wires everything the API serves to the database and the engine, and returns the
-// training service whose loop runs beside the API.
-func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) (api.Deps, *training.Service) {
+// services whose loops run beside the API.
+func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logger *slog.Logger, metrics *telemetry.Metrics) (api.Deps, background) {
 	ledger := experiments.NewService(database, analysis, experiments.Outbox{Dir: cfg.OutboxDir}, logger)
 	if err := ledger.PublishRunning(context.Background()); err != nil {
 		logger.Error("run plans not written again", "error", err)
@@ -103,6 +121,7 @@ func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logg
 	diagnoses := diagnosis.NewService(database, analysis, ledger, logger)
 	garage := sensitivity.NewService(database, analysis, ledger, diagnoses, logger)
 	trainer := training.NewService(database, ledger, garage, diagnoses, logger)
+	sweeps := discovery.NewService(database, ledger, analysis, logger)
 	return api.Deps{
 		Logger: logger, Version: version, Database: database,
 		Sessions:    store.NewReader(database),
@@ -112,9 +131,10 @@ func services(cfg config.Config, database *sql.DB, analysis *engine.Client, logg
 		Reference:   reference.NewService(database),
 		Garage:      garage,
 		Training:    trainer,
+		Sweeps:      sweeps,
 		BaseSetups:  sensitivity.NewBaseSetups(garage, ledger, analysis, logger),
 		Metrics:     metrics.Handler,
-	}, trainer
+	}, background{trainer: trainer, sweeps: sweeps}
 }
 
 func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (*sql.DB, error) {

@@ -66,6 +66,9 @@
       "items": {
         "$ref": "#/definitions/OfftrackBlock"
       }
+    },
+    "response": {
+      "$ref": "#/definitions/VehicleResponseInput"
     }
   },
   "definitions": {
@@ -289,6 +292,174 @@
           "description": "Those marked invalid (off track).",
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "VehicleResponseInput": {
+      "title": "VehicleResponseInput",
+      "description": "What the engine needs to measure the car's response per frozen phase and speed regime inside the verdict (ADR 0034): the track, where each session's raw samples are, and the experiment's push passes on the arm's setup from its driver, off-track ones included (valid false: never compared, but they may complete the previous pass's traction).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_length_m",
+        "corners",
+        "sessions",
+        "passes"
+      ],
+      "properties": {
+        "track_length_m": {
+          "description": "Lap length along the AI line.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "item_role": {
+          "description": "The changed setup item's role in the catalog (arb, wing, bias, ...); picks the parameter row of the observables mapping.",
+          "type": "string"
+        },
+        "item_axle": {
+          "description": "F or R when the changed item belongs to one axle; empty otherwise.",
+          "type": "string"
+        },
+        "corners": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/VehicleCorner"
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/VehicleSession"
+          }
+        },
+        "passes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/VehiclePass"
+          }
+        }
+      }
+    },
+    "VehicleCorner": {
+      "title": "VehicleCorner",
+      "description": "Where a corner and its zone are, in metres from the start line.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "zone_start_m",
+        "start_m",
+        "end_m",
+        "zone_end_m"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "zone_start_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "start_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "zone_end_m": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "VehicleSession": {
+      "title": "VehicleSession",
+      "description": "Where one game session's raw samples are.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session",
+        "parquet_dir"
+      ],
+      "properties": {
+        "session": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parquet_dir": {
+          "description": "Directory of the session's Parquet parts.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "VehiclePass": {
+      "title": "VehiclePass",
+      "description": "One push-lap pass, with the block, lap code and covariates of its EvaluatePass.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session",
+        "seq",
+        "corner",
+        "arm",
+        "block",
+        "t_start_s",
+        "duration_s",
+        "valid"
+      ],
+      "properties": {
+        "session": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seq": {
+          "description": "Order of the pass within its session.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "corner": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "arm": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "variant"
+          ]
+        },
+        "block": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lap": {
+          "description": "Lap code, as in EvaluatePass.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "t_start_s": {
+          "description": "When the pass started, seconds on any clock shared by the session's passes.",
+          "type": "number"
+        },
+        "duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "covariates": {
+          "description": "As in EvaluatePass.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
         }
       }
     }

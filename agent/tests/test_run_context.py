@@ -184,8 +184,9 @@ def test_a_refuel_that_does_not_take_stops_the_run(agent: Agent) -> None:
 
     ghost = agent.rt.eval('require("game.ghost")')
     assert ghost.phase() == "failed"
-    assert "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L (set 4 times)" in (
-        ghost.message()
+    assert (
+        "the car has 24.0 L after refuelling for block 1, the plan wants 30.0 L (set 4 times)"
+        in (ghost.message())
     )
     assert not [p for p in agent.passes() if "block" in p and p["block"]["lap"] > 0]
 

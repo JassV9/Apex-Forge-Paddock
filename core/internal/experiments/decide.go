@@ -127,6 +127,10 @@ func (s *Service) Extend(ctx context.Context, id int64) (contracts.Experiment, e
 	})
 }
 
+// measureOnlyRevert is the reason a measure-only experiment's revert gives: it frees the car for
+// the next step of its series, and no one chose the baseline over the variant.
+const measureOnlyRevert = "Measure-only: the baseline is back on the car; nothing was decided."
+
 // Revert goes back to the baseline: giving up on an inconclusive experiment, declining a
 // trade-off, or rolling back an accepted experiment whose variant is the current champion.
 func (s *Service) Revert(ctx context.Context, id int64) (contracts.Experiment, error) {
@@ -151,6 +155,9 @@ func (s *Service) revert(ctx context.Context, id int64, reason string, by contra
 				return fmt.Errorf("experiment %d is on the car; finish it first: %w", other, ErrConflict)
 			}
 			reason = "Rolled back by the driver: the baseline is the champion again."
+		}
+		if exp.purpose == contracts.ExperimentPurposeSweep && by == contracts.VerdictSummaryDecidedByDriver {
+			reason = measureOnlyRevert
 		}
 		if err := restore(ctx, tx, exp, exp.state, reason); err != nil {
 			return err

@@ -87,6 +87,21 @@ func TestEveryExperimentSaysWhyItWasDriven(t *testing.T) {
 	}
 }
 
+func TestRevertingAMeasureOnlyExperimentSaysNothingWasDecided(t *testing.T) {
+	f := newFixture(t, "exp_measure_only_revert")
+	step := f.runSweepStep(t, -1, inconclusive)
+
+	reverted, err := f.service.Revert(t.Context(), int64(step.Id))
+	if err != nil {
+		t.Fatalf("Revert: %v", err)
+	}
+
+	last := reverted.Events[len(reverted.Events)-1]
+	if last.To != "reverted" || last.Reason != measureOnlyRevert {
+		t.Errorf("last event %s: %q, want %q", last.To, last.Reason, measureOnlyRevert)
+	}
+}
+
 func TestAMeasureOnlyExperimentIsAcceptedWithoutBeingPromoted(t *testing.T) {
 	f := newFixture(t, "exp_measure_only")
 	exp, err := f.service.Create(t.Context(), contracts.ExperimentCreate{

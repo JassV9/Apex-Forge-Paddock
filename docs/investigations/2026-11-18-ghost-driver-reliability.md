@@ -268,3 +268,86 @@ Process gaps seen: the prediction was recorded only as event text (`predictions`
 machine-checked); the driver-input check now uses the absolute braking point (ADR 0034) but has no
 margin, so a 0.19 m shift is flagged; and the accepted verdict promoted the change to champion,
 which a hint sweep must avoid between its steps (fixed with `measure_only`, ADR 0032 amendment).
+
+### Experiment C: grip hint (experiments 22 to 26, 2026-11-19)
+
+Rear wing -1 (`WING_1 + WING_9`) against one baseline (setup 237: experiment 20's champion, rear ARB
+5), measure-only, one experiment per pinned hint, run in the pre-registered order 0.93, 0.885, 1.0,
+0.97, 0.9409 in one game session, 8 ABAB blocks each, engine 0.4.0. Driven unattended by a chain
+that evaluated each step at look 1 and would have extended on `continue` (no step asked: every
+recommendation was `investigate_context`).
+
+**Conditions held.** The hint read back on every pass equals the pin (min = max). Push lap 1 fuel
+27.82 to 27.89 L in every experiment. No invalid pass, no damage, off-track rate 0 in every arm
+(`reset_counter` counts the agent's own teleports, not incidents). 336 passes each, except exp 24
+(hint 1.0): 329, one block-3 lap short of 7 passes (not investigated).
+
+**Pace by hint** (mean corner pass over both arms; between experiments, so time of day and track
+temperature are not controlled):
+
+| Hint | 0.885 | 0.93 | 0.9409 | 0.97 | 1.0 |
+|---|---|---|---|---|---|
+| Mean pass (s) | 5.734 | 5.662 | 5.656 | 5.636 | 5.645 |
+| vs 0.9409, per lap (s) | +1.09 | +0.08 | 0 | -0.28 | -0.15 |
+
+The AI gets faster with the hint up to 0.97 and no faster at 1.0.
+
+**Corner time, rear wing -1 minus baseline (ms per corner, 90 %, block-level):**
+
+| Hint | all | slow | medium | fast | Finding |
+|---|---|---|---|---|---|
+| 0.885 | +15.6 [+2.3, +29.0] | +20.9 [+5.4, +36.4] | +13.6 [+7.7, +19.5] | +17.8 [+10.6, +25.0] | context-dependent |
+| 0.93 | +1.1 [-5.4, +7.6] | +7.8 [+0.3, +15.2] | +6.6 [-5.7, +18.9] | -10.0 [-14.4, -5.6] | context-dependent |
+| 0.9409 | +2.9 [-4.2, +9.9] | -12.2 [-20.3, -4.1] | +11.8 [+1.1, +22.5] | -1.3 [-7.0, +4.4] | context-dependent |
+| 0.97 | -1.5 [-17.6, +14.5] | +8.1 [-2.0, +18.2] | +1.3 [-21.2, +23.8] | -15.3 [-19.7, -10.9] | context-dependent |
+| 1.0 | +1.7 [-4.0, +7.4] | +6.4 [-2.1, +14.9] | +8.1 [-3.1, +19.2] | -7.6 [-11.5, -3.6] | context-dependent |
+
+**Response, rear wing -1 (all corners; Holm-adjusted findings, every one listed moved beyond its margin):**
+
+| Hint | rear slip mid (deg) | rear slip exit (deg) | yaw gain mid | slip balance mid (deg) | top-speed proxy, fast (km/h) |
+|---|---|---|---|---|---|
+| 0.885 | +0.11 | +0.10 | +0.02 | -0.23 | not moved |
+| 0.93 | +0.11 | +0.10 | +0.02 | -0.24 | +1.56 |
+| 0.9409 | +0.11 | +0.19 | +0.03 | -0.32 | +0.72 |
+| 0.97 | +0.15 | +0.15 | +0.01 | -0.31 | +1.22 |
+| 1.0 | +0.20 (fast) | +0.13 (fast) | +0.03 | -0.41 | not moved |
+
+**AI inputs:** at every hint the AI brakes about 1 m earlier with less wing (-0.95 to -1.26 m,
+absolute braking point). At 0.885 it also picks up the throttle later (+0.9 m) and corrects more.
+
+**Against the hypothesis** ("higher hints raise corner speeds and expose larger time effects of the
+same change; incidents rise"):
+
+- *Speeds rise with the hint: held up to 0.97*, flat at 1.0.
+- *Larger time effects at higher hints: not supported.* The pooled time effect is near zero at every
+  hint from 0.93 up. What is stable is its *shape*: less rear wing is faster in the fast corners
+  (-7.6 to -15.3 ms at 0.93, 0.97, 1.0) with more top speed after them (+0.7 to +1.6 km/h), and
+  slower or unchanged in slow and medium ones. That is the drag/downforce trade-off, and it is why
+  every step is context-dependent: the pooled number is the wrong question for an aero change
+  (experiment 15's replay found the same: slow +8.7, fast -9.1 ms). 0.9409's slow-corner gain is the
+  exception; one experiment cannot say whether it is real.
+- *Larger response at higher hints: partly supported.* The balance shift grows with the hint (slip
+  balance mid -0.23 at 0.885 to -0.41 at 1.0; rear slip in fast corners +0.09 to +0.20 deg): the
+  closer the AI drives to the limit, the more of the setup's effect on balance shows. Direction and
+  rough size match experiment 15 at every hint, on a different baseline (rear ARB 5, not 2): the
+  rear-wing response replicates.
+- *Incidents rise: not seen.* None at any hint, so by the design rule (highest hint with incidents
+  in at most one block) 1.0 is usable; it is not faster than 0.97.
+- *At 0.885 the AI drives the change differently:* slower everywhere (+15.6 ms), brakes earlier,
+  throttles later. A low hint leaves margin the AI's plan does not use, and its plan reacts to the
+  setup's aero rather than to grip it is not near: 0.885 hides the trade-off.
+
+**Reading.** For this car and AI, 0.97 is the most useful hint: the fastest AI, the largest balance
+response, no incidents. Time is not a sufficient observable for an aero change; per-class time and
+the response cells are. The AI's planner reacts to downforce (about 1 m earlier braking for one
+click less wing at every hint), so "the AI does not compensate" from experiment B holds for a
+mechanical change (ARB) but not for an aero one: the braking point is part of the response here.
+
+**Limits.** One experiment per hint, so the hint trend is between experiments, at different times of
+the night (time since start is flagged between blocks in all five). Look 1 only. The 1.0 run is short
+one lap. The usable-hint choice should be confirmed with one A/A at 0.97 (experiment A) before 0.97
+becomes the default pin.
+
+The five reverts were recorded as "The driver kept the baseline", which is wrong for measure-only
+runs; reverting a measure-only experiment now says nothing was decided (the five events stay as
+written: the ledger is append-only).

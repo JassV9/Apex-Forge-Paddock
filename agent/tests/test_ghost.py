@@ -63,8 +63,19 @@ def test_a_plan_for_the_ai_sends_the_car_to_the_pits_then_loads_and_hands_it_ove
     assert state.phase == "to_pits" and state.fuel == 40
     seen = run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, fuel=12)
     assert seen == ["repair", "set_fuel", "load"]
-    assert names(ghost.loaded(state, True, "ok")) == ["autopilot_on", "start"]
+    handed_over = to_py(ghost.loaded(state, True, "ok"))
+    assert [a["name"] for a in handed_over] == ["set_fuel", "autopilot_on", "start"]
     assert state.phase == "driving" and ghost.active(state)
+
+
+def test_the_fuel_is_set_again_after_the_reset_has_taken_effect(rt):
+    # resetCarState (repair) lands a physics step later and can undo the first set_fuel (seen in
+    # game, experiment 20: 26 L for a 50 L block); the hand-over sets it once more
+    ghost, state = machine(rt)
+    ghost.step(state, obs(rt))
+    run_for(rt, ghost, state, ghost.SETTLE_S + 0.1, parked=True, onTrack=False, fuel=12)
+    handed_over = to_py(ghost.loaded(state, True, "ok"))
+    assert handed_over[0] == {"name": "set_fuel", "liters": 40}
 
 
 def test_every_block_gets_the_fuel_of_the_first(rt):

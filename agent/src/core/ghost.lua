@@ -218,7 +218,9 @@ function ghost.loaded(s, ok, message, offCar)
   s.phase, s.stuck, s.damage, s.sinceLap, s.fuelCheck = "driving", 0, nil, 0, ghost.FUEL_CHECK_S
   s.resets, s.lapsDone = nil, nil  -- the teleport and the start count as resets; begin afresh
   s.message = "AI driver: driving " .. name(s.block) .. "."
-  return { act("autopilot_on"), act("start") }
+  -- the fuel again: resetCarState (the repair) takes effect a step later and can put back the
+  -- session's starting fuel over the first set_fuel (seen in game: 26 L for a 50 L block)
+  return { act("set_fuel", { liters = s.fuel }), act("autopilot_on"), act("start") }
 end
 
 ---The driver takes the car back. The AI does not start again until `resume`.

@@ -3423,6 +3423,12 @@ type ExperimentCreate struct {
 	// marked as coming from the rules; without it the hypothesis is the human's own.
 	HypothesisKey *string `json:"hypothesis_key,omitempty,omitzero"`
 
+	// True: the experiment measures and is never promoted, whatever its verdict; the
+	// baseline goes back on the car, as for a sweep step (purpose sweep,
+	// docs/adr/0032-sensitivity-discovery-sweeps.md). For a series that must share
+	// one baseline, such as a grip-hint sweep.
+	MeasureOnly bool `json:"measure_only,omitempty,omitzero"`
+
 	// Setup item to change.
 	Parameter string `json:"parameter"`
 
@@ -3503,6 +3509,9 @@ func (j *ExperimentCreate) UnmarshalJSON(value []byte) error {
 	}
 	if plain.HypothesisKey != nil && utf8.RuneCountInString(string(*plain.HypothesisKey)) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "hypothesis_key", 1)
+	}
+	if v, ok := raw["measure_only"]; !ok || v == nil {
+		plain.MeasureOnly = false
 	}
 	if utf8.RuneCountInString(string(plain.Parameter)) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "parameter", 1)

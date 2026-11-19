@@ -4,6 +4,13 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Core (ADR 0032): `measure_only` on `POST /experiments` files the experiment with purpose
+  `sweep`: measured, never promoted, the baseline back after any verdict, so a series such as the
+  grip-hint sweep shares one baseline. Experiment 20 (rear ARB +3) was accepted and promoted at
+  look 3, which is what a hint sweep must not do between its steps.
+- Agent (ADR 0028 amendment): one fuel, 30 L, for every block of every AI experiment, and an off
+  fuel read-back is set again during the out-lap before the run stops. Verified in game on
+  experiment 20 blocks 11 and 12 (both on the same fuel as blocks 1 to 10).
 - Engine, core and web (ADR 0033, audit findings I1, I11, I12, I13): a stratified vehicle
   sensitivity profile. Each finished one-item experiment is re-derived once per engine version
   (`POST /sensitivity/measure`: finding, block-level estimate, standard error and degrees of

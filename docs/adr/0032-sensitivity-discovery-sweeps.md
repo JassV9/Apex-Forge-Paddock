@@ -175,6 +175,13 @@ Nothing below is implemented beyond what a one-factor sweep needs.
 - Migrations 00013 and 00014 are written in parallel; on a fresh database 00015 applies after
   00012 as well as after them.
 
+## Amendment: measure-only experiments (2026-11-19)
+
+`POST /experiments` takes `measure_only: true` to file one experiment with purpose `sweep`
+without a sweep around it: the same never-promote rule, so a hand-run series that is not a click
+sweep (the grip-hint sweep of the reliability investigation, one hint per experiment) keeps one
+baseline. Experiment 20 showed the need: accepted at look 3, it became the champion.
+
 ## Not verified
 
 - **Unverified in game.** No sweep has been driven in Assetto Corsa. The loop is tested against a

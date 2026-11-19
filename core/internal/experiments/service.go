@@ -63,8 +63,12 @@ func (s *Service) List(ctx context.Context) ([]contracts.Experiment, error) {
 
 // Create proposes an experiment: one setting moved by some clicks, against the setup the
 // session was driven on. The variant is validated against the car's setup menu here, so an
-// experiment that could not be driven is never stored.
+// experiment that could not be driven is never stored. A measure-only experiment is filed as a
+// sweep step: never promoted, so a series of them shares one baseline.
 func (s *Service) Create(ctx context.Context, request contracts.ExperimentCreate) (contracts.Experiment, error) {
+	if request.MeasureOnly {
+		return s.create(ctx, request, contracts.ExperimentPurposeSweep)
+	}
 	return s.create(ctx, request, contracts.ExperimentPurposeImprove)
 }
 

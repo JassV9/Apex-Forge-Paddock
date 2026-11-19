@@ -53,6 +53,11 @@
       "minimum": 0.5,
       "maximum": 1.5
     },
+    "measure_only": {
+      "description": "True: the experiment measures and is never promoted, whatever its verdict; the baseline goes back on the car, as for a sweep step (purpose sweep, docs/adr/0032-sensitivity-discovery-sweeps.md). For a series that must share one baseline, such as a grip-hint sweep.",
+      "type": "boolean",
+      "default": false
+    },
     "hypothesis_key": {
       "description": "Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",
       "type": "string",

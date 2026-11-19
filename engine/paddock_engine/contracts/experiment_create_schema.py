@@ -59,6 +59,10 @@ class ExperimentCreate(BaseModel):
         ge=0.5,
         le=1.5,
     )
+    measure_only: bool | None = Field(
+        False,
+        description="True: the experiment measures and is never promoted, whatever its verdict; the baseline goes back on the car, as for a sweep step (purpose sweep, docs/adr/0032-sensitivity-discovery-sweeps.md). For a series that must share one baseline, such as a grip-hint sweep.",
+    )
     hypothesis_key: str | None = Field(
         None,
         description="Key of the hypothesis in the session's latest diagnosis that this experiment tests. The hypothesis is then stored with its evidence and alternatives and marked as coming from the rules; without it the hypothesis is the human's own.",

@@ -43,6 +43,7 @@ describe("ProposeForm", () => {
       parameter: "ARB_REAR",
       clicks: 2,
       driver: "human",
+      measure_only: false,
       statement: "A stiffer rear bar helps rotation.",
       predictions: [{ channel: "corner_time_s", direction: "decrease", low: 0.01, high: 0.05 }],
     });
@@ -113,6 +114,7 @@ describe("ProposeForm", () => {
         parameter: "ARB_REAR",
         clicks: 1,
         driver: "human",
+        measure_only: false,
         statement: prefill.statement,
         predictions: [],
         hypothesis_key: "mid_understeer.slow",

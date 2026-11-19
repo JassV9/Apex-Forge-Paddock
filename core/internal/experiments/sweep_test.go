@@ -87,6 +87,36 @@ func TestEveryExperimentSaysWhyItWasDriven(t *testing.T) {
 	}
 }
 
+func TestAMeasureOnlyExperimentIsAcceptedWithoutBeingPromoted(t *testing.T) {
+	f := newFixture(t, "exp_measure_only")
+	exp, err := f.service.Create(t.Context(), contracts.ExperimentCreate{
+		SessionId: f.sessionID, Parameter: "ARB_FRONT", Clicks: -1, Statement: "Grip-hint sweep step.",
+		Predictions: []contracts.PredictionSpec{}, MeasureOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if exp.Purpose == nil || *exp.Purpose != contracts.ExperimentPurposeSweep {
+		t.Fatalf("purpose = %v, want sweep", exp.Purpose)
+	}
+	if _, err := f.service.Plan(t.Context(), int64(exp.Id)); err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if _, err := f.service.Start(t.Context(), int64(exp.Id)); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	judged := f.judge(t, exp.Id, accepted)
+
+	if got := path(judged); got[len(got)-1] != "reverted" {
+		t.Errorf("events = %v, want the baseline back after acceptance", got)
+	}
+	champion := f.count(t, `SELECT count(*) FROM champion c JOIN experiment_arm a
+		ON a.setup_version_id = c.setup_version_id AND a.is_baseline WHERE a.experiment_id = $1`, exp.Id)
+	if champion != 1 {
+		t.Error("the champion must stay the baseline")
+	}
+}
+
 func TestTheResponseRequestCarriesTheVerdictsPasses(t *testing.T) {
 	f := newFixture(t, "exp_response_request")
 	exp := f.runSweepStep(t, -1, rejected)

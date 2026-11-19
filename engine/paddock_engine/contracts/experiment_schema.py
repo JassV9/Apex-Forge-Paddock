@@ -46,6 +46,16 @@ class Driver(StrEnum):
     ai = "ai"
 
 
+class Purpose(StrEnum):
+    """
+    Why the experiment was driven (docs/adr/0032-sensitivity-discovery-sweeps.md): improve the setup (the champion follows the verdict), sweep (a step of a sensitivity sweep: measured, never promoted), or recheck (the champion against the original baseline).
+    """
+
+    improve = "improve"
+    sweep = "sweep"
+    recheck = "recheck"
+
+
 class Better(StrEnum):
     """
     Which direction is an improvement.
@@ -424,6 +434,10 @@ class Experiment(BaseModel):
     driver: Driver = Field(
         ...,
         description="Who drives the laps: the human, or AC's AI on the player's car (Ghost Driver, docs/adr/0014-ghost-driver.md).",
+    )
+    purpose: Purpose | None = Field(
+        None,
+        description="Why the experiment was driven (docs/adr/0032-sensitivity-discovery-sweeps.md): improve the setup (the champion follows the verdict), sweep (a step of a sensitivity sweep: measured, never promoted), or recheck (the champion against the original baseline).",
     )
     track_name: str
     parameter: str = Field(..., description="Setup item that is changed.")

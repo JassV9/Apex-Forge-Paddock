@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "discovery_curve_response.schema.json",
+  "title": "DiscoveryCurve",
+  "description": "How each observable responds to the swept item, from the per-step effects (docs/adr/0032-sensitivity-discovery-sweeps.md). A classification per observable, never a decision: there is no control of multiplicity across observables.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "parameter",
+    "level",
+    "curves",
+    "engine_version"
+  ],
+  "properties": {
+    "parameter": {
+      "type": "string"
+    },
+    "level": {
+      "type": "number"
+    },
+    "engine_version": {
+      "type": "string"
+    },
+    "curves": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CurveResult"
+      }
+    }
+  },
+  "definitions": {
+    "CurveResult": {
+      "title": "CurveResult",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "phase",
+        "regime",
+        "source",
+        "unit",
+        "shape",
+        "clicks",
+        "reason"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "regime": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "unit": {
+          "description": "Unit of the metric, read from its name (s, deg, m, km/h, g, mm, ...); empty when unknown.",
+          "type": "string"
+        },
+        "shape": {
+          "title": "CurveShape",
+          "description": "negligible: every step inside the margin (two one-sided tests at each step). direction_change: one stretch of the curve rises and another falls, both clear of zero. nonlinear: the quadratic term of the weighted fit through the baseline is clear of zero. linear: the slope is clear of zero and the quadratic term is not. insufficient: fewer than two steps, or nothing clear.",
+          "type": "string",
+          "enum": [
+            "linear",
+            "nonlinear",
+            "negligible",
+            "direction_change",
+            "insufficient"
+          ]
+        },
+        "clicks": {
+          "description": "The steps the classification used, in clicks from the baseline, ascending.",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "slope": {
+          "$ref": "#/definitions/CurveEstimate"
+        },
+        "curvature": {
+          "$ref": "#/definitions/CurveEstimate"
+        },
+        "turn_clicks": {
+          "description": "For a direction change: the step (or 0, the baseline) at which the response turns.",
+          "type": "integer"
+        },
+        "margin": {
+          "type": "number"
+        },
+        "reason": {
+          "description": "Why this shape, in words.",
+          "type": "string"
+        }
+      }
+    },
+    "CurveEstimate": {
+      "title": "CurveEstimate",
+      "description": "A coefficient of the weighted fit through the baseline, with its interval at the classification's level. slope: per click (straight line). curvature: per click squared (the quadratic term).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimate",
+        "ci_low",
+        "ci_high"
+      ],
+      "properties": {
+        "estimate": {
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

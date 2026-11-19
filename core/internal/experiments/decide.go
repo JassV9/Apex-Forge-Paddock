@@ -62,9 +62,13 @@ func applyVerdict(ctx context.Context, tx *sql.Tx, exp record, reply contracts.E
 
 // settle carries out what follows from a verdict without asking anyone: an accepted variant
 // becomes the champion, a rejected one comes off the car, and an experiment that is still
-// unclear after its last extension goes to the baseline. A trade-off waits for the driver.
+// unclear after its last extension goes to the baseline. A trade-off waits for the driver. A
+// sweep step is measured, never promoted: accepted or a trade-off, its baseline goes back on the
+// car as after a rejection (docs/adr/0032-sensitivity-discovery-sweeps.md).
 func settle(ctx context.Context, tx *sql.Tx, exp record, decision State) error {
 	switch {
+	case exp.purpose == contracts.ExperimentPurposeSweep && (decision == Accepted || decision == Tradeoff):
+		return restore(ctx, tx, exp, decision, "A sweep step is measured, never promoted: the baseline goes back on the car.")
 	case decision == Accepted:
 		return promote(ctx, tx, exp)
 	case decision == Rejected:

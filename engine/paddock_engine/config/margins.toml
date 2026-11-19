@@ -18,6 +18,15 @@ rear_slip_peak_deg = 0.5    # deg: the guardrail tolerances core freezes on ever
 countersteer_s = 0.05       # s
 offtrack_rate = 0.05        # share of push-lap passes off track, variant minus baseline
 
+# Driver inputs (core's driver channels): a shift is flagged only when Holm rejects "no change"
+# and the whole interval lies beyond the margin (ADR 0034, amendment). Set by judgement after the
+# A/A of experiment 27: identical arms differed by -0.27 m in braking point. brake_point_m is
+# below, shared with the response metric of the same name.
+throttle_pickup_point_m = 1.0   # m, where the throttle comes in, from the zone start
+brake_dist_m = 1.0              # m, apex-relative (experiments whose features predate the above)
+throttle_pickup_m = 1.0         # m, apex-relative
+steer_corrections_per_s = 0.1   # 1/s, as steer_reversals_per_s
+
 # Vehicle-response metrics per frozen phase (ADR 0031). Initial values, set by judgement from
 # experiment 15's scatter; to be learned from discovery sweeps.
 phase_time_s = 0.002                # s

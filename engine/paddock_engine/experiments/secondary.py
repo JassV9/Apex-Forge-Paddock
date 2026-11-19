@@ -3,7 +3,8 @@
 Every interval here is block-level (ADR 0029) at the success test's nominal level; only the
 primary channel is judged at the sequential look's level. Several tests at once are
 Holm-corrected at 1 - level: the driver inputs (does the driver drive the setups differently?)
-and the response channels (did anything but the primary move?).
+and the response channels (did anything but the primary move?). A driver input has shifted only
+when, beyond that, its whole interval lies outside its margin (config/margins.toml).
 """
 
 from collections.abc import Sequence
@@ -109,15 +110,41 @@ def _guardrails(
 
 
 def _measured(
-    passes: Sequence[EvaluatePass], channels: Sequence[str], level: float
+    passes: Sequence[EvaluatePass],
+    channels: Sequence[str],
+    level: float,
+    bands: dict[str, float] | None = None,
 ) -> list[tuple[str, Effect]]:
-    found = ((channel, channel_effect(passes, channel, 0.0, level)) for channel in channels)
+    bands = bands or {}
+    found = (
+        (channel, channel_effect(passes, channel, bands.get(channel, 0.0), level))
+        for channel in channels
+    )
     return [(channel, effect) for channel, effect in found if effect is not None]
 
 
 def _holm_hits(measured: Sequence[tuple[str, Effect]], alpha: float) -> list[str]:
     hits = holm([_p(effect) for _, effect in measured], alpha)
     return [channel for (channel, _), hit in zip(measured, hits, strict=True) if hit]
+
+
+def _driver_margins(request: EvaluateRequest) -> dict[str, float]:
+    """Each driver channel's margin; 0 (judged against zero alone) where none is configured."""
+    channels = (c.root for c in request.driver_channels)
+    return {c: margins().margin(c, request.parameter, 0.0) or 0.0 for c in channels}
+
+
+def _shifted(
+    drivers: Sequence[tuple[str, Effect]], bands: dict[str, float], alpha: float
+) -> list[str]:
+    """Driver inputs that moved after Holm and by more than their margin: the whole interval
+    beyond it, as for a response cell's increase or decrease (ADR 0034, amendment)."""
+    effects = dict(drivers)
+    return [
+        channel
+        for channel in _holm_hits(drivers, alpha)
+        if effects[channel].ci_low > bands[channel] or effects[channel].ci_high < -bands[channel]
+    ]
 
 
 def _hit(effect: Effect, direction: Direction) -> bool:
@@ -128,7 +155,8 @@ def _hit(effect: Effect, direction: Direction) -> bool:
 def secondary(request: EvaluateRequest, passes: Sequence[EvaluatePass]) -> Secondary:
     level = request.success_test.level
     statuses, results, guarded = _guardrails(request, passes)
-    drivers = _measured(passes, [c.root for c in request.driver_channels], level)
+    bands = _driver_margins(request)
+    drivers = _measured(passes, list(bands), level, bands)
     results += [to_result(effect, channel, Role.driver_input) for channel, effect in drivers]
     reported = {request.success_test.channel} | {r.channel for r in results}
     predicted = _measured(passes, [p.channel for p in request.predictions], level)
@@ -143,7 +171,7 @@ def secondary(request: EvaluateRequest, passes: Sequence[EvaluatePass]) -> Secon
     return Secondary(
         guardrails=statuses,
         results=results,
-        shifted=_holm_hits(drivers, 1.0 - level),
+        shifted=_shifted(drivers, bands, 1.0 - level),
         moved=_holm_hits(sorted(responses.items()), 1.0 - level),
         prediction_hits=hits,
         prediction_total=len(predicted),

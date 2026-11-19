@@ -116,6 +116,43 @@ every compared pass carries them, and the apex-relative pair otherwise, so an ex
 features predate them keeps its two driver checks (`driverInputs`, `looks.go`). The AI reference
 still reads the relative pair. Experiment 20 was not re-judged here.
 
+### 8. Amendment (2026-11-19, engine 0.5.0): a driver input shifts only beyond its margin
+
+Experiment 27, an A/A (identical arms, the AI at hint 0.97), flagged `driver_input_shifted` on the
+braking point at -0.27 m [-0.43, -0.11]. The check tested each driver channel against zero (Holm
+at 1 - level), so it worked at its nominal rate on identical setups (11 % for one channel,
+simulated) but flagged any real wobble however small: 96.5 % of runs with a 0.3 m shift. Every
+sweep step of experiment D and experiment B's -0.19 m were flagged the same way, so the flag
+stopped saying anything.
+
+Now a driver input has shifted only when Holm still rejects "no change" **and** the whole interval
+lies beyond the channel's margin, the rule a response cell needs for an increase or decrease. The
+margins are in `config/margins.toml` beside the others: `brake_point_m`, `throttle_pickup_point_m`
+and the apex-relative `brake_dist_m`, `throttle_pickup_m` at 1 m (experiment B's prediction named
+1 m for the braking point; the response metric `pickup_point_m` already used 1 m);
+`steer_corrections_per_s` at 0.1 /s (as `steer_reversals_per_s`). A channel with no margin is
+judged against zero as before. The driver-input result rows are classed against the margin too.
+
+Simulated (`tests/test_driver_inputs.py`, 200 runs each, 8 blocks, interval about +-0.15 m, as in
+experiment 27), braking-point shift and the share flagged, new rule (zero alone):
+
+| Shift (m) | 0 | -0.3 | -0.5 | -1.0 | -1.5 | -2.0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Flagged | 0 % (11 %) | 0 % (96.5 %) | 0 % (100 %) | 5.5 % (100 %) | 100 % | 100 % |
+
+Re-judged on the stored intervals of experiments 20 to 31 (the Holm step is unchanged, so this
+is exact): 11 flagged before, 3 now. Gone: experiment 20, the A/A, every rear ARB sweep step's
+braking and throttle flags, and four of the five grip-hint runs' braking point (-0.95 to -1.23 m:
+the AI's earlier braking with less wing sits on the 1 m margin). Kept: experiment 22's braking
+point (-1.26 m [-1.39, -1.12]) and the steering corrections of experiments 25 (+0.26 /s) and 30
+(+0.21 /s). Stored verdicts are not re-judged (the ledger is append-only); the next evaluate of an
+experiment applies the rule.
+
+Rejected: a minimum-effect test (one-sided p of |shift| > margin) inside Holm. It flags at a
+lower bar than "the whole 90 % interval beyond the margin" and would give driver inputs a rule
+the response cells do not have. Known limit: 1 m is set by judgement, not learned; an aero change
+moves the AI's braking by about that much, so for wing experiments the flag is on the boundary.
+
 ## Operating characteristics (offline, known truth)
 
 `engine/tests/test_verdict_response.py`, `tests/verdict_data.py`; rates from 1000 simulated

@@ -381,6 +381,15 @@ way the check fires on noise. It is as large as the flags on rear ARB +1 and +2 
 experiment B's -0.19 m. Until the check has a margin and a calibrated interval, a braking-point flag
 under about 0.3 m on this car says nothing.
 
+*Fixed (engine 0.5.0, ADR 0034 amendment):* the interval was not the problem (simulated, the old
+check flagged 11 % of identical runs for one channel, its nominal rate); the missing margin was (a
+real 0.3 m wobble was flagged 96.5 % of the time). A driver input now shifts only when its whole
+interval lies beyond its margin (1 m for braking and throttle points, 0.1 /s for steering
+corrections). Re-judged on the stored intervals, experiments 20 to 31 keep 3 of their 11 flags:
+experiment 22's braking point (-1.26 m, rear wing -1 at 0.93) and the steering corrections of
+experiments 25 and 30. The A/A's flag is gone. Whether experiment 27's -0.27 m was chance or a
+small order effect inside the ABAB blocks, one A/A cannot say.
+
 **Reading.** At hint 0.97 the inference did not invent effects on the primary metric or the response
 cells in this run, so 0.97 is fit to be the default pin for this car (a calibration change, not made
 here). One A/A is one draw: it rules out a gross false-decision rate, not a 5 % one.

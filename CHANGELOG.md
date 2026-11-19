@@ -4,6 +4,11 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Engine 0.5.0 (ADR 0034 amendment): a driver input is flagged as shifted only when Holm rejects
+  "no change" and its whole interval lies beyond its margin (1 m for braking and throttle points,
+  0.1 /s for steering corrections, `config/margins.toml`). The A/A of experiment 27 flagged a
+  -0.27 m braking point between identical arms; re-judged on stored intervals, 3 of 11 flags in
+  experiments 20 to 31 remain.
 - Core (ADR 0032): `measure_only` on `POST /experiments` files the experiment with purpose
   `sweep`: measured, never promoted, the baseline back after any verdict, so a series such as the
   grip-hint sweep shares one baseline. Experiment 20 (rear ARB +3) was accepted and promoted at

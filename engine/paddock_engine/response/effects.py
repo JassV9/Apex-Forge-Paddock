@@ -26,6 +26,7 @@ from paddock_engine.response.config import MetricSpec
 from paddock_engine.response.passes import BASELINE, Cell, Measured
 from paddock_engine.stats.effects import estimate_effects
 from paddock_engine.stats.model import NotEstimableError
+from paddock_engine.stats.multiplicity import two_sided_p
 from paddock_engine.stats.observations import Observation
 
 MIN_CORNERS_PER_REGIME = 3  # as for speed classes in the verdict (finding I4)
@@ -46,6 +47,8 @@ class CellEffect:
     n_passes: int
     corners: int
     note: str | None = None
+    p_value: float | None = None  # two-sided, block-level t against 0 (for Holm, ADR 0034)
+    blocks: int = 0
 
 
 def finding(ci_low: float, ci_high: float, margin: float) -> str:
@@ -111,6 +114,8 @@ def cell_effect(
         finding=finding(effect.ci_low, effect.ci_high, spec.margin), estimate=effect.estimate,
         ci_low=effect.ci_low, ci_high=effect.ci_high, baseline_mean=sum(base) / len(base),
         n_passes=effect.n_passes, corners=len(used),
+        p_value=two_sided_p(effect.estimate, effect.standard_error, effect.block_degrees),
+        blocks=effect.blocks,
     )  # fmt: skip
 
 

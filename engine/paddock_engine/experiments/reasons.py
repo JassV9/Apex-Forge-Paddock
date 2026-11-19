@@ -10,8 +10,8 @@ from paddock_engine.contracts.evaluate_response_schema import (
     Kind,
     Status,
 )
+from paddock_engine.experiments.context import Context
 from paddock_engine.stats.effects import Effect
-from paddock_engine.stats.interaction import Interaction
 from paddock_engine.stats.sequential import LOOKS
 
 NAMED_BELOW_WEIGHT = 0.5  # corners that counted less than half are named in the reason
@@ -21,7 +21,7 @@ _FINDING_WORDS = {
     FindingClass.confirmed_improvement: "Better on",
     FindingClass.confirmed_regression: "Worse on",
     FindingClass.neutral: "No meaningful effect on",
-    FindingClass.context_dependent: "Acts differently by speed class on",
+    FindingClass.context_dependent: "Acts differently by speed class or phase on",
     FindingClass.likely_improvement: "Probably better on",
     FindingClass.likely_regression: "Probably worse on",
     FindingClass.insufficient_evidence: "Unclear on",
@@ -102,7 +102,7 @@ def notes(primary: Effect, shifted: Sequence[str], few_blocks: bool) -> str:
 def confounders(
     primary: Effect | None,
     shifted: Sequence[str],
-    interactions: Sequence[Interaction],
+    found: Context,
     excluded: tuple[int, int],
 ) -> list[Confounder]:
     items = []
@@ -116,7 +116,11 @@ def confounders(
     items += [Confounder(kind=Kind.driver_input_shifted, name=c) for c in shifted]
     items += [
         Confounder(kind=Kind.speed_class_interaction, name=f"{i.first} vs {i.second}")
-        for i in interactions
+        for i in found.regimes
+    ]
+    items += [
+        Confounder(kind=Kind.phase_interaction, name=f"{i.first} vs {i.second}")
+        for i in found.phases
     ]
     for kind, count in zip((Kind.setup_mismatch, Kind.source_mismatch), excluded, strict=True):
         if count:

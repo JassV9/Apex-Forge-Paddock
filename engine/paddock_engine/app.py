@@ -26,6 +26,7 @@ from paddock_engine.contracts.sensitivity_response_schema import SensitivityResp
 from paddock_engine.diagnosis.report import report
 from paddock_engine.experiments.evaluate import evaluate
 from paddock_engine.experiments.plan import plan
+from paddock_engine.experiments.vehicle import verdict_samples
 from paddock_engine.explain.config import Choice, from_env
 from paddock_engine.features.session import session_features
 from paddock_engine.optimize.base_setup import base_setup
@@ -53,7 +54,7 @@ def create_app(llm: Choice | None = None) -> FastAPI:
 
     @app.post("/evaluate")
     def judge(request: EvaluateRequest) -> EvaluateResponse:
-        return evaluate(request)
+        return evaluate(request, verdict_samples(request))
 
     @app.post("/response", response_model_exclude_none=True)
     def vehicle_response(request: ResponseRequest) -> ResponseResponse:

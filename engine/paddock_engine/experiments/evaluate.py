@@ -1,11 +1,13 @@
 """Judge a driven experiment: the primary effect at the pre-registered look, the speed classes,
-the guardrails, whether the driver adapted, which predictions came true, the finding and what to
-do next. The work behind POST /evaluate.
+the guardrails, whether the driver adapted, which predictions came true, what the car did, the
+finding and what to do next. The work behind POST /evaluate.
 
 Every interval is block-level (ADR 0029). The primary channel is judged with the repeated
 confidence interval of its look (stats/sequential.py) against its margin (config/margins.py);
-the finding and the decision follow experiments/finding.py. Nothing but the numbers and the test
-fixed before driving enters.
+the finding and the decision follow experiments/finding.py. When core sends the raw samples'
+whereabouts, the cells the changed parameter is expected to move are judged too
+(experiments/response_findings.py, ADR 0034): a finding of their own beside the time's, which
+only steers the recommendation. Nothing but the numbers and the test fixed before driving enters.
 """
 
 from dataclasses import dataclass
@@ -27,14 +29,18 @@ from paddock_engine.contracts.evaluate_response_schema import (
 from paddock_engine.experiments.channel_effects import (
     BASELINE,
     channel_effect,
+    experiment_regimes,
     observations,
     per_speed_class,
     to_result,
 )
-from paddock_engine.experiments.context import interactions, reportable_classes
+from paddock_engine.experiments.context import NO_CONTEXT, Context, context, reportable_classes
 from paddock_engine.experiments.finding import Evidence, classify, decide, recommend
 from paddock_engine.experiments.reasons import confounders, finding_reason, notes
+from paddock_engine.experiments.response_findings import any_moved
 from paddock_engine.experiments.secondary import Secondary, secondary
+from paddock_engine.experiments.vehicle_verdict import VehicleVerdict, vehicle_verdict
+from paddock_engine.response.service import Samples
 from paddock_engine.stats.effects import Effect
 from paddock_engine.stats.observations import build_design
 from paddock_engine.stats.sequential import interval_level, look_of
@@ -103,8 +109,8 @@ def _evidence(
     prepared: _Request,
     primary: Effect,
     invalid: bool,
-    context: bool,
-    side: Secondary,
+    found: Context,
+    moved: bool,
 ) -> Evidence:
     gain, low, high = _gain(primary, request.success_test.better)
     return Evidence(
@@ -116,8 +122,8 @@ def _evidence(
         look=prepared.look,
         extensions_left=request.extensions_left or 0,
         invalid=invalid,
-        context=context,
-        response_moved=bool(side.moved),
+        context=found.found,
+        response_moved=moved,
     )
 
 
@@ -137,25 +143,47 @@ def _not_estimable(prepared: _Request, reason: str, tangled: bool) -> EvaluateRe
         flags=[],
         recommendation=Recommendation.stop_invalid,
         look=prepared.look,
-        confounders=tangles + confounders(None, [], [], prepared.mismatched),
+        confounders=tangles + confounders(None, [], NO_CONTEXT, prepared.mismatched),
         engine_version=__version__,
     )
 
 
 def _primary_results(
-    request: EvaluateRequest, prepared: _Request, primary: Effect
+    request: EvaluateRequest, prepared: _Request, primary: Effect, classes: dict[int, str]
 ) -> list[ChannelResult]:
     """The primary effect over all corners, then per speed class where a class is worth it."""
     test = request.success_test
     margin = prepared.margin or 0.0
-    classes = per_speed_class(prepared.used, test.channel, margin, test.level, Role.primary)
+    found = per_speed_class(prepared.used, test.channel, margin, test.level, Role.primary, classes)
     return [
         to_result(primary, test.channel, Role.primary),
-        *reportable_classes(classes, prepared.used, primary),
+        *reportable_classes(found, prepared.used, primary, classes),
     ]
 
 
-def evaluate(request: EvaluateRequest) -> EvaluateResponse:
+@dataclass(frozen=True)
+class _Judged:
+    """Everything the verdict reads beside the primary effect."""
+
+    side: Secondary
+    car: VehicleVerdict
+    classes: dict[int, str]  # the verdict's one regime map
+    found: Context
+
+
+def _judge_around(
+    request: EvaluateRequest, prepared: _Request, invalid: str | None, samples: Samples | None
+) -> _Judged:
+    car = vehicle_verdict(request, samples)
+    data = car.data
+    classes = data.regimes.classes if data else experiment_regimes(prepared.used).classes
+    channel = request.success_test.channel
+    found = NO_CONTEXT if invalid else context(prepared.used, channel, classes, data)
+    return _Judged(secondary(request, prepared.used), car, classes, found)
+
+
+def evaluate(request: EvaluateRequest, samples: Samples | None = None) -> EvaluateResponse:
+    """`samples`: the raw samples of request.response's sessions, keyed by (session, seq)."""
     test = request.success_test
     prepared = _prepare(request)
     level = interval_level(prepared.look, test.level)
@@ -164,9 +192,10 @@ def evaluate(request: EvaluateRequest) -> EvaluateResponse:
     invalid = _invalid(request, prepared, primary, tangled)
     if primary is None or prepared.margin is None:
         return _not_estimable(prepared, invalid or "", tangled)
-    side = secondary(request, prepared.used)
-    found = [] if invalid else interactions(prepared.used, test.channel)
-    evidence = _evidence(request, prepared, primary, invalid is not None, bool(found), side)
+    around = _judge_around(request, prepared, invalid, samples)
+    side = around.side
+    moved = bool(side.moved) or any_moved(around.car.findings)
+    evidence = _evidence(request, prepared, primary, invalid is not None, around.found, moved)
     finding, flags = classify(evidence)
     decision = decide(finding, side.guardrails)
     reason = invalid or finding_reason(
@@ -175,7 +204,7 @@ def evaluate(request: EvaluateRequest) -> EvaluateResponse:
     return EvaluateResponse(
         decision=decision,
         reason=reason + notes(primary, side.shifted, Flag.few_blocks in flags),
-        results=[*_primary_results(request, prepared, primary), *side.results],
+        results=[*_primary_results(request, prepared, primary, around.classes), *side.results],
         guardrails=side.guardrails,
         prediction_hits=side.prediction_hits,
         prediction_total=side.prediction_total,
@@ -187,6 +216,9 @@ def evaluate(request: EvaluateRequest) -> EvaluateResponse:
         recommendation=recommend(finding, evidence),
         look=prepared.look,
         margin=prepared.margin,
-        confounders=confounders(primary, side.shifted, found, prepared.mismatched),
+        confounders=confounders(primary, side.shifted, around.found, prepared.mismatched),
         engine_version=__version__,
+        responses=around.car.findings,
+        response_parameter=around.car.parameter,
+        response_notes=around.car.notes,
     )

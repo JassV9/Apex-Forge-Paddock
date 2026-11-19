@@ -6,7 +6,7 @@ configured (metric, phase, regime), from the existing effect model. Observables 
 channels cannot give are listed as unavailable, never filled in.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 from paddock_engine.contracts.response_request_schema import ResponseRequest
@@ -46,13 +46,18 @@ def _refs(request: ResponseRequest) -> list[PassRef]:
     ]  # fmt: skip
 
 
+def samples_of(sessions: Iterable[tuple[int, str]], load: Loader = read_session_samples) -> Samples:
+    """Every pass's samples of the (session, Parquet directory) pairs, keyed by (session, seq)."""
+    out: dict[tuple[int, int], PassSamples] = {}
+    for session, parquet_dir in sessions:
+        for seq, samples in load(Path(parquet_dir)).items():
+            out[(session, seq)] = samples
+    return out
+
+
 def load_samples(request: ResponseRequest, load: Loader = read_session_samples) -> Samples:
     """Every pass's samples, keyed by (session, seq)."""
-    out: dict[tuple[int, int], PassSamples] = {}
-    for session in request.sessions:
-        for seq, samples in load(Path(session.parquet_dir)).items():
-            out[(session.session, seq)] = samples
-    return out
+    return samples_of(((s.session, s.parquet_dir) for s in request.sessions), load)
 
 
 def regimes_of(views: Mapping[int, CornerView]) -> tuple[Regimes, AeroFit | None]:

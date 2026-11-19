@@ -9,6 +9,7 @@ from response_data import ZONE_M, Shape, sampled
 
 from paddock_engine import app as app_module
 from paddock_engine.app import create_app
+from paddock_engine.config.margins import margins
 from paddock_engine.contracts.response_request_schema import ResponseRequest
 from paddock_engine.io.samples import PassSamples
 from paddock_engine.response.config import observables, parse
@@ -20,12 +21,12 @@ TRACK = ZONE_M * len(APEX_SPEEDS)
 SMALL = parse(
     {
         "metrics": {
-            name: {"kind": "direct", "unit": "-", "margin": margin, "phases": phases, "about": ""}
-            for name, margin, phases in (
-                ("rear_slip_deg", 0.05, ["entry", "mid", "exit"]),
-                ("front_slip_deg", 0.05, ["mid"]),
-                ("corner_time_s", 0.005, ["corner"]),
-                ("phase_time_s", 0.002, ["mid"]),
+            name: {"kind": "direct", "unit": "-", "phases": phases, "about": ""}
+            for name, phases in (
+                ("rear_slip_deg", ["entry", "mid", "exit"]),
+                ("front_slip_deg", ["mid"]),
+                ("corner_time_s", ["corner"]),
+                ("phase_time_s", ["mid"]),
             )
         },
         "unavailable": {"normalised_slip": "not recorded"},
@@ -39,7 +40,8 @@ SMALL = parse(
                 "regimes": ["slow"],
             },
         ],
-    }
+    },
+    {"rear_slip_deg": 0.05, "front_slip_deg": 0.05, "corner_time_s": 0.005, "phase_time_s": 0.002},
 )
 
 
@@ -82,6 +84,7 @@ def test_every_configured_metric_is_computed_and_every_computation_configured() 
     config = observables()
 
     assert set(config.metrics) == set(PHASE_METRICS) | set(CORNER_METRICS)
+    assert all(config.metrics[m].margin == margins().metrics[m] for m in config.metrics)
     assert {m for m, spec in config.metrics.items() if "corner" in spec.phases} == set(
         CORNER_METRICS
     )
@@ -138,3 +141,14 @@ def test_the_endpoint_answers_with_the_default_mapping(monkeypatch: pytest.Monke
     assert body["parameter"] == "rear_arb" and body["regimes"]["method"] == "fixed"
     assert {u["observable"] for u in body["unavailable"]} >= {"normalised_slip", "body_slip_deg"}
     assert {e["phase"] for e in body["effects"]} >= {"braking", "mid", "traction", "corner"}
+
+
+def test_a_metric_without_a_margin_in_the_one_margins_file_is_refused() -> None:
+    raw = {
+        "metrics": {"yaw_gain": {"kind": "direct", "unit": "-", "phases": ["mid"], "about": ""}},
+        "unavailable": {},
+        "parameters": [],
+    }
+
+    with pytest.raises(ValueError, match="no margin"):
+        parse(raw, {})

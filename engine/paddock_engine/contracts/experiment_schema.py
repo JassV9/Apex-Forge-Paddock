@@ -292,6 +292,7 @@ class Kind3(StrEnum):
     setup_mismatch = "setup_mismatch"
     source_mismatch = "source_mismatch"
     speed_class_interaction = "speed_class_interaction"
+    phase_interaction = "phase_interaction"
 
 
 class Confounder(BaseModel):
@@ -309,6 +310,56 @@ class Confounder(BaseModel):
         min_length=1,
     )
     count: int | None = Field(None, description="Passes concerned, for the exclusions.", ge=0)
+
+
+class ExperimentResponsePhase(StrEnum):
+    braking = "braking"
+    entry = "entry"
+    mid = "mid"
+    exit = "exit"
+    traction = "traction"
+    corner = "corner"
+
+
+class ExperimentResponseRegime(StrEnum):
+    all = "all"
+    slow = "slow"
+    medium = "medium"
+    fast = "fast"
+
+
+class ExperimentResponseExpected(StrEnum):
+    direct = "direct"
+    proxy = "proxy"
+
+
+class ExperimentResponseFinding(StrEnum):
+    increase = "increase"
+    decrease = "decrease"
+    neutral = "neutral"
+    likely_increase = "likely_increase"
+    likely_decrease = "likely_decrease"
+    insufficient = "insufficient"
+
+
+class ExperimentResponse(BaseModel):
+    """
+    One stored response finding (result row of role response).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    metric: str
+    phase: ExperimentResponsePhase = Field(..., title="ExperimentResponsePhase")
+    regime: ExperimentResponseRegime = Field(..., title="ExperimentResponseRegime")
+    expected: ExperimentResponseExpected = Field(..., title="ExperimentResponseExpected")
+    finding: ExperimentResponseFinding = Field(..., title="ExperimentResponseFinding")
+    estimate: float
+    ci_low: float
+    ci_high: float
+    margin: float = Field(..., gt=0.0)
+    n_passes: int = Field(..., ge=0)
 
 
 class VerdictSummary(BaseModel):
@@ -385,6 +436,10 @@ class Experiment(BaseModel):
     plan: PlanSummary | None = None
     blocks: list[ExperimentBlock]
     results: list[ExperimentResult]
+    responses: list[ExperimentResponse] | None = Field(
+        None,
+        description="What the car did: the latest engine verdict's response findings on the cells the changed parameter is expected to move (ADR 0034). Absent or empty for experiments judged before.",
+    )
     verdict: VerdictSummary | None = None
     events: list[ExperimentEvent]
     extensions: int = Field(

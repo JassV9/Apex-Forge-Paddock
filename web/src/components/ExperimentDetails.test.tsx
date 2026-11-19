@@ -44,6 +44,7 @@ describe("VerdictSection finding", () => {
         flags: [],
         confounders: [
           { kind: "speed_class_interaction" as const, name: "fast vs medium" },
+          { kind: "phase_interaction" as const, name: "braking vs exit" },
           { kind: "setup_mismatch" as const, name: "setup mismatch", count: 3 },
         ],
       },
@@ -54,8 +55,9 @@ describe("VerdictSection finding", () => {
     const finding = screen.getByRole("group", { name: "Finding" });
     expect(finding).toHaveTextContent("Depends on the corner: better in some, worse in others");
     expect(finding).toHaveTextContent("Judged at look 1 of 3.");
-    expect(finding).toHaveTextContent("Next: Look at the speed classes");
+    expect(finding).toHaveTextContent("Next: Look at the speed classes and corner phases");
     expect(finding).toHaveTextContent("effect differs between: fast vs medium");
+    expect(finding).toHaveTextContent("effect differs between the phases: braking vs exit");
     expect(finding).toHaveTextContent("passes on another setup left out: setup mismatch (3)");
   });
 

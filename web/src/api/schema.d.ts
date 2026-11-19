@@ -1125,7 +1125,8 @@ export interface components {
         | "session_tangled"
         | "setup_mismatch"
         | "source_mismatch"
-        | "speed_class_interaction";
+        | "speed_class_interaction"
+        | "phase_interaction";
       /** @description The covariate, channel, speed classes or reason it is about. */
       name: string;
       /** @description Passes concerned, for the exclusions. */
@@ -1236,6 +1237,44 @@ export interface components {
       n_passes: number;
       /** @enum {string} */
       effect_class: "positive" | "negative" | "negligible" | "inconclusive";
+    };
+    /**
+     * ExperimentResponse
+     * @description One stored response finding (result row of role response).
+     */
+    ExperimentResponse: {
+      metric: string;
+      /**
+       * ExperimentResponsePhase
+       * @enum {string}
+       */
+      phase: "braking" | "entry" | "mid" | "exit" | "traction" | "corner";
+      /**
+       * ExperimentResponseRegime
+       * @enum {string}
+       */
+      regime: "all" | "slow" | "medium" | "fast";
+      /**
+       * ExperimentResponseExpected
+       * @enum {string}
+       */
+      expected: "direct" | "proxy";
+      /**
+       * ExperimentResponseFinding
+       * @enum {string}
+       */
+      finding:
+        | "increase"
+        | "decrease"
+        | "neutral"
+        | "likely_increase"
+        | "likely_decrease"
+        | "insufficient";
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+      margin: number;
+      n_passes: number;
     };
     /**
      * VerdictSummary
@@ -1350,6 +1389,8 @@ export interface components {
       plan?: components["schemas"]["PlanSummary"];
       blocks: components["schemas"]["ExperimentBlock"][];
       results: components["schemas"]["ExperimentResult"][];
+      /** @description What the car did: the latest engine verdict's response findings on the cells the changed parameter is expected to move (ADR 0034). Absent or empty for experiments judged before. */
+      responses?: components["schemas"]["ExperimentResponse"][];
       verdict?: components["schemas"]["VerdictSummary"];
       events: components["schemas"]["ExperimentEvent"][];
       /** @description Times the plan was extended after an inconclusive result (at most 2). */

@@ -132,6 +132,13 @@
         "$ref": "#/definitions/ExperimentResult"
       }
     },
+    "responses": {
+      "description": "What the car did: the latest engine verdict's response findings on the cells the changed parameter is expected to move (ADR 0034). Absent or empty for experiments judged before.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentResponse"
+      }
+    },
     "verdict": {
       "$ref": "#/definitions/VerdictSummary"
     },
@@ -609,7 +616,8 @@
             "session_tangled",
             "setup_mismatch",
             "source_mismatch",
-            "speed_class_interaction"
+            "speed_class_interaction",
+            "phase_interaction"
           ]
         },
         "name": {
@@ -619,6 +627,88 @@
         },
         "count": {
           "description": "Passes concerned, for the exclusions.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ExperimentResponse": {
+      "title": "ExperimentResponse",
+      "description": "One stored response finding (result row of role response).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "phase",
+        "regime",
+        "expected",
+        "finding",
+        "estimate",
+        "ci_low",
+        "ci_high",
+        "margin",
+        "n_passes"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string"
+        },
+        "phase": {
+          "title": "ExperimentResponsePhase",
+          "type": "string",
+          "enum": [
+            "braking",
+            "entry",
+            "mid",
+            "exit",
+            "traction",
+            "corner"
+          ]
+        },
+        "regime": {
+          "title": "ExperimentResponseRegime",
+          "type": "string",
+          "enum": [
+            "all",
+            "slow",
+            "medium",
+            "fast"
+          ]
+        },
+        "expected": {
+          "title": "ExperimentResponseExpected",
+          "type": "string",
+          "enum": [
+            "direct",
+            "proxy"
+          ]
+        },
+        "finding": {
+          "title": "ExperimentResponseFinding",
+          "type": "string",
+          "enum": [
+            "increase",
+            "decrease",
+            "neutral",
+            "likely_increase",
+            "likely_decrease",
+            "insufficient"
+          ]
+        },
+        "estimate": {
+          "type": "number"
+        },
+        "ci_low": {
+          "type": "number"
+        },
+        "ci_high": {
+          "type": "number"
+        },
+        "margin": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "n_passes": {
           "type": "integer",
           "minimum": 0
         }

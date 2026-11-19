@@ -153,7 +153,12 @@ tests validate them against the same schema files.
    covariate that changes between blocks (`stats/block_level.py`), at the level of the
    pre-registered look (`stats/sequential.py`), judged against a margin per metric and setup
    item (`config/margins.toml`) into one of eight findings (`experiments/finding.py`,
-   [ADR 0029](adr/0029-block-level-inference-and-finding-classes.md)).
+   [ADR 0029](adr/0029-block-level-inference-and-finding-classes.md)). When core sends where
+   the raw samples are, the verdict also judges the response cells the changed parameter is
+   expected to move (`experiments/response_findings.py`, Holm across them) and tests arm x phase
+   interactions on the frozen phases beside the speed regimes; the verdict has one regime map
+   and one margins file for every channel
+   ([ADR 0034](adr/0034-vehicle-response-in-verdicts.md)).
    `stats/mde.py` says what a plan can detect before it is driven; `stats/noise.py` measures
    the scatter per corner and `stats/lap_noise.py` the error a whole lap shares across its
    corners ([ADR 0025](adr/0025-finished-laps-and-lap-noise.md)).
@@ -187,11 +192,14 @@ the session's Parquet parts.
 6. **Evaluate.** Only once every block is driven. Core sends the valid push-lap passes on the
    block's setup and from the experiment's driver, with their covariates (time since the first
    pass, a term per game session after the first), the passes it left out, the off-track count
-   per block, and the look (8, 10, 12 blocks) to `POST /evaluate`. The engine returns an effect
-   and interval per channel, the guardrail checks (off-track share included), the prediction
-   score, a finding, what to do next and a decision; core appends the verdict and its results
-   with the engine version ([ADR 0030](adr/0030-append-only-results-and-engine-version.md)) and
-   moves the state.
+   per block, and the look (8, 10, 12 blocks) to `POST /evaluate`, and in the same request where
+   the sessions' raw samples are with the push passes (off-track ones included) and the changed
+   item's role and axle. The engine returns an effect and interval per channel, the guardrail
+   checks (off-track share included), the prediction score, a finding, what to do next, a
+   decision and, apart from them, a response finding per cell the parameter is expected to move
+   ([ADR 0034](adr/0034-vehicle-response-in-verdicts.md)); core appends the verdict, its results
+   and its response findings (result rows of role `response`) with the engine version
+   ([ADR 0030](adr/0030-append-only-results-and-engine-version.md)) and moves the state.
 7. **Settle.** Accepted: the variant is the champion. Rejected: reverted in the same
    transaction. Trade-off: the driver decides. Inconclusive: extend (twice at most: the looks at
    10 and 12 blocks) or revert; a training program extends only when the engine recommends it.
@@ -346,7 +354,8 @@ The rule and its limits (the AI plans with a calibrated share of the car's tyre 
 | Block-level intervals, pre-registered looks at 8, 10 and 12 blocks (O'Brien-Fleming, 70 % of the 5 % spent), eight findings with a recommendation, margins per metric and setup item (`engine/paddock_engine/config/margins.toml`), Holm for driver inputs and speed-class interactions, off-track share as a guardrail, passes on another setup or from another driver left out and counted, every block driven before a manual evaluate ([ADR 0029](adr/0029-block-level-inference-and-finding-classes.md)); results kept per verdict with the engine version (migration 00012, [ADR 0030](adr/0030-append-only-results-and-engine-version.md)) | Tested (pytest incl. hypothesis and known-truth simulations, a real-data A/A and replay of experiments 11, 12 and 15 to 19 offline, Go table-driven and against PostgreSQL, Vitest, the end-to-end test on the mocked game); **unverified in game** |
 | Surrogate optimizer for 20+ experiments (Thompson sampling), profile per track and conditions | Not built ([ADR 0011](adr/0011-sensitivity-and-ranking.md)) |
 | Ghost Driver level 3 (own controller over CSP Custom AI, manoeuvres) | Not started |
-| Corner phases at fixed distances, per-corner speed regimes and the vehicle-response analysis: `phases/align.py`, `events.py`, `cuts.py`, `join.py`, `reference.py`, `features/regimes.py`, `engine/paddock_engine/response/` with its metrics and parameter-to-observable configuration (`metrics.toml`, `parameters.toml`), `POST /response` (`contracts/response_*.schema.json`), absolute `brake_point_m` / `throttle_pickup_point_m` ([ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)) | Tested (pytest incl. hypothesis, the real FH26 and 488 GT3 corner medians as a fixture, offline replay of experiment 15's real passes); core does not call `/response` yet; **unverified in game** |
+| Corner phases at fixed distances, per-corner speed regimes and the vehicle-response analysis: `phases/align.py`, `events.py`, `cuts.py`, `join.py`, `reference.py`, `features/regimes.py`, `engine/paddock_engine/response/` with its metrics and parameter-to-observable configuration (`metrics.toml`, `parameters.toml`), `POST /response` (`contracts/response_*.schema.json`), absolute `brake_point_m` / `throttle_pickup_point_m` ([ADR 0031](adr/0031-corner-phases-speed-regimes-and-response.md)) | Tested (pytest incl. hypothesis, the real FH26 and 488 GT3 corner medians as a fixture, offline replay of experiment 15's real passes); core does not call `/response` (kept for ad-hoc analysis): the verdict measures its expected cells itself (ADR 0034); **unverified in game** |
+| Vehicle response in verdicts: expected response cells with block-level intervals and Holm (`experiments/vehicle.py`, `response_findings.py`), regime and phase interactions under one Holm family (`experiments/context.py`), one margins file (`config/margins.toml`), response findings as result rows (migration 00013, `current_response`), the response context built by core in the evaluate request (`core/internal/experiments/vehicle.go`), the "What the car did" table ([ADR 0034](adr/0034-vehicle-response-in-verdicts.md)) | Tested (pytest on known-truth simulations incl. an A/A of the false-finding rate and sampled synthetic passes, offline replay of experiment 15, Go against PostgreSQL with a fake engine, the migration down and up, Vitest); **unverified in game** |
 | AI as the reference driver: `GET /sessions/{id}/reference`, `GET /reference`, the hotlap window, "Against the AI" and the AI overlay in the dashboard ([ADR 0019](adr/0019-ai-reference-driver.md)) | Tested offline and against a real PostgreSQL; run on real AI sessions only; the window is **unverified in game** |
 | A layout and its test copy are one track in the web app: an original-layout session is compared with the AI on `<layout>_paddock` when the corner maps match (same numbers, apexes within 5 m), `ai_tracks` and `variant_note` on the reply; the game's `GET /reference` stays exact ([ADR 0027](adr/0027-layout-variants.md)) | Tested (Go table-driven and against PostgreSQL, Vitest, agent pytest); run read-only on the real rows (COTA groups, the Hungaroring has no original row yet); **unverified in game and in a browser** |
 

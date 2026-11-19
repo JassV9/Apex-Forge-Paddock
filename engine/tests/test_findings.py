@@ -190,11 +190,11 @@ def test_a_margin_must_be_a_positive_number(value: str) -> None:
 
 
 def test_the_configured_defaults_are_the_documented_ones() -> None:
-    assert margins() == Margins(
-        metrics={
-            "corner_time_s": 0.005,
-            "rear_slip_peak_deg": 0.5,
-            "countersteer_s": 0.05,
-            "offtrack_rate": 0.05,
-        }
-    )
+    """One file for the verdict's channels and the response metrics (ADR 0034)."""
+    config = margins()
+    verdict = {"corner_time_s": 0.005, "rear_slip_peak_deg": 0.5, "countersteer_s": 0.05}
+    response = {"phase_time_s": 0.002, "rear_slip_deg": 0.05, "yaw_gain": 0.005}
+
+    assert config.metrics.items() >= (verdict | response | {"offtrack_rate": 0.05}).items()
+    assert config.parameters == {}
+    assert isinstance(config, Margins)

@@ -145,6 +145,79 @@ class OfftrackBlock(BaseModel):
     offtrack: int = Field(..., description="Those marked invalid (off track).", ge=0)
 
 
+class VehicleCorner(BaseModel):
+    """
+    Where a corner and its zone are, in metres from the start line.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    number: int = Field(..., ge=1)
+    zone_start_m: float = Field(..., ge=0.0)
+    start_m: float = Field(..., ge=0.0)
+    end_m: float = Field(..., ge=0.0)
+    zone_end_m: float = Field(..., ge=0.0)
+
+
+class VehicleSession(BaseModel):
+    """
+    Where one game session's raw samples are.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: int = Field(..., ge=1)
+    parquet_dir: str = Field(
+        ..., description="Directory of the session's Parquet parts.", min_length=1
+    )
+
+
+class VehiclePass(BaseModel):
+    """
+    One push-lap pass, with the block, lap code and covariates of its EvaluatePass.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: int = Field(..., ge=1)
+    seq: int = Field(..., description="Order of the pass within its session.", ge=1)
+    corner: int = Field(..., ge=1)
+    arm: Arm
+    block: int = Field(..., ge=1)
+    lap: int | None = Field(None, description="Lap code, as in EvaluatePass.", ge=0)
+    t_start_s: float = Field(
+        ...,
+        description="When the pass started, seconds on any clock shared by the session's passes.",
+    )
+    duration_s: float = Field(..., gt=0.0)
+    valid: bool
+    covariates: dict[str, float] | None = Field(None, description="As in EvaluatePass.")
+
+
+class VehicleResponseInput(BaseModel):
+    """
+    What the engine needs to measure the car's response per frozen phase and speed regime inside the verdict (ADR 0034): the track, where each session's raw samples are, and the experiment's push passes on the arm's setup from its driver, off-track ones included (valid false: never compared, but they may complete the previous pass's traction).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    track_length_m: float = Field(..., description="Lap length along the AI line.", gt=0.0)
+    item_role: str | None = Field(
+        None,
+        description="The changed setup item's role in the catalog (arb, wing, bias, ...); picks the parameter row of the observables mapping.",
+    )
+    item_axle: str | None = Field(
+        None, description="F or R when the changed item belongs to one axle; empty otherwise."
+    )
+    corners: list[VehicleCorner] = Field(..., min_length=1)
+    sessions: list[VehicleSession] = Field(..., min_length=1)
+    passes: list[VehiclePass]
+
+
 class EvaluateRequest(BaseModel):
     """
     Core asks the engine to judge a driven experiment (POST /evaluate).
@@ -179,3 +252,4 @@ class EvaluateRequest(BaseModel):
         None,
         description="Push-lap passes per block and how many of them were off track (ADR 0029).",
     )
+    response: VehicleResponseInput | None = None

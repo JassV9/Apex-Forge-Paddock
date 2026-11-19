@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from enum import StrEnum
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class Decision(StrEnum):
@@ -41,7 +41,7 @@ class GuardrailResult(BaseModel):
 
 class FindingClass(StrEnum):
     """
-    What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence.
+    What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed regimes or corner phases), likely improvement or regression (the interval excludes zero), insufficient evidence.
     """
 
     invalid = "invalid"
@@ -61,7 +61,7 @@ class Flag(StrEnum):
 
 class Recommendation(StrEnum):
     """
-    What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.
+    What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed regime or phase, switch the primary metric (time neutral or unclear, an expected response channel moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.
     """
 
     continue_ = "continue"
@@ -70,6 +70,10 @@ class Recommendation(StrEnum):
     switch_metric = "switch_metric"
     stop_neutral = "stop_neutral"
     stop_invalid = "stop_invalid"
+
+
+class ResponseNote(RootModel[str]):
+    root: str = Field(..., min_length=1)
 
 
 class Role(StrEnum):
@@ -129,6 +133,7 @@ class Kind(StrEnum):
     setup_mismatch = "setup_mismatch"
     source_mismatch = "source_mismatch"
     speed_class_interaction = "speed_class_interaction"
+    phase_interaction = "phase_interaction"
 
 
 class Confounder(BaseModel):
@@ -142,10 +147,93 @@ class Confounder(BaseModel):
     kind: Kind
     name: str = Field(
         ...,
-        description="The covariate, channel, speed classes or reason it is about.",
+        description="The covariate, channel, speed classes, phases or reason it is about.",
         min_length=1,
     )
     count: int | None = Field(None, description="Passes concerned, for the exclusions.", ge=0)
+
+
+class ResponsePhase(StrEnum):
+    braking = "braking"
+    entry = "entry"
+    mid = "mid"
+    exit = "exit"
+    traction = "traction"
+    corner = "corner"
+
+
+class ResponseRegime(StrEnum):
+    """
+    Speed regime of the corners, per corner and frozen from the baseline (ADR 0031).
+    """
+
+    all = "all"
+    slow = "slow"
+    medium = "medium"
+    fast = "fast"
+
+
+class ResponseExpected(StrEnum):
+    """
+    direct: a measurement the parameter is expected to move; proxy: a stand-in for one.
+    """
+
+    direct = "direct"
+    proxy = "proxy"
+
+
+class ResponseFindingClass(StrEnum):
+    """
+    What the car did on this cell (ADR 0034), judged against the metric's margin with Holm across the parameter's expected cells: increase or decrease (moved after Holm, the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), likely increase or decrease (moved after Holm, not by the margin), insufficient (otherwise).
+    """
+
+    increase = "increase"
+    decrease = "decrease"
+    neutral = "neutral"
+    likely_increase = "likely_increase"
+    likely_decrease = "likely_decrease"
+    insufficient = "insufficient"
+
+
+class ResponseFinding(BaseModel):
+    """
+    Variant minus baseline on one expected (metric, phase, speed regime) cell, block-level interval at the success test's level.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    metric: str = Field(
+        ..., description="Response metric id (response/metrics.toml).", min_length=1
+    )
+    phase: ResponsePhase = Field(..., title="ResponsePhase")
+    regime: ResponseRegime = Field(
+        ...,
+        description="Speed regime of the corners, per corner and frozen from the baseline (ADR 0031).",
+        title="ResponseRegime",
+    )
+    expected: ResponseExpected = Field(
+        ...,
+        description="direct: a measurement the parameter is expected to move; proxy: a stand-in for one.",
+        title="ResponseExpected",
+    )
+    finding: ResponseFindingClass = Field(
+        ...,
+        description="What the car did on this cell (ADR 0034), judged against the metric's margin with Holm across the parameter's expected cells: increase or decrease (moved after Holm, the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), likely increase or decrease (moved after Holm, not by the margin), insufficient (otherwise).",
+        title="ResponseFindingClass",
+    )
+    estimate: float | None = None
+    ci_low: float | None = None
+    ci_high: float | None = None
+    p_value: float | None = Field(
+        None, description="Two-sided, block-level t, before Holm.", ge=0.0, le=1.0
+    )
+    margin: float = Field(
+        ..., description="From config/margins.toml: the item's own, else the metric's.", gt=0.0
+    )
+    n_passes: int = Field(..., ge=0)
+    corners: int = Field(..., ge=0)
+    note: str | None = None
 
 
 class EvaluateResponse(BaseModel):
@@ -174,7 +262,7 @@ class EvaluateResponse(BaseModel):
     )
     finding_class: FindingClass | None = Field(
         None,
-        description="What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed classes), likely improvement or regression (the interval excludes zero), insufficient evidence.",
+        description="What the experiment found on the primary channel (ADR 0029), orthogonal to the decision: invalid, confirmed improvement or regression (the whole interval beyond the margin, at least 8 blocks), neutral (the interval inside the margin), context-dependent (the effect differs between speed regimes or corner phases), likely improvement or regression (the interval excludes zero), insufficient evidence.",
     )
     flags: list[Flag] | None = Field(
         None,
@@ -182,7 +270,7 @@ class EvaluateResponse(BaseModel):
     )
     recommendation: Recommendation | None = Field(
         None,
-        description="What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed class, switch the primary metric (time neutral, response moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.",
+        description="What to do next (ADR 0029): continue to the next look, test a larger step, investigate a speed regime or phase, switch the primary metric (time neutral or unclear, an expected response channel moved), stop (nothing to gain), stop (invalid). Absent when the finding is confirmed.",
     )
     look: int | None = Field(
         None, description="The look this verdict was judged at (ADR 0029).", ge=0, le=3
@@ -197,4 +285,16 @@ class EvaluateResponse(BaseModel):
         None,
         description="Version of the engine that computed the numbers (ADR 0030).",
         min_length=1,
+    )
+    responses: list[ResponseFinding] | None = Field(
+        None,
+        description="The vehicle-response finding per cell the changed parameter is expected to move (ADR 0034), separate from the time finding. Cells it is not expected to move are not judged here (POST /response describes them).",
+    )
+    response_parameter: str | None = Field(
+        None,
+        description="The parameter row of the observables mapping the expected cells came from.",
+        min_length=1,
+    )
+    response_notes: list[ResponseNote] | None = Field(
+        None, description="Why the response findings are missing or what to read them with."
     )

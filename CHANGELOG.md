@@ -4,6 +4,25 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Engine, core and web (ADR 0034): the verdict says what the car did, apart from the time. Core
+  sends, in the same evaluate request, where the raw samples are and the experiment's push passes
+  (off-track ones included); the engine freezes phases and per-corner regimes from the baseline
+  and judges each cell `response/parameters.toml` expects the changed parameter to move
+  (block-level interval, Holm across those cells at 5 %): increase, decrease, neutral, likely
+  increase or decrease, insufficient. These steer `switch_metric`, never the time finding or the
+  decision; other cells stay descriptive in `POST /response`. Context-dependent now tests speed
+  regimes per corner (one regime map per verdict) and arm x phase interactions on the phase
+  times together under one Holm family (confounder `phase_interaction`). One margins file,
+  `config/margins.toml`, for the verdict's channels and every response metric. Migration 00013:
+  response findings are result rows of role `response` (phase, regime as corner class, finding,
+  direct or proxy, margin), appended per verdict, out of `current_result`, in `current_response`.
+  The experiment page has a "What the car did" table. Engine 0.3.0. On identical setups 0.5 to
+  3.8 % of simulated experiments had any false response finding (82 to 92 % without Holm).
+  Replayed offline on experiment 15: time context-dependent (0.0 ms overall), ten of sixteen rear
+  wing cells moved after Holm (rear slip mid +0.11 deg, yaw gain +0.02, slip balance -0.17 deg).
+  The driver-input check uses the absolute braking and pickup points when every pass has them
+  (experiment 20's "driver adapted" came from the moving slowest point, not the braking point).
+  **Unverified in game.**
 - Agent and core (ADR 0028, audit findings C1, I9, I10): run context and AI provenance. The
   session line now says what it was driven under (CSP version and build, cars in the session,
   the car's AI tyre, aero and brake hints, the learned share, AI level and aggression; in an AI

@@ -8,247 +8,212 @@
 # kind:   direct   = read from a channel CSP records per sample (slip angle, slip ratio,
 #                    speed, inputs, g, yaw rate, ride height), averaged over the phase's metres
 #         proxy    = derived from direct channels, standing in for something not recorded
-# margin: half-width of the band of changes too small to matter, in the metric's unit, per
-#         corner pass. Initial values, set by judgement from experiment 15's scatter; they
-#         are to be replaced by the margins configuration of ADR 0029 once it exists.
+# margin: not here. Every margin is in config/margins.toml, the one source for the verdict and
+#         this analysis (ADR 0034); a test checks every metric here has one.
 # phases: where the metric is computed: braking, entry, mid, exit, traction, or corner
 #         (one value per pass: the corner as a whole, or an event's position)
 
 [metrics.phase_time_s]
 kind = "direct"
 unit = "s"
-margin = 0.002
 phases = ["braking", "entry", "mid", "exit", "traction"]
 about = "time between the phase's frozen boundaries, t(x_end) - t(x_start)"
 
 [metrics.corner_time_s]
 kind = "direct"
 unit = "s"
-margin = 0.005
 phases = ["corner"]
 about = "sum of the phase times: from the first cut phase's start to the traction phase's end"
 
 [metrics.v_min_kmh]
 kind = "direct"
 unit = "km/h"
-margin = 0.3
 phases = ["entry", "mid", "exit"]
 about = "lowest speed in the phase"
 
 [metrics.v_start_kmh]
 kind = "direct"
 unit = "km/h"
-margin = 0.3
 phases = ["braking", "entry", "mid", "exit", "traction"]
 about = "speed at the phase's first metre (entry speed of the phase)"
 
 [metrics.v_end_kmh]
 kind = "direct"
 unit = "km/h"
-margin = 0.3
 phases = ["braking", "entry", "mid", "exit", "traction"]
 about = "speed at the phase's last metre (exit speed of the phase)"
 
 [metrics.v_max_kmh]
 kind = "proxy"
 unit = "km/h"
-margin = 0.3
 phases = ["traction"]
 about = "highest speed in the 150 m after the corner: a top-speed proxy (the straight is longer)"
 
 [metrics.lat_g_mean]
 kind = "direct"
 unit = "g"
-margin = 0.01
 phases = ["entry", "mid", "exit"]
 about = "mean |lateral g|"
 
 [metrics.long_g_mean]
 kind = "direct"
 unit = "g"
-margin = 0.01
 phases = ["braking", "traction"]
 about = "mean longitudinal g, signed (negative is deceleration)"
 
 [metrics.peak_decel_g]
 kind = "direct"
 unit = "g"
-margin = 0.02
 phases = ["braking"]
 about = "largest deceleration"
 
 [metrics.steer_per_g]
 kind = "direct"
 unit = "deg/g"
-margin = 0.5
 phases = ["entry", "mid", "exit"]
 about = "mean |steering| per mean |lateral g|, cornering metres only (|lat| >= max(0.3, 45 % of the pass's p95))"
 
 [metrics.yaw_gain]
 kind = "direct"
 unit = "1e-3 rad/(m deg)"
-margin = 0.005
 phases = ["entry", "mid", "exit"]
 about = "mean |yaw rate| / (speed x |steering|), where steering > 10 % of its p95 and speed > 5 m/s"
 
 [metrics.front_slip_deg]
 kind = "direct"
 unit = "deg"
-margin = 0.05
 phases = ["braking", "entry", "mid", "exit", "traction"]
 about = "front axle slip angle (CSP wheel slipAngle, load-weighted), cornering metres only"
 
 [metrics.rear_slip_deg]
 kind = "direct"
 unit = "deg"
-margin = 0.05
 phases = ["braking", "entry", "mid", "exit", "traction"]
 about = "rear axle slip angle (CSP wheel slipAngle, load-weighted), cornering metres only"
 
 [metrics.slip_balance_deg]
 kind = "proxy"
 unit = "deg"
-margin = 0.05
 phases = ["entry", "mid", "exit"]
 about = "front minus rear slip angle: a balance proxy; compared across speed regimes it stands in for the aero balance"
 
 [metrics.front_slip_ratio_braking]
 kind = "direct"
 unit = "ratio"
-margin = 0.002
 phases = ["braking", "entry"]
 about = "front axle |slip ratio| (larger tyre) while braking (brake > 0.2)"
 
 [metrics.rear_slip_ratio_braking]
 kind = "direct"
 unit = "ratio"
-margin = 0.002
 phases = ["braking", "entry"]
 about = "rear axle |slip ratio| (larger tyre) while braking (brake > 0.2)"
 
 [metrics.front_slip_ratio_traction]
 kind = "direct"
 unit = "ratio"
-margin = 0.002
 phases = ["exit", "traction"]
 about = "front axle |slip ratio| on the throttle (gas > 0.3, brake < 0.04)"
 
 [metrics.rear_slip_ratio_traction]
 kind = "direct"
 unit = "ratio"
-margin = 0.002
 phases = ["exit", "traction"]
 about = "rear axle |slip ratio| on the throttle (gas > 0.3, brake < 0.04)"
 
 [metrics.front_lock_share]
 kind = "proxy"
 unit = "share"
-margin = 0.01
 phases = ["braking", "entry"]
 about = "share of braking metres with a front tyre past slip ratio 0.18: lock events"
 
 [metrics.rear_lock_share]
 kind = "proxy"
 unit = "share"
-margin = 0.01
 phases = ["braking", "entry"]
 about = "share of braking metres with a rear tyre past slip ratio 0.18: lock events"
 
 [metrics.steer_rate_deg_s]
 kind = "direct"
 unit = "deg/s"
-margin = 2.0
 phases = ["entry", "mid", "exit"]
 about = "mean |steering rate|"
 
 [metrics.steer_reversals_per_s]
 kind = "direct"
 unit = "1/s"
-margin = 0.1
 phases = ["entry", "mid", "exit"]
 about = "steering reversals (hysteresis max(1.5 deg, 4 % of p95)) per second: corrections"
 
 [metrics.coast_s]
 kind = "direct"
 unit = "s"
-margin = 0.005
 phases = ["braking", "entry", "mid"]
 about = "time with gas < 0.1 and brake < 0.04"
 
 [metrics.brake_mean]
 kind = "direct"
 unit = "pedal"
-margin = 0.01
 phases = ["braking", "entry"]
 about = "mean brake pedal (application)"
 
 [metrics.gas_mean]
 kind = "direct"
 unit = "pedal"
-margin = 0.01
 phases = ["mid", "exit", "traction"]
 about = "mean throttle pedal (application)"
 
 [metrics.ride_height_front_mm]
 kind = "direct"
 unit = "mm"
-margin = 0.2
 phases = ["braking", "mid", "traction"]
 about = "mean front ride height"
 
 [metrics.ride_height_rear_mm]
 kind = "direct"
 unit = "mm"
-margin = 0.2
 phases = ["braking", "mid", "traction"]
 about = "mean rear ride height"
 
 [metrics.ride_height_front_sd_mm]
 kind = "proxy"
 unit = "mm"
-margin = 0.1
 phases = ["braking", "mid"]
 about = "standard deviation of front ride height: platform variance"
 
 [metrics.ride_height_rear_sd_mm]
 kind = "proxy"
 unit = "mm"
-margin = 0.1
 phases = ["braking", "mid"]
 about = "standard deviation of rear ride height: platform variance"
 
 [metrics.brake_point_m]
 kind = "direct"
 unit = "m"
-margin = 1.0
 phases = ["corner"]
 about = "first brake > 0.08, metres from the zone start (absolute, not from the apex)"
 
 [metrics.turn_in_point_m]
 kind = "direct"
 unit = "m"
-margin = 1.0
 phases = ["corner"]
 about = "turn-in (50 % of the pass's p95 steering), metres from the zone start"
 
 [metrics.apex_point_m]
 kind = "direct"
 unit = "m"
-margin = 1.0
 phases = ["corner"]
 about = "slowest metre (curvature peak on a flat-out corner), metres from the zone start"
 
 [metrics.pickup_point_m]
 kind = "direct"
 unit = "m"
-margin = 1.0
 phases = ["corner"]
 about = "throttle pickup (gas > 0.25, brake < 0.04, held 0.2 s), metres from the zone start"
 
 [metrics.end_point_m]
 kind = "direct"
 unit = "m"
-margin = 1.0
 phases = ["corner"]
 about = "corner end (steering < 20 % of p95 and lateral g < 50 % of peak, held 0.15 s), metres from the zone start"
 

@@ -22,7 +22,8 @@ export const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   continue: "Drive two more blocks: the next look may settle it.",
   larger_perturbation:
     "Try a bigger step of the same setting: the effect is small but points one way.",
-  investigate_context: "Look at the speed classes: the change acts differently in them.",
+  investigate_context:
+    "Look at the speed classes and corner phases: the change acts differently in them.",
   switch_metric: "Judge it on the car's response instead: the time did not move, the car did.",
   stop_neutral: "Stop: there is nothing worth having to gain.",
   stop_invalid: "Stop: fix what made the experiment invalid and drive it again.",
@@ -36,6 +37,7 @@ const CONFOUNDER_LABEL: Record<Confounder["kind"], string> = {
   setup_mismatch: "passes on another setup left out",
   source_mismatch: "passes from another driver left out",
   speed_class_interaction: "effect differs between",
+  phase_interaction: "effect differs between the phases",
 };
 
 export function confounderText(confounder: Confounder): string {

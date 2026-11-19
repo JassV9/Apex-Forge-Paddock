@@ -18,10 +18,12 @@ import (
 // The sample session: a Mazda MX-5 Cup on a 7-corner track, ARB_FRONT at 3 of 0..4.
 const sampleSpool = "../ingest/testdata/spool"
 
-// fakeEngine plans four blocks and hands out the queued decisions, one per Evaluate.
+// fakeEngine plans four blocks and hands out the queued decisions, one per Evaluate, with the
+// queued response findings (none when the queue is empty).
 type fakeEngine struct {
 	failure   error
 	decisions []contracts.EvaluateResponseDecision
+	responses [][]contracts.ResponseFinding
 	plans     []contracts.PlanRequest
 	evaluated []contracts.EvaluateRequest
 }
@@ -53,6 +55,10 @@ func (f *fakeEngine) Evaluate(_ context.Context, request contracts.EvaluateReque
 	}
 	decision := f.decisions[0]
 	f.decisions = f.decisions[1:]
+	var responses []contracts.ResponseFinding
+	if len(f.responses) > 0 {
+		responses, f.responses = f.responses[0], f.responses[1:]
+	}
 	finding := findings[decision]
 	next := contracts.EvaluateResponseRecommendationContinue
 	version, look := "test-engine", 0
@@ -68,7 +74,7 @@ func (f *fakeEngine) Evaluate(_ context.Context, request contracts.EvaluateReque
 			EffectClass: contracts.ChannelResultEffectClassNegative,
 		}},
 		Guardrails:     []contracts.GuardrailResult{},
-		PredictionHits: 1, PredictionTotal: 1, PassesUsed: len(request.Passes),
+		PredictionHits: 1, PredictionTotal: 1, PassesUsed: len(request.Passes), Responses: responses,
 	}, nil
 }
 

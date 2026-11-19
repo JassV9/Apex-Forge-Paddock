@@ -16,6 +16,7 @@ import {
   TestSection,
   VerdictSection,
 } from "./ExperimentDetails";
+import { ResponseSection } from "./ResponseSection";
 import { StateBadge } from "./Ledger";
 
 /** The calls the page makes; injected in tests, the real client by default. */
@@ -140,6 +141,7 @@ export function ExperimentPage({ id, api = coreApi }: ExperimentPageProps) {
       <PlanSection experiment={experiment} />
       <ResultsSection experiment={experiment} />
       <VerdictSection experiment={experiment} />
+      <ResponseSection experiment={experiment} />
       <HistorySection experiment={experiment} />
     </article>
   );

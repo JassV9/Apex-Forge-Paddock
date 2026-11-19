@@ -4,7 +4,7 @@ Speed classes belong to corners, frozen from the baseline arm (features/regimes.
 a pass's own minimum speed is an outcome of the setup and never picks its class.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from paddock_engine.contracts.evaluate_request_schema import Arm, EvaluatePass
 from paddock_engine.contracts.evaluate_response_schema import (
@@ -85,13 +85,18 @@ def experiment_regimes(passes: Sequence[EvaluatePass]) -> Regimes:
 
 
 def per_speed_class(
-    passes: Sequence[EvaluatePass], channel: str, rope: float, level: float, role: Role
+    passes: Sequence[EvaluatePass],
+    channel: str,
+    rope: float,
+    level: float,
+    role: Role,
+    classes: Mapping[int, str],
 ) -> list[ChannelResult]:
     """The same effect restricted to slow, medium and fast corners, where estimable.
 
-    A class needs MIN_CORNERS_PER_CLASS corners; with fewer it is left out, never estimated.
+    `classes` is the verdict's one regime map (corner -> class). A class needs
+    MIN_CORNERS_PER_CLASS corners; with fewer it is left out, never estimated.
     """
-    classes = experiment_regimes(passes).classes
     results = []
     for corner_class in (CornerClass.slow, CornerClass.medium, CornerClass.fast):
         members = {corner for corner, name in classes.items() if name == corner_class.value}

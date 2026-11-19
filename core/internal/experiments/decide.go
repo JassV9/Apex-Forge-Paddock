@@ -50,6 +50,9 @@ func applyVerdict(ctx context.Context, tx *sql.Tx, exp record, reply contracts.E
 	if err := saveResults(ctx, tx, exp.id, verdictID, reply.EngineVersion, reply.Results); err != nil {
 		return err
 	}
+	if err := saveResponses(ctx, tx, exp.id, verdictID, reply.EngineVersion, reply.Responses); err != nil {
+		return err
+	}
 	decision := State(reply.Decision)
 	if err := move(ctx, tx, exp.id, Evaluating, decision, reply.Reason); err != nil {
 		return err

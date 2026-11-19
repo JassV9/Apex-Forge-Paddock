@@ -1,6 +1,8 @@
 # ADR 0031: Corner phases at fixed distances, per-corner speed regimes, vehicle-response analysis
 
-Status: accepted (2026-11-18). Implements findings C4, I6 and I7 and sections 3 and 4 of
+Status: accepted (2026-11-18); amended by [ADR 0034](0034-vehicle-response-in-verdicts.md)
+(margins moved to `config/margins.toml`; the verdict judges the expected cells with Holm).
+Implements findings C4, I6 and I7 and sections 3 and 4 of
 [the reliability investigation](../investigations/2026-11-18-ghost-driver-reliability.md).
 Amends the phases of the measurement path (ADR 0008's inputs) and the speed classes of the
 verdict and the diagnosis.

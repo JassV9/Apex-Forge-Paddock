@@ -43,13 +43,14 @@ var sources = map[string][]string{"human": {"human", "demo"}, "ai": {"ai", "ghos
 
 // pushPass is one push-lap pass of an experiment's blocks, as the ledger has it.
 type pushPass struct {
-	corner, block, session, lap int
-	baseline, valid, onArmSetup bool
-	source, driver              string
-	speedClass                  sql.NullString
-	metrics                     []byte
-	fuel, tyreCore, ersStart    sql.NullFloat64
-	start                       float64 // seconds since the epoch
+	corner, block, session, lap, seq int
+	baseline, valid, onArmSetup      bool
+	source, driver                   string
+	speedClass                       sql.NullString
+	metrics                          []byte
+	fuel, tyreCore, ersStart         sql.NullFloat64
+	start                            float64 // seconds since the epoch
+	duration                         float64 // seconds
 }
 
 // Push laps only: lap 0 of a block is the out-lap, on cold tyres, and is never compared.
@@ -58,7 +59,8 @@ SELECT c.number, a.is_baseline, b."order", p.session_id, p.block_lap, p.features
        p.features->'metrics', p.fuel_l,
        (SELECT avg(core) FROM unnest(p.tyre_core_c) AS core),
        EXTRACT(EPOCH FROM p.t_start)::float8, p.ers_charge_start, p.valid,
-       p.setup_version_id IS NOT DISTINCT FROM a.setup_version_id, s.source, e.driver
+       p.setup_version_id IS NOT DISTINCT FROM a.setup_version_id, s.source, e.driver, p.seq,
+       p.duration_s
 FROM corner_pass p
 JOIN run_block b ON b.id = p.block_id
 JOIN experiment e ON e.id = b.experiment_id
@@ -73,19 +75,21 @@ func readPushPasses(ctx context.Context, q querier, id int64) ([]pushPass, error
 		var p pushPass
 		return p, rows.Scan(&p.corner, &p.baseline, &p.block, &p.session, &p.lap, &p.speedClass,
 			&p.metrics, &p.fuel, &p.tyreCore, &p.start, &p.ersStart, &p.valid, &p.onArmSetup,
-			&p.source, &p.driver)
+			&p.source, &p.driver, &p.seq, &p.duration)
 	}, id)
 }
 
 // comparison is what the engine is sent about an experiment's passes (ADR 0029): the valid
 // passes on the arm's setup and from the experiment's own driver, the passes left out for either
 // reason, and per block how many push-lap passes went off track. pending counts the compared
-// passes whose features the engine has not computed yet.
+// passes whose features the engine has not computed yet. vehicle are the passes the car's
+// response is measured on (ADR 0034).
 type comparison struct {
 	passes   []contracts.EvaluatePass
 	pending  int
 	excluded contracts.ExcludedPasses
 	offtrack []contracts.OfftrackBlock
+	vehicle  []contracts.VehiclePass
 }
 
 // compare sorts the push passes. A pass on another setup is never compared, whatever else is
@@ -94,7 +98,7 @@ type comparison struct {
 func compare(rows []pushPass) (comparison, error) {
 	var out comparison
 	blocks := map[int]*contracts.OfftrackBlock{}
-	var kept []pushPass
+	var own, kept []pushPass
 	for _, row := range rows {
 		switch {
 		case !row.onArmSetup:
@@ -103,13 +107,19 @@ func compare(rows []pushPass) (comparison, error) {
 			out.excluded.SourceMismatch++
 		default:
 			countOfftrack(blocks, row)
+			own = append(own, row)
 			if row.valid {
 				kept = append(kept, row)
 			}
 		}
 	}
+	laps := newLapCodes()
 	var err error
-	out.passes, out.pending, err = evaluatePasses(kept)
+	out.passes, out.pending, err = evaluatePasses(kept, laps)
+	out.vehicle = []contracts.VehiclePass{}
+	if len(kept) > 0 {
+		out.vehicle = vehiclePasses(own, laps, kept[0].start, sessionOrder(kept))
+	}
 	for _, order := range slices.Sorted(maps.Keys(blocks)) {
 		out.offtrack = append(out.offtrack, *blocks[order])
 	}
@@ -134,13 +144,12 @@ func countOfftrack(blocks map[int]*contracts.OfftrackBlock, row pushPass) {
 
 // evaluatePasses turns compared passes into the engine's, with lap codes, time since the first
 // of them and a session term for every game session after the first.
-func evaluatePasses(rows []pushPass) ([]contracts.EvaluatePass, int, error) {
+func evaluatePasses(rows []pushPass, laps *lapCodes) ([]contracts.EvaluatePass, int, error) {
 	passes, pending := []contracts.EvaluatePass{}, 0
 	if len(rows) == 0 {
 		return passes, 0, nil
 	}
 	sessions := sessionOrder(rows)
-	laps := newLapCodes()
 	for _, row := range rows {
 		if row.metrics == nil {
 			pending++

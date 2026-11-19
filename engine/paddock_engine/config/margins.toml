@@ -1,16 +1,57 @@
-# Margins of practical equivalence (docs/adr/0029-block-level-inference-and-finding-classes.md).
+# Margins of practical equivalence: the ONE place every margin lives (ADR 0029, ADR 0034).
 #
-# A margin is the smallest change of a channel that matters, in the channel's unit. A finding is
-# judged against it: confirmed when the whole interval lies beyond it, neutral when the whole
-# interval lies inside it. A margin is never 0: a channel without one gets no neutral finding,
-# and the success test's band is used only when the configuration has none.
+# A margin is the smallest change of a channel that matters, in the channel's unit, per corner
+# pass. A finding is judged against it: confirmed (or, for a response channel, an increase or a
+# decrease) when the whole interval lies beyond it, neutral when the whole interval lies inside
+# it. A margin is never 0: a channel without one gets no neutral finding.
 #
-# [metrics] holds the defaults; [parameters.<SETUP_ITEM>] overrides them for one setup item.
+# [metrics] holds the defaults, keyed by metric id. The verdict's per-pass channels (pass
+# features) and the vehicle-response metrics (response/metrics.toml, ADR 0031) share one
+# namespace: where an id is both (corner_time_s, v_min_kmh) it is the same quantity in the same
+# unit and has one margin. A test checks that every response metric has one.
+# [parameters.<SETUP_ITEM>] overrides them for one setup item, for both kinds of channel.
 
 [metrics]
-corner_time_s = 0.005       # 5 ms per corner pass (ADR 0008)
-rear_slip_peak_deg = 0.5    # the guardrail tolerances core freezes on every experiment
-countersteer_s = 0.05
+# Per-pass channels of the verdict (ADR 0029).
+corner_time_s = 0.005       # s: 5 ms per corner pass (ADR 0008)
+rear_slip_peak_deg = 0.5    # deg: the guardrail tolerances core freezes on every experiment
+countersteer_s = 0.05       # s
 offtrack_rate = 0.05        # share of push-lap passes off track, variant minus baseline
+
+# Vehicle-response metrics per frozen phase (ADR 0031). Initial values, set by judgement from
+# experiment 15's scatter; to be learned from discovery sweeps.
+phase_time_s = 0.002                # s
+v_min_kmh = 0.3                     # km/h
+v_start_kmh = 0.3                   # km/h
+v_end_kmh = 0.3                     # km/h
+v_max_kmh = 0.3                     # km/h
+lat_g_mean = 0.01                   # g
+long_g_mean = 0.01                  # g
+peak_decel_g = 0.02                 # g
+steer_per_g = 0.5                   # deg/g
+yaw_gain = 0.005                    # 1e-3 rad/(m deg)
+front_slip_deg = 0.05               # deg
+rear_slip_deg = 0.05                # deg
+slip_balance_deg = 0.05             # deg
+front_slip_ratio_braking = 0.002    # ratio
+rear_slip_ratio_braking = 0.002     # ratio
+front_slip_ratio_traction = 0.002   # ratio
+rear_slip_ratio_traction = 0.002    # ratio
+front_lock_share = 0.01             # share
+rear_lock_share = 0.01              # share
+steer_rate_deg_s = 2.0              # deg/s
+steer_reversals_per_s = 0.1         # 1/s
+coast_s = 0.005                     # s
+brake_mean = 0.01                   # pedal
+gas_mean = 0.01                     # pedal
+ride_height_front_mm = 0.2          # mm
+ride_height_rear_mm = 0.2           # mm
+ride_height_front_sd_mm = 0.1       # mm
+ride_height_rear_sd_mm = 0.1        # mm
+brake_point_m = 1.0                 # m
+turn_in_point_m = 1.0               # m
+apex_point_m = 1.0                  # m
+pickup_point_m = 1.0                # m
+end_point_m = 1.0                   # m
 
 [parameters]

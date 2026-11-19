@@ -231,5 +231,40 @@ named: the agent took "the first block's fuel" from whatever the car held when t
 AI experiment, and an off read-back sets the fuel again during the out-lap before stopping (ADR 0028
 amendment). Experiments before this change compared across sessions may differ in fuel.
 
+**Look 3 (12 blocks, final; blocks 11 and 12 on the fixed-fuel agent, same 29.6 L out-lap as all
+others), engine 0.4.0 after D1/D2/D3 were deployed:** corner time **-11.5 ms [-16.8, -6.3]**, finding
+*confirmed improvement*, decision **accepted** (rear ARB 5 became the champion). Guardrails hold (rear
+slip peak +0.06 deg, negligible). By class: medium -17.3 ms [-22.0, -12.7], fast -6.8 [-9.1, -4.5],
+slow -16.1 [-29.5, -2.7]; a fast-vs-medium interaction and phase interactions (the gain is in exit
+and traction, not braking or entry) are flagged, so the effect is context-dependent in size, not in
+sign. The absolute braking point moved -0.19 m [-0.27, -0.11]: flagged as a driver-input shift
+because the check has no margin, but 19 cm is far inside the prediction's 1 m.
+
+Response findings (ADR 0034, first run through the deployed stack: core built the response context
+from the real Parquet parts; 27 expected rear-ARB cells, block-level, Holm):
+
+| Observable | Phase | all | medium | slow |
+|---|---|---|---|---|
+| slip balance F-R (deg, proxy) | mid | -0.081 decrease | -0.146 decrease | insufficient |
+| slip balance F-R (deg, proxy) | exit | -0.073 decrease | -0.195 decrease | insufficient |
+| yaw gain (direct) | mid | +0.0060 likely increase | +0.0099 increase | insufficient |
+| yaw gain (direct) | exit | +0.0045 likely increase | +0.0102 increase | insufficient |
+| rear slip (deg, direct) | exit | +0.057 likely increase | +0.081 increase | insufficient |
+| rear slip (deg, direct) | mid | +0.009 neutral | +0.021 neutral | insufficient |
+| rear traction slip ratio (direct) | exit | +0.0014 neutral | +0.0037 increase | neutral |
+| steer reversals (/s, proxy) | mid, exit | insufficient | insufficient | insufficient |
+
+**Final reading of experiment B.** The AI did not compensate through its inputs (braking point within
+0.2 m, minimum speed +0.2 km/h). The car's response to rear ARB +3 is real but modest and
+concentrated in the medium corners (5, 8, 9): the balance moves rearward (slip balance -0.15 to -0.2
+deg), the car rotates more for its steering (yaw gain about +0.01) and the rear slips more on exit
+(+0.08 deg) while traction slip rises slightly. The slow corners carry too few blocks of evidence
+either way; the fast corners gain time with no response cell beyond its margin. And here the time did
+show it: -11.5 ms per corner, confirmed. The prediction's "response moves beyond the margin
+everywhere" was too strong; "response moves while the AI's inputs do not" held where the response
+moved.
+
 Process gaps seen: the prediction was recorded only as event text (`predictions` empty, not
-machine-checked), and the verdict's driver check still uses the apex-relative pair.
+machine-checked); the driver-input check now uses the absolute braking point (ADR 0034) but has no
+margin, so a 0.19 m shift is flagged; and the accepted verdict promoted the change to champion,
+which a hint sweep must avoid between its steps (fixed with `measure_only`, ADR 0032 amendment).

@@ -391,6 +391,64 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/sessions/{id}/sweeps": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start a sensitivity discovery sweep of one setting on the session's car.
+     * @description AC's AI drives one A-B-A-B experiment per step (clicks from the baseline, clipped to the item's range), each against the same baseline, at the pinned AI hint; the baseline goes back on the car between steps and the champion never changes. When every step is measured the engine classifies each observable's curve (docs/adr/0032). 409 when an experiment, a training program or another sweep is on the car, or the baseline was never read back from the car; 422 when the item cannot be swept.
+     */
+    post: operations["startSweep"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sweeps": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Every sweep, newest first, with its steps and, when done, its curves. */
+    get: operations["listSweeps"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/sweeps/{id}/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ProgramId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop a sweep. An experiment it started stays as it is, to finish or abort. */
+    post: operations["stopSweep"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -411,6 +469,8 @@ export interface components {
     PassTrace: components["schemas"]["pass_trace.schema"];
     TrainingCreate: components["schemas"]["training_create.schema"];
     TrainingProgram: components["schemas"]["training_program.schema"];
+    SweepCreate: components["schemas"]["sweep_create.schema"];
+    Sweep: components["schemas"]["sweep.schema"];
     SessionReference: components["schemas"]["session_reference.schema"];
     AiReference: components["schemas"]["ai_reference.schema"];
     Problem: {
@@ -1336,6 +1396,11 @@ export interface components {
        * @enum {string}
        */
       driver: "human" | "ai";
+      /**
+       * @description Why the experiment was driven (docs/adr/0032-sensitivity-discovery-sweeps.md): improve the setup (the champion follows the verdict), sweep (a step of a sensitivity sweep: measured, never promoted), or recheck (the champion against the original baseline).
+       * @enum {string}
+       */
+      purpose?: "improve" | "sweep" | "recheck";
       track_name: string;
       /** @description Setup item that is changed. */
       parameter: string;
@@ -1430,8 +1495,118 @@ export interface components {
       /** @description The program's experiments, oldest first. */
       steps: components["schemas"]["TrainingStep"][];
     };
+    /**
+     * SweepCreate
+     * @description Start a sensitivity discovery sweep on a session's car and track (docs/adr/0032-sensitivity-discovery-sweeps.md): one setting moved step by step, each step an A-B-A-B experiment the AI drives against the same baseline, at a pinned AI hint.
+     */
+    "sweep_create.schema": {
+      /** @description Setup item to sweep. A member of a linked group sweeps the whole group (ADR 0026). */
+      parameter: string;
+      /** @description Clicks from the baseline, in the order they are driven, e.g. [-1, 1, 2, 3]. Each is clipped to the item's range; a step that clipping makes 0 or a repeat is skipped and said so. */
+      steps: number[];
+      /** @description The share of the car's own AI tyre hint pinned for every step (ADR 0028). Required: a sweep compares steps driven at one hint. */
+      ai_hint_share: number;
+    };
+    /** SweepStep */
+    SweepStep: {
+      clicks: number;
+      experiment_id: number;
+      /** @description The experiment's state (see experiment.schema.json). */
+      state: string;
+      /** @description The verdict's finding on lap time (ADR 0029), once judged. */
+      finding_class?: string;
+      recommendation?: string;
+    };
+    /**
+     * CurveEstimate
+     * @description A coefficient of the weighted fit through the baseline, with its interval at the classification's level. slope: per click (straight line). curvature: per click squared (the quadratic term).
+     */
+    CurveEstimate: {
+      estimate: number;
+      ci_low: number;
+      ci_high: number;
+    };
+    /** CurveResult */
+    CurveResult: {
+      metric: string;
+      phase: string;
+      regime: string;
+      source: string;
+      role?: string;
+      expected?: string;
+      /** @description Unit of the metric, read from its name (s, deg, m, km/h, g, mm, ...); empty when unknown. */
+      unit: string;
+      /**
+       * CurveShape
+       * @description negligible: every step inside the margin (two one-sided tests at each step). direction_change: one stretch of the curve rises and another falls, both clear of zero. nonlinear: the quadratic term of the weighted fit through the baseline is clear of zero. linear: the slope is clear of zero and the quadratic term is not. insufficient: fewer than two steps, or nothing clear.
+       * @enum {string}
+       */
+      shape: "linear" | "nonlinear" | "negligible" | "direction_change" | "insufficient";
+      /** @description The steps the classification used, in clicks from the baseline, ascending. */
+      clicks: number[];
+      slope?: components["schemas"]["CurveEstimate"];
+      curvature?: components["schemas"]["CurveEstimate"];
+      /** @description For a direction change: the step (or 0, the baseline) at which the response turns. */
+      turn_clicks?: number;
+      margin?: number;
+      /** @description Why this shape, in words. */
+      reason: string;
+    };
+    /**
+     * DiscoveryCurve
+     * @description How each observable responds to the swept item, from the per-step effects (docs/adr/0032-sensitivity-discovery-sweeps.md). A classification per observable, never a decision: there is no control of multiplicity across observables.
+     */
+    "discovery_curve_response.schema": {
+      parameter: string;
+      level: number;
+      engine_version: string;
+      curves: components["schemas"]["CurveResult"][];
+    };
+    /**
+     * Sweep
+     * @description A sensitivity discovery sweep (docs/adr/0032-sensitivity-discovery-sweeps.md): how a car responds to one setting, learned from one experiment per step against the same baseline. It never changes the champion.
+     */
+    "sweep.schema": {
+      id: number;
+      session_id: number;
+      car_name: string;
+      track_name: string;
+      /** @description The setting swept: the item, or a linked group's leader. */
+      parameter: string;
+      parameter_label: string;
+      /** @description The setup every step is measured against; it goes back on the car between steps. */
+      baseline_version_id: number;
+      ai_hint_share: number;
+      /** @description The steps asked for, in clicks from the baseline. */
+      requested: number[];
+      /** @description The steps the sweep drives, in order, after clipping to the item's range. */
+      planned: number[];
+      /** @description What clipping changed or skipped, in words. */
+      skipped: string[];
+      /**
+       * SweepState
+       * @description running: a step is being driven or about to be. waiting: another experiment is on the car. done: every step measured and the curve classified. stopped: by the driver. failed: stopped by the sweep itself (an invalid step, an AI failure, the baseline moved); the message says why.
+       * @enum {string}
+       */
+      state: "running" | "waiting" | "done" | "stopped" | "failed";
+      message: string;
+      /** Format: date-time */
+      created_at: string;
+      /** @description The steps driven so far, oldest first. */
+      steps: components["schemas"]["SweepStep"][];
+      curve?: components["schemas"]["discovery_curve_response.schema"];
+    };
   };
   responses: {
+    /** @description The sweep as it is after the request. */
+    Sweep: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["sweep.schema"];
+      };
+    };
     /** @description The training program as it is after the request. */
     TrainingProgram: {
       headers: {
@@ -1927,6 +2102,63 @@ export interface operations {
     requestBody?: never;
     responses: {
       200: components["responses"]["TrainingProgram"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
+    };
+  };
+  startSweep: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["SessionId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["sweep_create.schema"];
+      };
+    };
+    responses: {
+      201: components["responses"]["Sweep"];
+      404: components["responses"]["Problem"];
+      409: components["responses"]["Problem"];
+      422: components["responses"]["Problem"];
+    };
+  };
+  listSweeps: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The sweeps. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["sweep.schema"][];
+        };
+      };
+    };
+  };
+  stopSweep: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["ProgramId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components["responses"]["Sweep"];
       404: components["responses"]["Problem"];
       409: components["responses"]["Problem"];
     };

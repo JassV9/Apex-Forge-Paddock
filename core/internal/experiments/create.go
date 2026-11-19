@@ -55,6 +55,20 @@ type draft struct {
 	predictions     []contracts.PredictionSpec
 	driver          contracts.ExperimentCreateDriver // empty: the human
 	aiHintShare     *float64                         // the AI's tyre hint pinned; nil: learned
+	purpose         contracts.ExperimentPurpose      // empty: improve, or recheck for a re-check
+}
+
+// purposeOf is why the draft is driven: a re-check checks the champion, a sweep step measures,
+// everything else tries to improve the setup (docs/adr/0032-sensitivity-discovery-sweeps.md).
+func purposeOf(d draft) contracts.ExperimentPurpose {
+	switch {
+	case d.purpose != "":
+		return d.purpose
+	case d.kind == contracts.ExperimentKindRecheck:
+		return contracts.ExperimentPurposeRecheck
+	default:
+		return contracts.ExperimentPurposeImprove
+	}
 }
 
 // driverOf is who drives the laps; an experiment without one is driven by the human.
@@ -148,10 +162,10 @@ func insertDraft(ctx context.Context, tx *sql.Tx, d draft, baselineLabel, varian
 	}
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO experiment (hypothesis_id, kind, baseline_version_id, parameter_id, clicks,
-		                         state, success_test, guardrails, driver, ai_hint_share)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+		                         state, success_test, guardrails, driver, ai_hint_share, purpose)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
 		hypothesisID, string(d.kind), d.baselineVersion, d.parameterID, d.clicks,
-		string(Proposed), test, guardrails, driverOf(d.driver), d.aiHintShare).Scan(&id)
+		string(Proposed), test, guardrails, driverOf(d.driver), d.aiHintShare, string(purposeOf(d))).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("save experiment: %w", err)
 	}

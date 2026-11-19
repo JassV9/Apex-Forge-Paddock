@@ -58,6 +58,18 @@ func (c *Client) Evaluate(ctx context.Context, request contracts.EvaluateRequest
 	return post[contracts.EvaluateResponse](ctx, c, "/evaluate", request)
 }
 
+// Response asks how an experiment's variant changed the car's response, per phase and speed
+// regime (docs/adr/0031-corner-phases-speed-regimes-and-response.md).
+func (c *Client) Response(ctx context.Context, request contracts.ResponseRequest) (contracts.ResponseResponse, error) {
+	return post[contracts.ResponseResponse](ctx, c, "/response", request)
+}
+
+// Curve classifies each observable's response to a swept item from its per-step effects
+// (docs/adr/0032-sensitivity-discovery-sweeps.md).
+func (c *Client) Curve(ctx context.Context, request contracts.DiscoveryCurveRequest) (contracts.DiscoveryCurve, error) {
+	return post[contracts.DiscoveryCurve](ctx, c, "/discovery/curve", request)
+}
+
 // Diagnose asks what a session's passes say about the car.
 func (c *Client) Diagnose(ctx context.Context, request contracts.DiagnoseRequest) (contracts.Diagnosis, error) {
 	return post[contracts.Diagnosis](ctx, c, "/diagnose", request)

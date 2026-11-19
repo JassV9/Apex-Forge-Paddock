@@ -4,6 +4,25 @@ One short entry per phase. Dates are when the phase was finished, not accepted.
 
 ## Unreleased: the driving flow
 
+- Core, engine and web (ADR 0032, Experiment D of the reliability investigation): sensitivity
+  discovery sweeps. `POST /sessions/{id}/sweeps {parameter, steps, ai_hint_share}` has the AI
+  drive one setting through a list of steps (clicks from the baseline, clipped to the item's
+  range, a clipped repeat skipped and said so; a linked group is one setting), each step its own
+  A-B-A-B experiment against the same verified baseline (read back from the car) at a required
+  pinned hint, the baseline back on the car between steps. New `core/internal/discovery` with its
+  own loop beside training's, using only the ledger's actions. Experiments now carry a purpose
+  (migration 00015: `improve`, `sweep`, `recheck`); a sweep step is never promoted, whatever the
+  verdict. A step stops the sweep, with the reason, on an invalid finding, an abort, a block
+  driven at another hint, 30 minutes without anything from the AI, or a moved baseline; `continue`
+  extends to the next look, any other recommendation moves on. Core now calls `POST /response`
+  per measured step (`experiments.Service.ResponseRequest`) and keeps the cells the item's row
+  expects. The engine's new `POST /discovery/curve` (`discovery/curve.py`) classifies each
+  observable as linear, nonlinear, negligible (TOST at every step), direction change or
+  insufficient (never from one step), from a weighted fit through the baseline. `GET /sweeps`,
+  `POST /sweeps/{id}/stop`, and a "Discover" card that says each curve in a sentence. The 2^2
+  factorial and response-surface stages are designed in the ADR, not built. Tested offline (Go
+  against PostgreSQL with a fake ledger and engine, pytest with hypothesis on synthetic curves,
+  Vitest); **unverified in game**.
 - Agent and core (ADR 0028, audit findings C1, I9, I10): run context and AI provenance. The
   session line now says what it was driven under (CSP version and build, cars in the session,
   the car's AI tyre, aero and brake hints, the learned share, AI level and aggression; in an AI

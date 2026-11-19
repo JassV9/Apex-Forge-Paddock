@@ -21,6 +21,9 @@ export type PassRecord = SessionPasses["passes"][number];
 export type CornerSummary = SessionPasses["corners"][number];
 export type PassTrace = components["schemas"]["PassTrace"];
 export type TrainingProgram = components["schemas"]["TrainingProgram"];
+export type Sweep = components["schemas"]["Sweep"];
+export type SweepCreate = components["schemas"]["SweepCreate"];
+export type CurveResult = NonNullable<Sweep["curve"]>["curves"][number];
 export type SessionReference = components["schemas"]["SessionReference"];
 export type CornerReference = SessionReference["corners"][number];
 export type FeatureDifference = CornerReference["differences"][number];
@@ -162,6 +165,25 @@ export async function startTraining(
 export async function stopTraining(id: number): Promise<TrainingProgram> {
   const reply = await coreApi.POST("/training/{id}/stop", { params: { path: { id } } });
   return unwrap(reply, "POST /training/{id}/stop");
+}
+
+/** Every sensitivity sweep, newest first (docs/adr/0032-sensitivity-discovery-sweeps.md). */
+export async function fetchSweeps(): Promise<Sweep[]> {
+  return unwrap(await coreApi.GET("/sweeps"), "GET /sweeps");
+}
+
+/** Starts a sweep of one setting on the session's car at a pinned AI hint. */
+export async function startSweep(sessionId: number, body: SweepCreate): Promise<Sweep> {
+  const reply = await coreApi.POST("/sessions/{id}/sweeps", {
+    params: { path: { id: sessionId } },
+    body,
+  });
+  return unwrap(reply, "POST /sessions/{id}/sweeps");
+}
+
+export async function stopSweep(id: number): Promise<Sweep> {
+  const reply = await coreApi.POST("/sweeps/{id}/stop", { params: { path: { id } } });
+  return unwrap(reply, "POST /sweeps/{id}/stop");
 }
 
 /** The driver's call on a trade-off: keep the variant, or go back to the baseline. */

@@ -434,6 +434,60 @@ paths:
           $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
+  /sessions/{id}/sweeps:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      operationId: startSweep
+      summary: Start a sensitivity discovery sweep of one setting on the session's car.
+      description: >
+        AC's AI drives one A-B-A-B experiment per step (clicks from the baseline, clipped to the
+        item's range), each against the same baseline, at the pinned AI hint; the baseline goes
+        back on the car between steps and the champion never changes. When every step is
+        measured the engine classifies each observable's curve (docs/adr/0032). 409 when an
+        experiment, a training program or another sweep is on the car, or the baseline was
+        never read back from the car; 422 when the item cannot be swept.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SweepCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Sweep"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /sweeps:
+    get:
+      operationId: listSweeps
+      summary: Every sweep, newest first, with its steps and, when done, its curves.
+      responses:
+        "200":
+          description: The sweeps.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sweep"
+  /sweeps/{id}/stop:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: stopSweep
+      summary: Stop a sweep. An experiment it started stays as it is, to finish or abort.
+      responses:
+        "200":
+          $ref: "#/components/responses/Sweep"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     SessionId:
@@ -458,6 +512,12 @@ components:
         type: integer
         minimum: 1
   responses:
+    Sweep:
+      description: The sweep as it is after the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Sweep"
     TrainingProgram:
       description: The training program as it is after the request.
       content:
@@ -520,6 +580,10 @@ components:
       $ref: "../../contracts/training_create.schema.json"
     TrainingProgram:
       $ref: "../../contracts/training_program.schema.json"
+    SweepCreate:
+      $ref: "../../contracts/sweep_create.schema.json"
+    Sweep:
+      $ref: "../../contracts/sweep.schema.json"
     SessionReference:
       $ref: "../../contracts/session_reference.schema.json"
     AiReference:

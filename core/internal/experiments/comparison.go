@@ -50,6 +50,8 @@ type pushPass struct {
 	metrics                     []byte
 	fuel, tyreCore, ersStart    sql.NullFloat64
 	start                       float64 // seconds since the epoch
+	seq                         int     // order of the pass in its session
+	duration                    float64 // seconds
 }
 
 // Push laps only: lap 0 of a block is the out-lap, on cold tyres, and is never compared.
@@ -58,7 +60,8 @@ SELECT c.number, a.is_baseline, b."order", p.session_id, p.block_lap, p.features
        p.features->'metrics', p.fuel_l,
        (SELECT avg(core) FROM unnest(p.tyre_core_c) AS core),
        EXTRACT(EPOCH FROM p.t_start)::float8, p.ers_charge_start, p.valid,
-       p.setup_version_id IS NOT DISTINCT FROM a.setup_version_id, s.source, e.driver
+       p.setup_version_id IS NOT DISTINCT FROM a.setup_version_id, s.source, e.driver, p.seq,
+       p.duration_s
 FROM corner_pass p
 JOIN run_block b ON b.id = p.block_id
 JOIN experiment e ON e.id = b.experiment_id
@@ -73,7 +76,7 @@ func readPushPasses(ctx context.Context, q querier, id int64) ([]pushPass, error
 		var p pushPass
 		return p, rows.Scan(&p.corner, &p.baseline, &p.block, &p.session, &p.lap, &p.speedClass,
 			&p.metrics, &p.fuel, &p.tyreCore, &p.start, &p.ersStart, &p.valid, &p.onArmSetup,
-			&p.source, &p.driver)
+			&p.source, &p.driver, &p.seq, &p.duration)
 	}, id)
 }
 

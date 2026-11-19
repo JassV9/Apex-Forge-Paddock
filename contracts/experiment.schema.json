@@ -81,6 +81,15 @@
         "ai"
       ]
     },
+    "purpose": {
+      "description": "Why the experiment was driven (docs/adr/0032-sensitivity-discovery-sweeps.md): improve the setup (the champion follows the verdict), sweep (a step of a sensitivity sweep: measured, never promoted), or recheck (the champion against the original baseline).",
+      "type": "string",
+      "enum": [
+        "improve",
+        "sweep",
+        "recheck"
+      ]
+    },
     "track_name": {
       "type": "string"
     },

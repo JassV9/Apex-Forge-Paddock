@@ -40,6 +40,7 @@ func queryAll[T any](ctx context.Context, q querier, query string, scan func(*sq
 type record struct {
 	id              int64
 	kind            contracts.ExperimentKind
+	purpose         contracts.ExperimentPurpose
 	state           State
 	carID           int64
 	trackID         int64
@@ -53,7 +54,7 @@ type record struct {
 }
 
 const recordSQL = `
-SELECT e.id, e.kind, e.state, h.car_id, h.track_id, c.ac_id, e.baseline_version_id,
+SELECT e.id, e.kind, e.purpose, e.state, h.car_id, h.track_id, c.ac_id, e.baseline_version_id,
        (SELECT a.setup_version_id FROM experiment_arm a
         WHERE a.experiment_id = e.id AND NOT a.is_baseline),
        e.extensions, COALESCE(sp.name, ''), e.success_test, e.guardrails
@@ -72,7 +73,7 @@ func loadRecord(ctx context.Context, q querier, id int64, lock bool) (record, er
 	}
 	var exp record
 	var test, guardrails []byte
-	err := q.QueryRowContext(ctx, query, id).Scan(&exp.id, &exp.kind, &exp.state, &exp.carID,
+	err := q.QueryRowContext(ctx, query, id).Scan(&exp.id, &exp.kind, &exp.purpose, &exp.state, &exp.carID,
 		&exp.trackID, &exp.carACID, &exp.baselineVersion, &exp.variantVersion, &exp.extensions,
 		&exp.parameter, &test, &guardrails)
 	if errors.Is(err, sql.ErrNoRows) {

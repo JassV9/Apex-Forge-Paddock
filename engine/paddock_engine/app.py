@@ -10,6 +10,8 @@ from paddock_engine.contracts.base_setup_request_schema import BaseSetupRequest
 from paddock_engine.contracts.base_setup_schema import BaseSetup
 from paddock_engine.contracts.diagnose_request_schema import DiagnoseRequest
 from paddock_engine.contracts.diagnosis_schema import Diagnosis
+from paddock_engine.contracts.discovery_curve_request_schema import DiscoveryCurveRequest
+from paddock_engine.contracts.discovery_curve_response_schema import DiscoveryCurve
 from paddock_engine.contracts.evaluate_request_schema import EvaluateRequest
 from paddock_engine.contracts.evaluate_response_schema import EvaluateResponse
 from paddock_engine.contracts.features_request_schema import FeaturesRequest
@@ -24,6 +26,7 @@ from paddock_engine.contracts.response_response_schema import ResponseResponse
 from paddock_engine.contracts.sensitivity_request_schema import SensitivityRequest
 from paddock_engine.contracts.sensitivity_response_schema import SensitivityResponse
 from paddock_engine.diagnosis.report import report
+from paddock_engine.discovery.service import curves
 from paddock_engine.experiments.evaluate import evaluate
 from paddock_engine.experiments.plan import plan
 from paddock_engine.explain.config import Choice, from_env
@@ -58,6 +61,10 @@ def create_app(llm: Choice | None = None) -> FastAPI:
     @app.post("/response", response_model_exclude_none=True)
     def vehicle_response(request: ResponseRequest) -> ResponseResponse:
         return response(request, load_samples(request))
+
+    @app.post("/discovery/curve", response_model_exclude_none=True)
+    def sweep_curves(request: DiscoveryCurveRequest) -> DiscoveryCurve:
+        return curves(request)
 
     @app.post("/diagnose")
     def diagnose_session(request: DiagnoseRequest) -> Diagnosis:

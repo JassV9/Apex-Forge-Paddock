@@ -351,3 +351,120 @@ becomes the default pin.
 The five reverts were recorded as "The driver kept the baseline", which is wrong for measure-only
 runs; reverting a measure-only experiment now says nothing was decided (the five events stay as
 written: the ledger is append-only).
+
+### Experiment A: repeatability, A/A (experiment 27, 2026-11-19)
+
+Setup 237 (rear ARB 5) in both arms (rear ARB 0 clicks, measure-only, ADR 0032 amendment), hint
+pinned at 0.97, fixed 30 L fuel, engine 0.4.0. Pre-registered: the time finding is neutral or
+insufficient, never an improvement or regression; corner time for all corners covers 0 at 90 %; no
+response cell moves beyond its margin after Holm. One design deviation: one experiment in one game
+session plus the extension in a second, not 3 sessions x 8 blocks, so it measures the false-decision
+behaviour of one run, not session variance.
+
+| Look | Blocks | Corner time, all (ms) | Finding | Recommendation |
+|---|---|---|---|---|
+| 1 | 8 | -0.04 [-5.8, +5.8] | insufficient evidence | continue |
+| 2 | 10 | **+0.14 [-3.7, +3.9]** | **neutral** | stop (neutral) |
+
+420 passes, none excluded. By class: slow +2.4 [-4.1, +9.0], medium -1.1 [-12.0, +9.8], fast -0.8
+[-4.4, +2.8]. Guardrails negligible. Response: 22 cells, 18 insufficient, 4 neutral, **none moved**.
+
+**Against the prediction: held on every count.** The time interval covers 0 at both looks and the
+equivalence test closed at look 2 inside the 5 ms margin; no response cell moved. At 10 blocks an
+identical pair is resolved to about +-4 ms per corner, so an effect has to be about the size of the
+margin to be called at that look.
+
+**One failure: the driver-input check.** The absolute braking point "moved" -0.27 m [-0.43, -0.11]
+between identical arms and was flagged as `driver_input_shifted`. With nothing to respond to, that
+is either an order or time effect inside the ABAB blocks or an interval that is too narrow; either
+way the check fires on noise. It is as large as the flags on rear ARB +1 and +2 below (-0.24 m) and
+experiment B's -0.19 m. Until the check has a margin and a calibrated interval, a braking-point flag
+under about 0.3 m on this car says nothing.
+
+**Reading.** At hint 0.97 the inference did not invent effects on the primary metric or the response
+cells in this run, so 0.97 is fit to be the default pin for this car (a calibration change, not made
+here). One A/A is one draw: it rules out a gross false-decision rate, not a 5 % one.
+
+### Experiment D: rear ARB curve (sweep 1, experiments 28 to 31, 2026-11-19)
+
+The first sweep through `POST /sessions/{id}/sweeps` (ADR 0032): rear ARB -1, +1, +2, +3 from setup
+237 (rear ARB 5, so ARB 4, 6, 7, 8), hint 0.97, fixed fuel, the baseline back on the car between
+steps, each step its own experiment under the sequential policy, curves classified by the engine at
+the end. Driven unattended; no step failed, none skipped, 336 passes a look, none excluded.
+
+**Steps (corner time, variant minus baseline, ms per corner, 90 %):**
+
+| Step (ARB) | Exp | Looks | all | slow | medium | fast | Finding / recommendation |
+|---|---|---|---|---|---|---|---|
+| -1 (4) | 28 | 1 | +8.0 [-0.8, +16.9] | +4.3 [-10.4, +19.0] | +8.3 [+3.9, +12.7] | +10.3 [+4.0, +16.6] | insufficient / stop (futility) |
+| +1 (6) | 29 | 3 | -2.4 [-8.1, +3.3] | -1.1 [-10.7, +8.6] | -3.4 [-11.4, +4.6] | -3.4 [-8.1, +1.3] | insufficient / larger perturbation |
+| +2 (7) | 30 | 3 | -9.5 [-17.4, -1.6] | -11.9 [-22.2, -1.5] | -1.7 [-9.7, +6.3] | -10.1 [-13.0, -7.2] | likely improvement / larger perturbation |
+| +3 (8) | 31 | 1 | -11.0 [-21.1, -0.9] | -6.6 [-15.5, +2.3] | -7.3 [-20.6, +6.0] | -13.1 [-15.3, -10.9] | context-dependent / investigate context |
+
+Step -1 stopped at look 1 because its interval cannot reach an improvement (futility), although its
+point estimate is 8 ms slower; "stop (neutral)" is the policy's word for that and reads oddly here.
+
+**Curves (engine fit across the four steps; slope per click, 90 %):**
+
+| Observable | Phase | Regime | Shape | Slope per click |
+|---|---|---|---|---|
+| corner time (ms) | corner | all | linear | -4.1 [-5.9, -2.4] |
+| corner time (ms) | corner | fast | linear | -4.5 [-5.2, -3.9] |
+| corner time (ms) | corner | slow | linear | -3.0 [-5.5, -0.6] |
+| corner time (ms) | corner | medium | nonlinear (flattening) | -3.6 [-6.0, -1.3] |
+| yaw gain | mid | all | nonlinear (flattening) | +0.0026 [+0.0017, +0.0035] |
+| yaw gain | exit | all | linear | +0.0028 [+0.0019, +0.0037] |
+| rear slip (deg) | exit | all | linear | +0.021 [+0.010, +0.032] |
+| slip balance F-R (deg) | mid | all | nonlinear | -0.038 [-0.059, -0.017] |
+| slip balance F-R (deg) | exit | all | nonlinear | -0.030 [-0.042, -0.017] |
+| steer reversals (/s) | exit | all | linear | +0.020 [+0.004, +0.035] |
+| rear traction slip ratio | exit | all | negligible | 0.0000 |
+| rear slip peak (deg, guardrail) | corner | all | negligible | +0.023 (inside +-0.5) |
+| countersteer (s, guardrail) | corner | all | negligible | 0.000 |
+| braking point (m, AI input) | corner | all | linear | -0.15 [-0.19, -0.10] |
+| throttle pickup (m, AI input) | corner | all | linear | -0.32 [-0.42, -0.22] |
+| steer corrections (/s, AI input) | corner | all | linear | +0.073 [+0.048, +0.098] |
+
+37 curves in all: 12 insufficient (6 of them with only one step's data in their cell), the rest
+above or in slow-corner cells. Rear traction slip in slow corners is classed as a direction change
+at +1, inside its margin.
+
+**Against the hypothesis** ("rear ARB response is monotonic in clicks and phase-specific: mid/exit,
+slow corners"):
+
+- *Monotonic: held.* Time falls about 4 ms per corner per click from ARB 4 to ARB 8 with no
+  curvature overall, and the balance channels move one way across all four steps: more yaw gain,
+  more rear slip on exit, slip balance rearward. The curve has not turned by ARB 8, so the time
+  optimum on this car and AI is at or beyond the top of the swept range.
+- *Phase-specific (mid/exit): held.* Every balance curve that moved is in mid or exit; traction slip
+  did not move.
+- *Slow corners: not supported.* The fast corners carry the clearest time slope (-4.5 ms per click,
+  the tightest interval); the slow corners' slope is smaller and wide. Experiment B's medium-corner
+  concentration does not repeat as a curve: medium flattens.
+- *Replication of experiment B per click:* B's +3 clicks (ARB 2 to 5) gave yaw gain +0.0045 to
+  +0.006, rear slip exit +0.057, slip balance -0.07 to -0.08 (all corners), so about +0.002, +0.019
+  and -0.025 per click; the sweep from ARB 5 gives +0.0026 to +0.0028, +0.021 and -0.030 to -0.038.
+  Same direction, similar size per click, on a different stretch of the bar.
+
+**The sweep's main lesson for the method.** At the step level almost every response cell was
+*insufficient* (20 of 22 at each step): one click of rear ARB moves yaw gain by about half its 0.005
+margin, so no single A/B can call it. The curve, fitting four steps against one baseline, classifies
+the same channels with intervals clear of zero. For small-response parameters the sweep is the
+experiment, not the individual step verdicts.
+
+**AI inputs.** The AI does adapt to the bar: it picks the throttle up earlier (-0.32 m per click) and
+corrects more (+0.07 /s per click) as the rear stiffens. The braking-point slope (-0.15 m per click)
+must be read against experiment A: identical arms differed by -0.27 m, so only step +3's -0.51 m is
+clearly beyond that noise. "The AI does not compensate" from experiment B needs a qualifier: its
+braking does not, its throttle does, in the direction a car that rotates more allows.
+
+**Reading.** On this car, track and AI at 0.97, stiffer rear ARB is faster up to at least ARB 8,
+linearly, mostly in fast corners, through a car that rotates more and a throttle that comes in
+earlier, with the rear-slip guardrails far inside their margins. Next for this parameter: extend the
+sweep to the top of the range (ARB 9 and up, if the car allows), and check one step with the human
+driver on the regular layout before trusting the direction there (unverified with a human driver).
+The steps are measure-only and promoted nothing; the champion is still setup 237.
+
+**Limits.** One sweep, one baseline. Steps +1 and +2 were extended into later game sessions (flagged
+between blocks); -1 and +3 stopped at look 1, so the steps have unequal precision. Time since start
+is flagged between blocks in all four.
